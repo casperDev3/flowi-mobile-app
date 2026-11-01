@@ -80,6 +80,16 @@ import {
 } from '@/utils/taskUtils';
 import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { PriorityFilterChips } from '@/components/tasks/PriorityFilterChips';
+import { TaskPeriodMenu, UrgentFilterToggle } from '@/components/tasks/TaskPeriodMenu';
+import {
+  URGENT_PRIORITIES,
+  isUrgentFilter,
+  periodToKeepVisible,
+  periodToScope,
+  scopeToPeriod,
+  type ExtraTaskPeriod,
+  type TaskPeriod,
+} from '@/utils/taskPeriods';
 import { type TaskListScope } from '@/utils/taskListSections';
 import {
   applyTaskScope,
@@ -90,6 +100,7 @@ import {
   overdueForList,
   sortTasksForList,
   taskListQueryToParams,
+  taskPeriodCounts,
   taskScopeCounts,
   OVERDUE_GROUP_KEY,
   type GroupLabels,
@@ -349,9 +360,29 @@ export default function TasksScreen() {
    * БЕЗ дедлайну (utils/taskToday.ts inTaskScope). Поза «Всі» скидається.
    */
   const [noDeadline, setNoDeadline] = useState(false);
+  /**
+   * Лише планшет: «Завтра» / «Місяць» випадного списку періоду звужують
+   * «Всі» (utils/taskPeriods.ts). На телефоні завжди null — його чипи й
+   * конвеєр рівно ті самі, що й до цього стану.
+   */
+  const [extraPeriod, setExtraPeriod] = useState<ExtraTaskPeriod | null>(null);
   const selectScope = useCallback((next: TaskListScope, nextNoDeadline = false) => {
     setScope(next);
     setNoDeadline(next === 'all' && nextNoDeadline);
+    setExtraPeriod(null);
+  }, []);
+  // Вікно звузилось до телефона (Split View) — телефонні чипи не знають
+  // «Завтра»/«Місяць», тож лишаємо найближче, що вони вміють: «Всі».
+  useEffect(() => {
+    if (!isWide && extraPeriod) setExtraPeriod(null);
+  }, [isWide, extraPeriod]);
+  /** Поточний період випадного списку (планшет). */
+  const period: TaskPeriod = scopeToPeriod(scope, noDeadline, extraPeriod);
+  const selectPeriod = useCallback((next: TaskPeriod) => {
+    const mapped = periodToScope(next);
+    setScope(mapped.scope);
+    setNoDeadline(mapped.noDeadline);
+    setExtraPeriod(mapped.extra);
   }, []);
 
   // Search & extra filters
@@ -722,7 +753,8 @@ export default function TasksScreen() {
     myUserId: user?.id,
     projectRoles,
     noDeadline: scope === 'all' && noDeadline,
-  }), [filter, sort, scope, search, filterProject, filterPriorities, dateFilter, activeMonth, user?.id, projectRoles, noDeadline]);
+    period: extraPeriod,
+  }), [filter, sort, scope, search, filterProject, filterPriorities, dateFilter, activeMonth, user?.id, projectRoles, noDeadline, extraPeriod]);
 
   /**
    * Набір без урахування денного скоупу — тобто те, що людина побачила б,
@@ -820,7 +852,11 @@ export default function TasksScreen() {
     // невідрізнити від втрати даних: вона щойно натиснула кнопку й нічого не
     // побачила. Тому створення, що виводить завдання з поточного обсягу, САМЕ
     // розширює обсяг до «Усі» — дія користувача важить більше за фільтр.
-    if (!inTaskScope(created, storedTaskStatuses, scope, { noDeadline }, today)) {
+    if (isWide) {
+      // Планшет: той самий принцип через період (найближчий ширший, як на вебі).
+      const keep = periodToKeepVisible(created, storedTaskStatuses, period, today);
+      if (keep !== period) selectPeriod(keep);
+    } else if (!inTaskScope(created, storedTaskStatuses, scope, { noDeadline }, today)) {
       if (isWeekTask(created, storedTaskStatuses, today)) selectScope('week');
       else selectScope('all', !created.deadline);
     }
@@ -828,7 +864,7 @@ export default function TasksScreen() {
     setShowAdd(false);
     haptic.success();
     return created;
-  }, [composer, taskStatuses, storedTaskStatuses, today, sprints, setTasks, user, scope, noDeadline, selectScope]);
+  }, [composer, taskStatuses, storedTaskStatuses, today, sprints, setTasks, user, scope, noDeadline, selectScope, isWide, period, selectPeriod]);
 
   /** «Детальніше»: створити задачу й одразу відкрити її повну картку. */
   const createAndOpen = useCallback(() => {
@@ -1196,6 +1232,12 @@ export default function TasksScreen() {
     [filteredAll, listQuery, storedTaskStatuses, today],
   );
   const todayCount = scopeCounts.today;
+  /** Лічильники випадного списку періоду — рахуються лише на планшеті. */
+  const periodCountMap = useMemo(
+    () => (isWide ? taskPeriodCounts(filteredAll, listQuery, storedTaskStatuses, today) : null),
+    [isWide, filteredAll, listQuery, storedTaskStatuses, today],
+  );
+  const urgentOn = isUrgentFilter(filterPriorities);
   /**
    * Куди вести з порожнього «Сьогодні»: у найближчий непорожній режим —
    * тиждень, далі «Всі» з дедлайном, далі «Без дедлайну».
@@ -2092,6 +2134,22 @@ export default function TasksScreen() {
                 {/* Omni: вкладки розділу — pill-таби з іконками й лічильниками
                     (активна — чорна pill). Прокручуються вбік, коли при
                     великому Dynamic Type не вміщаються (NAT-06). */}
+                {isWide && periodCountMap ? (
+                  // Планшет (Layout System): «Термінові» — ПЕРШОЮ, далі ОДИН
+                  // випадний список періоду замість ряду чипів (як на вебі).
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+                    style={{ flex: 1, minWidth: 0 }} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 }}>
+                    <UrgentFilterToggle
+                      value={urgentOn}
+                      onChange={on => { haptic.light(); setFilterPriorities(on ? [...URGENT_PRIORITIES] : []); }}
+                    />
+                    <TaskPeriodMenu
+                      value={period}
+                      counts={periodCountMap}
+                      onChange={next => { haptic.light(); selectPeriod(next); }}
+                    />
+                  </ScrollView>
+                ) : (
                 <SectionTabs
                   tabs={[
                     { key: 'today' as const, label: tr.today, icon: 'sun.max', count: scopeCounts.today },
@@ -2103,6 +2161,7 @@ export default function TasksScreen() {
                   accessibilityLabel={tr.tasks}
                   style={{ flex: 1, minWidth: 0 }}
                 />
+                )}
 
                 {/* Фільтри й скидання — поруч із перемикачем, а не в хедері:
                     обидва органи керування звужують ОДИН набір завдань, і
@@ -2153,7 +2212,7 @@ export default function TasksScreen() {
             {/* «Без дедлайну» — лише в режимі «Всі»: особиста дошка
                 типово показує завдання З дедлайном, а беклог без дати
                 відкривається свідомо, цією кнопкою. */}
-            {scope === 'all' && (
+            {scope === 'all' && !isWide && (
               <View style={{ flexDirection: 'row', marginTop: 10 }}>
                   <TouchableOpacity
                     onPress={() => { haptic.light(); setNoDeadline(v => !v); }}
@@ -2457,7 +2516,7 @@ export default function TasksScreen() {
                   {search.trim() ? tr.tryAnotherQuery : hasFiltersBesidesSearch ? tr.noTasksMatchFiltersHint
                     // «Всі» з дедлайном порожні, а без дедлайну є — сказати, де
                     // вони, інакше людина вирішить, що задачі зникли.
-                    : scope === 'all' && !noDeadline && scopeCounts.noDeadline > 0 ? tr.noDatedTasksHint
+                    : scope === 'all' && !noDeadline && !extraPeriod && scopeCounts.noDeadline > 0 ? tr.noDatedTasksHint
                     : tr.pressToAdd}
                 </Text>
                 {/* Дія має вести до виходу з глухого кута. Коли список порожній

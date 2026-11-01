@@ -1,9 +1,17 @@
 /**
  * app/menu.tsx — тижневе меню страв спільної групи.
  *
- * Телефон: чипи днів + один вибраний день. Планшет (medium/expanded):
- * ліворуч статус тижня і список днів зі зведенням страв, праворуч — вибраний
- * день з прийомами їжі (як «Завдання»: список + деталь).
+ * Телефон: чипи днів + один вибраний день (без змін).
+ *
+ * Планшет (medium/expanded), вкладка «Меню» — три зони Layout System v2.4,
+ * як «Завдання» (components/layout-zones):
+ *   [статична: тиждень · зведення · групи] ┃ [головна: дні тижня] ┃ [динамічна: день]
+ *   • статична стоїть поруч лише там, де вистачає ширини; інакше картка тижня
+ *     лишається вгорі головної зони;
+ *   • тап по дню відкриває його страви в динамічній зоні (вузьке вікно — нижній
+ *     аркуш), ✕ закриває, список розтягується. Вибраний день — у параметрі
+ *     `?day=` (диплінк), видимість панелей — вибір пристрою (use-zone-state).
+ * Інші вкладки (звернення, учасники, група) — колонка читання, як і раніше.
  *
  * Шапка — спільний ScreenHeader: «Назад», перемикач групи чипом і вкладки
  * сегментованим перемикачем (як на «Фінансах»). Розмітка частин — у
@@ -21,9 +29,11 @@ import { DayPanel } from '@/components/menu/DayPanel';
 import { menuBits } from '@/components/menu/MenuBits';
 import { MenuEditorModal } from '@/components/menu/MenuEditorModal';
 import { MenuTabBar } from '@/components/menu/MenuTabBar';
+import { MenuZoneStatic } from '@/components/menu/MenuZones';
+import { useMenuZoneStrings } from '@/components/menu/menuZoneStrings';
 import {
-  dayListWidthFor,
   emptySlotCount,
+  longDayLabel,
   MENU_TABS,
   orderedMealsOf,
   pickDay,
@@ -34,8 +44,12 @@ import { SpaceSwitcher } from '@/components/menu/SpaceSwitcher';
 import { MENU_ERR, useMenuColors } from '@/components/menu/theme';
 import { useMenuEditor } from '@/components/menu/useMenuEditor';
 import { WeekStatusCard } from '@/components/menu/WeekStatusCard';
+import {
+  DEFAULT_ZONE_SIZE_KEY, ZONE_HANDLE_WIDTH, ZoneLayout, useZoneSizes, zoneWidths,
+} from '@/components/layout-zones';
 import { Layout } from '@/constants/tokens';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
+import { useZoneState } from '@/hooks/use-zone-state';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import {
@@ -55,8 +69,12 @@ export default function WeeklyMenu() {
     { user } = useAuth(),
     router = useRouter(),
     params = useLocalSearchParams<{ space?: string }>();
-  const { isWide, sizeClass } = useResponsive(),
+  const { isWide, sizeClass, width: windowWidth } = useResponsive(),
     screenWidth = useScreenWidth();
+  const zs = useMenuZoneStrings();
+  // Layout System v2.4 (лише планшет): вибраний день — `?day=`, панелі — вибір пристрою.
+  const zone = useZoneState({ section: 'menu', selectedParam: 'day', label: tr.menuNavLabel });
+  const zoneSizes = useZoneSizes(DEFAULT_ZONE_SIZE_KEY);
   const [spaces, setSpaces] = useState<MenuSpace[]>([]),
     [id, setId] = useState(params.space || ''),
     [week, setWeek] = useState(''),
@@ -172,6 +190,29 @@ export default function WeeklyMenu() {
     };
   }, [menu, id, day]);
 
+  /** Планшет, вкладка «Меню»: три зони. Телефон сюди не потрапляє ніколи. */
+  const split = isWide && !!menu && tab === 'menu';
+  const zoneDay = split && zone.selectedId && days.includes(zone.selectedId) ? zone.selectedId : null;
+  const zoneDayOpen = zone.panelOpen && !!zoneDay;
+  // Диплінк `?day=` або вибір у панелі — той самий день і для мініатюр фото.
+  const selectInZone = zone.select,
+    closeZone = zone.closePanel;
+  useEffect(() => {
+    if (zoneDay && zoneDay !== day) setDay(zoneDay);
+  }, [zoneDay, day]);
+  // Тиждень змінився (або група) і вибраного дня в ньому немає — панель закриваємо.
+  useEffect(() => {
+    if (!isWide || loading || !menu || !zone.selectedId) return;
+    if (!weekDays(menu.week).includes(zone.selectedId)) closeZone();
+  }, [isWide, loading, menu, zone.selectedId, closeZone]);
+  const selectZoneDay = useCallback(
+    (d: string) => {
+      setDay(d);
+      selectInZone(d);
+    },
+    [selectInZone],
+  );
+
   const pending = menu?.feedback.filter((x) => x.status === 'pending') || [],
     pendingWeek = pending.filter((x) => x.kind === 'proposal' && x.week === menu?.week).length;
   const proposalsOpen = !!menu && !menu.archived && !(menu.week === next && menu.published_at);
@@ -197,8 +238,17 @@ export default function WeeklyMenu() {
   const thumbOf = (e: MenuEntry) => thumbs.current.get(`${id}:${e.id}:${e.updated_at}`);
 
   const gutter = Layout.gutter[sizeClass];
-  const split = isWide && !!menu && tab === 'menu';
-  const listWidth = dayListWidthFor(Math.min(screenWidth, Layout.wideMaxWidth) - 2 * gutter);
+  const zoneFit = zoneWidths({
+    windowWidth,
+    screenWidth,
+    wide: isWide,
+    wantStatic: zone.panels.static,
+    wantDynamic: zoneDayOpen,
+    sizes: zoneSizes,
+    handles: { static: ZONE_HANDLE_WIDTH, dynamic: ZONE_HANDLE_WIDTH },
+  });
+  // Статична поруч — картку тижня несе вона, а не головна зона.
+  const staticBeside = split && zoneFit.showStatic;
   const refreshControl = (
     <RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor={c.accent} />
   );
@@ -292,88 +342,138 @@ export default function WeeklyMenu() {
     </>
   );
 
+  const header = (
+    <ScreenHeader
+      title={tr.menuNavLabel}
+      color={c.text}
+      back={{
+        onPress: () => (router.canGoBack() ? router.back() : router.replace('/')),
+        label: tr.back,
+        style: { backgroundColor: c.dim, borderColor: c.border },
+      }}
+      actions={
+        spaces.length > 0 ? (
+          <SpaceSwitcher
+            spaces={spaces}
+            currentId={id}
+            currentName={menu?.name || ''}
+            showArchive={showArchive}
+            onToggleArchive={() => setShowArchive((v) => !v)}
+            onSelect={selectSpace}
+            onCreate={() => open({ kind: 'create' })}
+            onJoin={() => open({ kind: 'join' })}
+            disabled={busy}
+            c={c}
+          />
+        ) : undefined
+      }>
+      {menu ? (
+        <MenuTabBar
+          tabs={MENU_TABS}
+          active={tab}
+          onChange={setTab}
+          pending={pending.length}
+          c={c}
+          stretch={!isWide}
+        />
+      ) : null}
+    </ScreenHeader>
+  );
+
+  if (split && menu) {
+    // ── Планшет, «Меню»: три зони (Layout System v2.4) ──────────────────────
+    return (
+      <View style={{ flex: 1, backgroundColor: c.bg1 }}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ZoneLayout
+          testID="menu-zones"
+          main={
+            <View style={{ flex: 1 }}>
+              {header}
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                refreshControl={refreshControl}
+                contentContainerStyle={[st.column, { paddingHorizontal: gutter }]}>
+                {notices}
+                {!staticBeside && weekCard}
+                <DayList
+                  days={days}
+                  // Підсвітка — лише дня, відкритого в панелі.
+                  day={zoneDayOpen ? day : ''}
+                  today={menu.today}
+                  dimBefore={menu.week === current ? menu.today : ''}
+                  entries={menu.entries}
+                  orderedMeals={orderedMeals}
+                  onSelect={selectZoneDay}
+                  todayPill={todayPill}
+                  c={c}
+                />
+              </ScrollView>
+            </View>
+          }
+          dynamic={
+            zoneDayOpen && zoneDay ? (
+              <DayPanel
+                day={zoneDay}
+                today={menu.today}
+                entries={menu.entries}
+                orderedMeals={orderedMeals}
+                showAdd={showAdd}
+                busy={busy}
+                thumbOf={thumbOf}
+                onOpenDish={(e) => open({ kind: 'dish', entry: e })}
+                onAdd={(d, m) => open({ kind: 'dish', date: d, meal: m })}
+                todayPill={todayPill}
+                wide
+                bare
+                c={c}
+              />
+            ) : null
+          }
+          dynamicOpen={zoneDayOpen}
+          onCloseDynamic={closeZone}
+          dynamicLabel={zoneDay ? `${zs.dayDetails}: ${longDayLabel(zoneDay)}` : zs.dayDetails}
+          static={
+            <MenuZoneStatic
+              weekCard={weekCard}
+              menu={menu}
+              spaces={spaces}
+              currentId={id}
+              pending={pending.length}
+              onOpenRequests={() => setTab('requests')}
+              onSelectSpace={selectSpace}
+              busy={busy}
+              c={c}
+            />
+          }
+          showStatic={zone.panels.static}
+          panels={zone.panels}
+          onTogglePanel={zone.togglePanel}
+        />
+        <MenuEditorModal ed={ed} menu={menu} id={id} current={current} next={next} readOnly={readOnly} wide={isWide} c={c} />
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: c.bg1 }}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: c.bg1 }]} />
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={st.headerBox}>
-        <ScreenHeader
-          title={tr.menuNavLabel}
-          color={c.text}
-          back={{
-            onPress: () => (router.canGoBack() ? router.back() : router.replace('/')),
-            label: tr.back,
-            style: { backgroundColor: c.dim, borderColor: c.border },
-          }}
-          actions={
-            spaces.length > 0 ? (
-              <SpaceSwitcher
-                spaces={spaces}
-                currentId={id}
-                currentName={menu?.name || ''}
-                showArchive={showArchive}
-                onToggleArchive={() => setShowArchive((v) => !v)}
-                onSelect={selectSpace}
-                onCreate={() => open({ kind: 'create' })}
-                onJoin={() => open({ kind: 'join' })}
-                disabled={busy}
-                c={c}
-              />
-            ) : undefined
-          }>
-          {menu ? (
-            <MenuTabBar
-              tabs={MENU_TABS}
-              active={tab}
-              onChange={setTab}
-              pending={pending.length}
-              c={c}
-              stretch={!isWide}
-            />
-          ) : null}
-        </ScreenHeader>
-      </View>
+      <View style={st.headerBox}>{header}</View>
 
-      {split && menu ? (
-        <View style={[st.split, { paddingHorizontal: gutter }]}>
-          <ScrollView
-            style={{ width: listWidth, flexGrow: 0, flexShrink: 0 }}
-            keyboardShouldPersistTaps="handled"
-            refreshControl={refreshControl}
-            contentContainerStyle={st.column}>
-            {notices}
-            {weekCard}
-            <DayList
-              days={days}
-              day={day}
-              today={menu.today}
-              dimBefore={menu.week === current ? menu.today : ''}
-              entries={menu.entries}
-              orderedMeals={orderedMeals}
-              onSelect={setDay}
-              todayPill={todayPill}
-              c={c}
-            />
-          </ScrollView>
-          <ScrollView style={{ flex: 1, minWidth: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={st.column}>
-            {dayPanel}
-          </ScrollView>
-        </View>
-      ) : (
-        <ScrollView keyboardShouldPersistTaps="handled" refreshControl={refreshControl} contentContainerStyle={{ paddingBottom: 100 }}>
-          <ContentContainer variant={tab === 'menu' ? 'wide' : 'reading'} style={{ gap: 16, paddingTop: 6 }}>
-            {notices}
-            {menu && tab === 'menu' && (
-              <>
-                {weekCard}
-                <DayChips days={days} day={day} today={menu.today} entries={menu.entries} onSelect={setDay} c={c} />
-                {dayPanel}
-              </>
-            )}
-            {otherTab}
-          </ContentContainer>
-        </ScrollView>
-      )}
+      <ScrollView keyboardShouldPersistTaps="handled" refreshControl={refreshControl} contentContainerStyle={{ paddingBottom: 100 }}>
+        <ContentContainer variant={tab === 'menu' ? 'wide' : 'reading'} style={{ gap: 16, paddingTop: 6 }}>
+          {notices}
+          {menu && tab === 'menu' && (
+            <>
+              {weekCard}
+              <DayChips days={days} day={day} today={menu.today} entries={menu.entries} onSelect={setDay} c={c} />
+              {dayPanel}
+            </>
+          )}
+          {otherTab}
+        </ContentContainer>
+      </ScrollView>
 
       <MenuEditorModal ed={ed} menu={menu} id={id} current={current} next={next} readOnly={readOnly} wide={isWide} c={c} />
     </View>
@@ -382,13 +482,5 @@ export default function WeeklyMenu() {
 
 const st = StyleSheet.create({
   headerBox: { width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center' },
-  split: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 16,
-    width: '100%',
-    maxWidth: Layout.wideMaxWidth,
-    alignSelf: 'center',
-  },
   column: { gap: 12, paddingTop: 6, paddingBottom: 100 },
 });

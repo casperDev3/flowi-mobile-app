@@ -12,7 +12,11 @@ import { NoteMarkdown } from '@/components/notes/NoteMarkdown';
 import { PickerField, type PickerOption } from '@/components/shared/PickerField';
 import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
-import { SwipeRow, ZoneEmpty, ZoneLayout, ZoneSkeleton, useZoneState, zoneWidths, type SwipeAction } from '@/components/layout-zones';
+import { SwipeRow, ZoneEmpty, ZoneLayout, ZoneSkeleton, useZoneState, zoneWidths, type SwipeAction, type ZonePanel } from '@/components/layout-zones';
+import { NoteToTaskSheet, type NoteToTaskSubmit } from '@/components/notes/NoteToTaskSheet';
+import { useNoteToTaskStrings } from '@/components/notes/noteToTaskStrings';
+import { noteAfterConversion, noteTaskHref, noteTaskRecord } from '@/utils/noteToTask';
+import { useRouter } from 'expo-router';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { loadData, loadDataResult, retryStorageRead, subscribeToStorage } from '@/store/storage';
@@ -97,6 +101,8 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   const insets = useSafeAreaInsets();
   const tabBarInset = useTabBarInset();
   const navigation = useNavigation();
+  const router = useRouter();
+  const ns = useNoteToTaskStrings();
   const roles = useProjectRoles();
   const [notes, setNotes] = useState<Note[]>([]);
   const [projects, setProjects] = useState<Record<string, string>>({});
@@ -126,6 +132,12 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   const [linkedMeetingId, setLinkedMeetingId] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** Планшет: «Перетворити на задачу» — яку нотатку перетворюємо. */
+  const [converting, setConverting] = useState<Note | null>(null);
+  /** Планшет: щойно створена з нотатки задача — смуга «Відкрити задачу». */
+  const [createdTask, setCreatedTask] = useState<{ id: string; title: string; projectId?: string } | null>(null);
+  /** Планшет: `?note=<id>`, якого немає в сховищі — стан «не знайдено» в панелі. */
+  const [missingId, setMissingId] = useState<string | null>(null);
   const busy = useRef(false);
   const mounted = useRef(true);
   const readVersion = useRef(0);
@@ -228,6 +240,10 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
     setPreview(false);
   };
   const open = (note: Note, fresh = false) => confirmLeave(() => {
+    setMissingId(null);
+    // Панель деталей вимкнена трьома крапками — відкриття запису вмикає її
+    // назад (як useZoneState.select): інакше тап по рядку «нічого не робив» би.
+    if (split && !zone.panels.dynamic) zone.setPanel('dynamic', true);
     setSelected(note); setIsNew(fresh);
     setMode(fresh ? 'edit' : 'read');
     fillDraft(note);
@@ -272,6 +288,9 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
     noteParamConsumed.current = true;
     const target = zone.selectedId ? notes.find(n => n.id === zone.selectedId) : undefined;
     if (target && !selected) open(target);
+    // Планшет: посилання на нотатку, якої вже немає, — пояснення в панелі
+    // замість мовчазного нічого (Layout System: стани зони).
+    else if (!target && zone.selectedId && isWide && !readError) setMissingId(zone.selectedId);
     // Лише на перше прочитання сховища.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
@@ -422,6 +441,64 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
     }
   };
 
+  /** Проєкти, у які можна створити задачу з нотатки (право правки). */
+  const convertProjects = useMemo(
+    () => Object.entries(projects)
+      .filter(([id]) => canEditProjectItem(id, roles))
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, locale)),
+    [projects, roles, locale],
+  );
+  /**
+   * «Перетворити на задачу» (планшет; дзеркало `convertNote` вебу): задача —
+   * тим самим шляхом даних, що й задача з рядка (`saveSyncedChanges('tasks')`).
+   * Далі нотатка або видаляється (якщо людина так обрала), або отримує
+   * зв'язок із задачею, коли зв'язку ще немає. Помилка запису задачі —
+   * кидається в аркуш (він лишається відкритим і показує її).
+   */
+  const convertNote = async ({ fields, deleteNote }: NoteToTaskSubmit) => {
+    const note = converting;
+    // Аркуш чекає або закриття, або помилки — тихий return лишив би його «зайнятим».
+    if (!note || busy.current) throw new Error(ns.createError);
+    const now = new Date().toISOString();
+    const task = noteTaskRecord(fields, { id: uuidV4(), now, userId });
+    if (!task) throw new Error(ns.createError);
+    busy.current = true; setSaving(true);
+    try {
+      try {
+        await saveSyncedChanges('tasks', [], [task], { checked: true });
+      } catch {
+        throw new Error(ns.createError);
+      }
+      // Задача вже є — невдача з нотаткою її не скасовує, лише повідомляє.
+      const after = noteAfterConversion(note, task.id, deleteNote, now);
+      try {
+        if (after.action === 'delete') {
+          const result = await saveSyncedChanges('notes', [note], [], { checked: true });
+          if (mounted.current) {
+            if (result) setNotes(normalizeNotes(result));
+            if (selected?.id === note.id) closeEditor();
+          }
+        } else if (after.action === 'link') {
+          const result = await saveSyncedChanges('notes', [note], [after.next], { checked: true });
+          if (mounted.current) {
+            if (result) setNotes(normalizeNotes(result));
+            if (selected?.id === note.id && mode === 'read') setSelected(after.next);
+          }
+        }
+      } catch {
+        Alert.alert(tr.error, ns.noteUpdateError);
+      }
+      if (mounted.current) {
+        setConverting(null);
+        setCreatedTask({ id: task.id, title: task.title, ...(task.projectId ? { projectId: task.projectId } : {}) });
+      }
+    } finally {
+      busy.current = false;
+      if (mounted.current) setSaving(false);
+    }
+  };
+
   const scoped = useMemo(() => (projectId
     ? notes.filter(n => n.projectId === projectId)
     : filterNotesByScope(notes, scope)),
@@ -475,6 +552,8 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
         {canEdit && button(current.pinned ? tr.notesUnpin : tr.notesPin, () => { void patchRead({ pinned: !current.pinned }); },
           'notes-pin', saving || readError, current.pinned === true)}
         {canEdit && button(tr.delete, remove, 'notes-delete', saving || readError)}
+        {/* Лише планшет: на телефоні панель інструментів читалки — як була. */}
+        {isWide && canEdit && button(ns.convert, () => setConverting(current), 'notes-convert', saving || readError)}
       </View>
       <Text style={[s.context, { color: c.sub }]}>{projectLabel(current)}</Text>
       {!canEdit && <Text style={{ color: c.sub, paddingBottom: 8 }}>{tr.notesReadOnly}</Text>}
@@ -552,6 +631,111 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
     </View>
   ) : null;
 
+  /**
+   * Статична зона (планшет, ≥ 1280pt вікна): контекст, незалежний від вибору —
+   * дата, KPI, закріплені, нещодавні, теги (як статична зона нотаток вебу).
+   * Поки вона на екрані, KPI не дублюються над списком.
+   */
+  const staticShown = isWide && zoneWidths({
+    windowWidth: width ?? 0, screenWidth: screenWidth ?? width ?? 0, wide: true,
+    wantStatic: zone.panels.static, wantDynamic: !!selected || !!missingId,
+  }).showStatic;
+  const pinnedNotes = useMemo(() => scoped.filter(n => n.pinned).slice(0, 5), [scoped]);
+  const recentNotes = useMemo(
+    () => [...scoped].sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, 5),
+    [scoped],
+  );
+  const shortcutList = (title: string, items: Note[], id: string) => items.length ? (
+    <View style={s.staticBlock}>
+      <Text accessibilityRole="header" style={[s.staticHeading, { color: c.sub }]}>{title}</Text>
+      {items.map(note => (
+        <TouchableOpacity key={note.id} testID={`${id}-${note.id}`} accessibilityRole="button"
+          accessibilityLabel={note.title || tr.untitled} accessibilityState={{ selected: selected?.id === note.id }}
+          onPress={() => open(note)}
+          style={[s.staticRow, selected?.id === note.id ? { backgroundColor: gl.surfaceSubtle } : null]}>
+          <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: selected?.id === note.id ? fontFamily.semibold : fontFamily.medium }}>
+            {note.title || tr.untitled}
+          </Text>
+          <Text style={{ color: c.sub, fontSize: 12, fontVariant: ['tabular-nums'] }}>
+            {new Date(note.updatedAt).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  ) : null;
+  const staticZone = isWide && ready && !readError ? (
+    <View testID="notes-static" style={s.staticRoot}>
+      <View>
+        <Text accessibilityRole="header" style={[s.staticTitle, { color: c.text }]}>{ns.staticToday}</Text>
+        <Text style={{ color: c.sub, fontSize: 13 }}>
+          {new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
+        </Text>
+      </View>
+      {scoped.length > 0 ? (
+        <View style={s.staticKpis}>
+          <KpiCounter value={scoped.length} label={tr.notes} />
+          <KpiCounter value={scoped.filter(n => n.pinned).length} label={tr.notesPinned} />
+        </View>
+      ) : null}
+      {shortcutList(ns.staticPinned, pinnedNotes, 'notes-static-pinned')}
+      {shortcutList(ns.staticRecent, recentNotes, 'notes-static-recent')}
+      {tagChips.length > 0 ? (
+        <View style={s.staticBlock}>
+          <Text accessibilityRole="header" style={[s.staticHeading, { color: c.sub }]}>{ns.staticTags}</Text>
+          <View style={s.staticTags}>
+            {[...tagChips].sort((a, b) => b.count - a.count).slice(0, 10).map(chip => {
+              const active = tagFilter !== null && tagKey(tagFilter) === tagKey(chip.tag);
+              return (
+                <React.Fragment key={tagKey(chip.tag)}>
+                  {button(`#${chip.tag} · ${chip.count}`, () => setTagFilter(active ? null : chip.tag), `notes-static-tag-${chip.tag}`, false, active)}
+                </React.Fragment>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  ) : undefined;
+
+  /** Три крапки (планшет): вимкнення панелі деталей закриває відкриту нотатку. */
+  const togglePanel = (panel: ZonePanel) => {
+    if (panel === 'dynamic' && zone.panels.dynamic && (selected || missingId)) {
+      confirmLeave(() => { closeEditor(); setMissingId(null); zone.setPanel('dynamic', false); });
+      return;
+    }
+    zone.togglePanel(panel);
+  };
+  const closeMissing = () => { setMissingId(null); zoneSelect(null); };
+  const missingBlock = missingId && !selected ? (
+    <ZoneEmpty
+      testID="notes-missing"
+      details
+      icon="magnifyingglass"
+      title={ns.notFound}
+      caption={ns.notFoundHint}
+      actionLabel={ns.close}
+      onAction={closeMissing}
+    />
+  ) : null;
+
+  /** Смуга після «Перетворити на задачу» (планшет): посилання на задачу. */
+  const createdBanner = isWide && createdTask ? (
+    <View testID="notes-task-created" accessibilityRole="alert" accessibilityLiveRegion="polite"
+      style={[s.banner, { backgroundColor: tk.surface.card }, cardShadow]}>
+      <IconSymbol name="checkmark.circle.fill" size={18} color={tk.status.success} />
+      <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontSize: 14 }}>{ns.created(createdTask.title)}</Text>
+      {button(ns.openTask, () => {
+        const href = noteTaskHref(createdTask);
+        setCreatedTask(null);
+        router.push(href as never);
+      }, 'notes-open-task')}
+      <TouchableOpacity testID="notes-task-created-dismiss" accessibilityRole="button" accessibilityLabel={ns.dismiss}
+        onPress={() => setCreatedTask(null)} style={s.bannerClose}>
+        <IconSymbol name="xmark" size={14} color={c.sub} />
+      </TouchableOpacity>
+    </View>
+  ) : null;
+
   // Телефон / вузький iPad: редагування — на весь екран (список ховається),
   // як і раніше; чернетка живе в стані й переживає поворот екрана.
   if (selected && !reading && !split) {
@@ -573,7 +757,8 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
       <View style={[s.panes, { paddingBottom: Math.max(insets.bottom, projectId ? tabBarInset : 0, 12) }]}>
         <View testID="notes-list" style={s.list}>
           {/* Omni KPI — з уже прочитаних нотаток цього зрізу. */}
-          {ready && !readError && scoped.length > 0 ? (
+          {createdBanner}
+          {ready && !readError && scoped.length > 0 && !staticShown ? (
             <PageHeader
               style={{ paddingTop: 4, paddingBottom: 4 }}
               kpis={
@@ -662,12 +847,25 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
     <ZoneLayout
       testID="notes-zones"
       main={listZone}
-      dynamic={reader ?? editor}
-      dynamicOpen={!!selected}
-      onCloseDynamic={() => confirmLeave(closeEditor)}
-      dynamicLabel={current ? current.title || tr.untitled : tr.notes}
+      dynamic={reader ?? editor ?? missingBlock}
+      dynamicOpen={!!selected || !!missingBlock}
+      onCloseDynamic={() => (missingBlock ? closeMissing() : confirmLeave(closeEditor))}
+      dynamicLabel={current ? current.title || tr.untitled : missingBlock ? ns.notFound : tr.notes}
       // «Закрити» вже є в панелі інструментів читалки/редактора.
       dynamicChrome={false}
+      // Планшет: статична зона (контекст) і три крапки під списком, як у «Завданнях».
+      static={staticZone}
+      showStatic={zone.panels.static}
+      panels={isWide ? zone.panels : undefined}
+      onTogglePanel={togglePanel}
+      overlay={isWide ? (
+        <NoteToTaskSheet
+          note={converting}
+          projects={convertProjects}
+          onCancel={() => { if (!saving) setConverting(null); }}
+          onSubmit={convertNote}
+        />
+      ) : undefined}
     />
   );
 }
@@ -694,4 +892,14 @@ const s = StyleSheet.create({
   bodyInZone: { flex: 0, minHeight: 320 },
   hint: { fontSize: 12, paddingTop: 8 },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  // Статична зона планшета.
+  staticRoot: { gap: 20, paddingHorizontal: 16 },
+  staticTitle: { fontSize: 20, fontFamily: fontFamily.semibold },
+  staticKpis: { flexDirection: 'row', gap: 16 },
+  staticBlock: { gap: 4 },
+  staticHeading: { fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.4, paddingBottom: 4 },
+  staticRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 10, borderRadius: Atlas.radius.medium },
+  staticTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, paddingLeft: 14, borderRadius: Atlas.radius.large, marginTop: 4, marginBottom: 8 },
+  bannerClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

@@ -28,6 +28,7 @@ export function DayPanel({
   onAdd,
   todayPill,
   wide,
+  bare = false,
   c,
 }: {
   day: string;
@@ -43,6 +44,11 @@ export function DayPanel({
   todayPill: React.ReactNode;
   /** Планшет: більший заголовок і ширша колонка назви прийому. */
   wide: boolean;
+  /**
+   * Без власної картки (планшет, динамічна зона Layout System): панель деталей
+   * сама є карткою, і картка в картці дала б подвійну тінь і відступи.
+   */
+  bare?: boolean;
   c: MenuColors;
 }) {
   const dish = (e: MenuEntry) => {
@@ -107,7 +113,7 @@ export function DayPanel({
 
   return (
     <View
-      style={{
+      style={bare ? { paddingTop: 4 } : {
         backgroundColor: c.card, ...shadow[c.isDark ? 'dark' : 'light'].card,
         borderRadius: Atlas.radius.xlarge,
         paddingHorizontal: 20,

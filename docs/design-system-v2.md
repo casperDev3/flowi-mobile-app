@@ -391,7 +391,7 @@ import {
 // Побудований на ScreenHeader (useTopInset, стеля Dynamic Type) — нові слоти ScreenHeader:
 <ScreenHeader … leading?={<HeaderButton/>} toolbar?={<View/>} />
 
-<NavSidebar pathname isDark variant?="docked|drawer" width? onNavigate? onClose? />
+<NavSidebar pathname isDark variant?="docked|drawer" width? onNavigate? onClose? />   // docked: шпилька, оверлей, закріплені
 <SidebarDrawer visible onClose />          // Modal, ковзання зліва (Reduce Motion — без анімації)
 <AccountSheet visible onClose />
 
@@ -470,8 +470,8 @@ const bc = useBentoColors();                        // text / textSecondary / ne
 |---|---|---|---|
 | Header | лого/заголовок, пошук, «Список / Колонки», акаунт | `AppHeader`: `[☰] … [пошук] [дії] [🔔] [аватар]` + H1 | тонка смуга `[пошук] [Список/Колонки] … [акаунт]` (`viewSwitch`) |
 | Navigation | меню модулів | 4 вкладки + шухляда ☰ (`SidebarDrawer`) | рейка/сайдбар (`NavSidebar`, app/_layout.tsx) |
-| Static | контекст: KPI, зустрічі дня | вкладка «Сьогодні» | колонка ліворуч від main лише від вікна **1280pt** і коли main лишається найширшою; інакше — «Сьогодні» |
-| Main | список / канбан — **завжди найширша** | на весь екран; «+» праворуч над баром | `flex:1`, `minWidth zone.mainMin`; «+» праворуч унизу; три крапки панелей під нею |
+| Static | контекст: KPI, зустрічі дня | вкладка «Сьогодні» | колонка ліворуч від main лише від вікна **1280pt** і коли main за типових ширин лишається ≥ `zone.mainMin`; інакше — «Сьогодні». Ширину тягнуть межею (11.2026) |
+| Main | список / канбан | на весь екран; «+» праворуч над баром | `flex:1`; «+» праворуч унизу; три крапки панелей під нею. Правило «головна завжди найширша» **знято** (11.2026) |
 | Dynamic | деталі вибраного запису (вкладки картки) | **нижній аркуш** ~60% → свайп угору на весь екран | панель праворуч після вибору, ✕ закриває (список розтягується); не вміщається (iPad mini портрет, Split View) → аркуш |
 
 Стан у **параметрах маршруту**: `?task=<id>&view=list|columns&panel=open|closed`
@@ -479,6 +479,57 @@ const bc = useBentoColors();                        // text / textSecondary / ne
 Вибір людини (режим, статична/динамічна панель) — локально, AsyncStorage
 `layout_zones_prefs_v1` (як `projects_list_prefs_v1`: звичка пристрою, НЕ
 `ui_preferences`; у синк, outbox і бекапи не йде, даних акаунта не містить).
+
+### Зміна ширини зон (планшет, 11.2026)
+
+Між static│main і main│dynamic стоять межі `ZoneResizeHandle` (смуга 16pt, ручка
+3×36 `text.secondary`, під час тягнення — `text.primary` 4×56). Рішення власника —
+**без обмежень**: старі межі (static 200–360, dynamic 300–600) і «головна найширша»
+прибрано. Лишилась технічна підлога **`ZONE_MIN_WIDTH = 120pt`** для КОЖНОЇ зони
+(і головної теж), щоб зона не зникла під ручкою; сховати зону цілком — трьома
+крапками панелей.
+
+- *Чи* стоїть зона поруч (панель/аркуш, статична) вирішують ТИПОВІ ширини
+  (`zoneWidths`); тягнення змінює лише розмір видимих зон, не їхню появу.
+- Не вміщається (поворот, Split View) — стискається спершу статична, потім
+  панель, до підлоги; збережене людиною не переписується.
+- Подвійний дотик по межі — типова ширина. VoiceOver: `adjustable`,
+  increment/decrement ±`ZONE_KEY_STEP` (16pt), дія «Типова ширина».
+- Ширини — локально на пристрої, AsyncStorage `layout_zone_sizes_v1`
+  (`components/layout-zones/zoneSizes.ts`), ключ — проп `sizeKey` ZoneLayout
+  (за замовч. `default`, спільний для розділів). `resizable={false}` вимикає межі.
+- Телефон — без змін (зон поруч немає).
+
+```ts
+zoneWidths({ windowWidth, screenWidth, wide, wantStatic, wantDynamic, sizes?: { static?, dynamic? }, handles?: { static?, dynamic? } })
+resizeZoneWidth(current, delta, maxAvailable?)   // лише підлога 120 і «скільки є місця»
+<ZoneLayout … resizable?={true} sizeKey?="default" />
+```
+
+### Сайдбар планшета: шпилька й закріплені розділи (11.2026)
+
+- **Шпилька** поруч зі шевроном у шапці повного сайдбара (`pin` / `pin.fill`, 44×44,
+  `accessibilityState.selected`). *Закріплений* (= режим `full` у `sidebar-mode`,
+  ключ `nav_sidebar_mode`, локально на клас вікна) — стоїть поруч і штовхає вміст,
+  сам не згортається. *Незакріплений* — під ним рейка 76pt, а розгорнутий сайдбар
+  виїжджає ПОВЕРХ вмісту: `Modal` + `OverlaySurface` («брудне скло», лівий край без
+  радіуса) + легке затемнення `OverlayScrim blur={false}` (opacity .45).
+  Згортають: тап поза панеллю, перехід на пункт / зміна маршруту, «Назад»
+  (Android), жест VoiceOver «Escape», Esc (веб/react-native-web). Панель —
+  `accessibilityViewIsModal`; після закриття фокус VoiceOver повертається на
+  кнопку «Розгорнути». Відкріпити — сайдбар лишається розгорнутим поверх.
+- **Групи планшета** (`tabletNavGroups`): «Сьогодні» (Огляд) — окремою групою без
+  заголовка НАД «Роботою»; «Інтеграції» — у кінці «Ще». Маніфест `NAV_GROUPS`
+  (шухляда й налаштування телефона) не змінено.
+- **Закріплені розділи** (`applyPinnedSections`): одразу під Оглядом, у порядку
+  закріплення, з кнопкою-шпилькою праворуч (44×44, «Відкріпити «…»») — тап
+  повертає розділ на його місце. У рейці — крихітна шпилька в куті іконки.
+  Закріпити: Налаштування → «Закріплені розділи сайдбару» (`/settings-sidebar`,
+  рядок лише на планшеті), утримання пункту сайдбара або дія VoiceOver
+  «Закріпити». Вимкнені модулі не показуються, навіть закріплені.
+  Зберігання — СИНХРОНІЗОВАНЕ поле `ui_preferences.pinnedSections: ModuleId[]`
+  (сервер зберігає singleton цілим JSON, обидва клієнти копіюють невідомі поля,
+  тож контракт не змінюється; `components/shared/pinned-sections.ts`).
 
 ### Токени (`constants/theme.ts`)
 
@@ -533,11 +584,12 @@ const zone = useZoneState({ section: 'tasks', selectedParam: 'task', columns: tr
   dynamic={<Details/>} dynamicOpen onCloseDynamic
   dynamicHeader? dynamicFooter? dynamicLabel? dynamicScrollRef?
   dynamicChrome?={true}                         // false — ✕ дає сама шапка вмісту
-  static?={<TodayPane/>} showStatic?            // лише ≥1280 і коли main лишається найширшою
+  static?={<TodayPane/>} showStatic?            // лише ≥1280 і коли main за типових ширин ≥ mainMin
+  resizable?={true} sizeKey?="default"          // межі між зонами (планшет)
   panels?={zone.panels} onTogglePanel?={zone.togglePanel}   // три крапки (лише iPad)
   fab?={<AddFab/>} overlay?={<BulkActionBar/>} testID? />
 
-zoneWidths({ windowWidth, screenWidth, wide, wantStatic, wantDynamic })
+zoneWidths({ windowWidth, screenWidth, wide, wantStatic, wantDynamic, sizes?, handles? })
 // → { dynamicMode: 'panel'|'sheet', showStatic, staticWidth, showDynamic, dynamicWidth, mainWidth }
 
 <BottomSheet visible onClose header? footer? peek?={0.6} full?={0.94} scrollRef? scroll? showClose? accessibilityLabel? testID? />

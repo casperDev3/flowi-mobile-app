@@ -7,10 +7,14 @@
  * app/_layout.tsx); ZoneLayout розкладає три вмістові:
  *
  *   iPad / широке вікно (не compact):
- *     [static?] [main — ЗАВЖДИ найширша] [dynamic — деталі, закривається ✕]
+ *     [static?] ┃ [main] ┃ [dynamic — деталі, закривається ✕]
  *     • static стоїть поруч лише від zone.staticFrom (1280pt вікна) і коли
- *       main лишається ≥ zone.mainMin; інакше статична зона живе на вкладці
- *       «Сьогодні» (екран її просто не передає / вона ховається тут);
+ *       main лишається ≥ zone.mainMin за типових ширин; інакше статична зона
+ *       живе на вкладці «Сьогодні» (екран її просто не передає / вона ховається тут);
+ *     • ┃ — межі (ZoneResizeHandle): ширину статичної й панелі деталей
+ *       тягнуть вільно, без min/max і без «головна найширша» — лише підлога
+ *       ZONE_MIN_WIDTH (120pt) для кожної зони. Ширини — локально на пристрої
+ *       (zoneSizes.ts, `layout_zone_sizes_v1`), ключ — `sizeKey`;
  *     • dynamic з'являється справа ПІСЛЯ вибору запису і закривається ✕ —
  *       список розтягується;
  *     • FAB «+» — у правому нижньому куті main;
@@ -42,8 +46,12 @@ import { useMotion } from '@/hooks/use-motion';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import type { ZonePanel } from '@/hooks/use-zone-state';
 
+import { useSidebarStrings } from '@/components/shared/sidebar-strings';
+
 import { BottomSheet } from './BottomSheet';
-import { zoneWidths } from './zoneWidths';
+import { DEFAULT_ZONE_SIZE_KEY, setZoneSize, useZoneSizes } from './zoneSizes';
+import { ZoneResizeHandle } from './ZoneResizeHandle';
+import { ZONE_HANDLE_WIDTH, ZONE_MIN_WIDTH, zoneWidths } from './zoneWidths';
 import { PanelToggles } from './PanelToggles';
 import { useZoneStrings } from './strings';
 
@@ -79,14 +87,23 @@ export interface ZoneLayoutProps {
   fab?: React.ReactNode;
   /** Плаваючий шар над main (BulkActionBar). */
   overlay?: React.ReactNode;
+  /**
+   * Межі між зонами можна тягнути (планшет, за замовч. так). Ширини —
+   * спільні для всіх розділів, якщо екран не дав власний `sizeKey`.
+   */
+  resizable?: boolean;
+  sizeKey?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
 
 export function ZoneLayout({
   main, dynamic, dynamicOpen, onCloseDynamic, dynamicHeader, dynamicFooter, dynamicLabel, dynamicScrollRef,
-  dynamicChrome = true, static: staticZone, showStatic = true, panels, onTogglePanel, fab, overlay, style, testID,
+  dynamicChrome = true, static: staticZone, showStatic = true, panels, onTogglePanel, fab, overlay,
+  resizable = true, sizeKey = DEFAULT_ZONE_SIZE_KEY, style, testID,
 }: ZoneLayoutProps) {
+  const ss = useSidebarStrings();
+  const sizes = useZoneSizes(sizeKey);
   const { t } = useDSTheme();
   const s = useZoneStrings();
   const motion = useMotion();
@@ -100,7 +117,13 @@ export function ZoneLayout({
     wide: isWide,
     wantStatic: !!staticZone && showStatic,
     wantDynamic: dynamicOpen && !!dynamic,
+    sizes: resizable ? sizes : undefined,
+    handles: resizable ? { static: ZONE_HANDLE_WIDTH, dynamic: ZONE_HANDLE_WIDTH } : {},
   });
+  // Стеля для кожної межі: решта зон (зокрема головна) — не вужче підлоги.
+  const handlesWidth = resizable ? (w.showStatic ? ZONE_HANDLE_WIDTH : 0) + (w.showDynamic ? ZONE_HANDLE_WIDTH : 0) : 0;
+  const staticMax = screenWidth - w.dynamicWidth - handlesWidth - zone.gap - ZONE_MIN_WIDTH;
+  const dynamicMax = screenWidth - w.staticWidth - handlesWidth - zone.gap - ZONE_MIN_WIDTH;
   // Ліва крапка має сенс лише там, де статична зона взагалі вміщається.
   const staticAvailable = !!staticZone && isWide && width >= zone.staticFrom;
 
@@ -108,9 +131,10 @@ export function ZoneLayout({
     return (
       <View testID={testID} style={[st.root, style]}>
         <View style={st.main}>
-          {main}
+          {isWide && panels && onTogglePanel ? <View style={st.mainBody}>{main}</View> : main}
           {isWide && panels && onTogglePanel ? (
-            <View pointerEvents="box-none" style={st.toggles}>
+            // Окрема смуга під main, а не поверх: крапки не перекривають кнопки в картках.
+            <View style={st.togglesBar}>
               <PanelToggles panels={panels} onToggle={onTogglePanel} staticAvailable={false} testID="zone-panel-toggles" />
             </View>
           ) : null}
@@ -144,11 +168,22 @@ export function ZoneLayout({
           </ScrollView>
         </Animated.View>
       ) : null}
+      {w.showStatic && resizable ? (
+        <ZoneResizeHandle
+          width={w.staticWidth - zone.gap}
+          direction={1}
+          maxWidth={staticMax}
+          onResize={(next, save) => setZoneSize(sizeKey, 'static', next, save)}
+          onReset={() => setZoneSize(sizeKey, 'static', undefined)}
+          label={ss.resizeStatic}
+          testID="zone-resize-static"
+        />
+      ) : null}
 
       <View style={[st.main, { minWidth: Math.min(zone.mainMin, w.mainWidth) }]}>
-        {main}
+        {panels && onTogglePanel ? <View style={st.mainBody}>{main}</View> : main}
         {panels && onTogglePanel ? (
-          <View pointerEvents="box-none" style={st.toggles}>
+          <View style={st.togglesBar}>
             <PanelToggles panels={panels} onToggle={onTogglePanel} staticAvailable={staticAvailable} testID="zone-panel-toggles" />
           </View>
         ) : null}
@@ -156,6 +191,17 @@ export function ZoneLayout({
         {overlay}
       </View>
 
+      {w.showDynamic && resizable ? (
+        <ZoneResizeHandle
+          width={w.dynamicWidth - zone.gap}
+          direction={-1}
+          maxWidth={dynamicMax}
+          onResize={(next, save) => setZoneSize(sizeKey, 'dynamic', next, save)}
+          onReset={() => setZoneSize(sizeKey, 'dynamic', undefined)}
+          label={ss.resizeDynamic}
+          testID="zone-resize-dynamic"
+        />
+      ) : null}
       {w.showDynamic ? (
         <Animated.View
           entering={motion.entering(SlideInRight.duration(200))}
@@ -209,5 +255,6 @@ const st = StyleSheet.create({
   dynHeader: { paddingHorizontal: space.cardPaddingCompact, paddingBottom: 4 },
   dynBody: { paddingHorizontal: space.cardPaddingCompact, paddingBottom: 32, paddingTop: 4 },
   dynFooter: { paddingHorizontal: space.cardPaddingCompact, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  toggles: { position: 'absolute', left: 0, right: 0, bottom: 12, alignItems: 'center' },
+  mainBody: { flex: 1, minHeight: 0 },
+  togglesBar: { alignItems: 'center', paddingTop: 6, paddingBottom: 10 },
 });

@@ -3,6 +3,29 @@ import { Alert } from "react-native";
 import { FormField } from "@/components/shared/FormField";
 import WeeklyMenu from "@/app/menu";
 
+// Зони планшета (Layout System) тягнуть AsyncStorage (налаштування зон) і скло.
+const mockStore = new Map<string, string>();
+jest.mock("@react-native-async-storage/async-storage", () => ({
+  getItem: jest.fn(async (k: string) => mockStore.get(k) ?? null),
+  setItem: jest.fn(async (k: string, v: string) => {
+    mockStore.set(k, v);
+  }),
+  removeItem: jest.fn(async (k: string) => {
+    mockStore.delete(k);
+  }),
+  multiGet: jest.fn(async (keys: string[]) => keys.map((k) => [k, mockStore.get(k) ?? null])),
+}));
+jest.mock("expo-blur", () => ({ BlurView: "BlurView" }));
+jest.mock("react-native-gesture-handler", () => {
+  const chain: any = new Proxy({}, { get: () => () => chain });
+  return {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    GestureHandlerRootView: require("react-native").View,
+    GestureDetector: ({ children }: any) => children,
+    Gesture: { Pan: () => chain, Tap: () => chain },
+  };
+});
+jest.mock("expo-linear-gradient", () => ({ LinearGradient: "LinearGradient" }));
 jest.mock("react-native-safe-area-context", () => ({
   SafeAreaView: "SafeAreaView",
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -146,13 +169,15 @@ afterEach(() => {
   if (tree) act(() => tree.unmount());
   jest.restoreAllMocks();
 });
-test("phone shows one selected day; tablet shows day list + selected day", async () => {
+test("phone shows one selected day; tablet: day list, tap opens the day in the dynamic zone", async () => {
   mockSize = "compact";
   await act(async () => {
     tree = create(<WeeklyMenu />);
   });
   expect(allText(tree.toJSON())).toContain("Суп сьогодні");
   expect(allText(tree.toJSON())).not.toContain("Риба завтра");
+  // Телефон зон не має.
+  expect(tree.root.findAll((n: any) => n.props.testID === "menu-zones")).toHaveLength(0);
   await act(async () => {
     tree.unmount();
   });
@@ -160,21 +185,46 @@ test("phone shows one selected day; tablet shows day list + selected day", async
   await act(async () => {
     tree = create(<WeeklyMenu />);
   });
-  // Ліворуч — список днів зі зведенням (страва завтра видна у рядку дня),
-  // праворуч — сьогоднішній день повністю (з описом страви).
-  const txt = allText(tree.toJSON());
+  // Головна зона — список днів зі зведенням (страви видно в рядках днів);
+  // динамічна (деталі дня з описом) — лише після вибору дня.
+  expect(tree.root.findAll((n: any) => n.props.testID === "menu-zones").length).toBeGreaterThan(0);
+  let txt = allText(tree.toJSON());
   expect(txt).toContain("Риба завтра");
-  expect(txt).toContain("Овочевий");
+  expect(txt).not.toContain("Овочевий");
   const tuesday = tree.root.findAll(
     (n: any) =>
       typeof n.props.accessibilityLabel === "string" &&
       n.props.accessibilityLabel.startsWith("Вівторок") &&
       typeof n.props.onPress === "function",
   )[0];
-  act(() => tuesday.props.onPress());
-  // Тепер праворуч вівторок: кнопка страви «Риба завтра» стала натисканою.
+  await act(async () => {
+    tuesday.props.onPress();
+  });
+  // Тепер у панелі вівторок: кнопка страви «Риба завтра» стала натисканою.
   expect(button("Риба завтра")).toBeDefined();
   expect(button("Суп сьогодні")).toBeUndefined();
+  const monday = tree.root.findAll(
+    (n: any) =>
+      typeof n.props.accessibilityLabel === "string" &&
+      n.props.accessibilityLabel.startsWith("Понеділок") &&
+      typeof n.props.onPress === "function",
+  )[0];
+  await act(async () => {
+    monday.props.onPress();
+  });
+  txt = allText(tree.toJSON());
+  expect(txt).toContain("Овочевий");
+  expect(button("Суп сьогодні")).toBeDefined();
+});
+test("tablet: static zone carries the week summary beside the list on a wide window", async () => {
+  mockSize = "expanded";
+  await act(async () => {
+    tree = create(<WeeklyMenu />);
+  });
+  // 1194 − 76: статичній зоні не вистачає місця (поріг 1280) — картка тижня
+  // лишається в головній зоні.
+  expect(tree.root.findAll((n: any) => n.props.testID === "menu-static-zone")).toHaveLength(0);
+  expect(button("Затвердити тиждень")).toBeDefined();
 });
 test("dish editor prefills existing dish and saves it by id/version", async () => {
   await act(async () => {

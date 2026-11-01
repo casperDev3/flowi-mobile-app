@@ -121,6 +121,12 @@ export interface NavGroup {
   /** null — група без заголовка. */
   titleKey: keyof Translations | null;
   items: NavItem[];
+  /**
+   * Службова група сайдбара ПЛАНШЕТА (не з маніфесту): 'overview' — «Сьогодні»
+   * над усіма групами, 'pinned' — закріплені розділи під ним
+   * ({@link tabletNavGroups}, {@link applyPinnedSections}).
+   */
+  kind?: 'overview' | 'pinned';
 }
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -291,6 +297,112 @@ export function menuNavGroups(groups: NavGroup[]): NavGroup[] {
   return result;
 }
 
+// ─── Сайдбар планшета: «Огляд» угорі, «Інтеграції» в «Ще», закріплені ────────
+//
+// ЛИШЕ планшет (docked NavSidebar). Маніфест NAV_GROUPS не змінюється: з нього
+// ж будуються шухляда телефона й перелік модулів у налаштуваннях телефона, а
+// телефон за рішенням власника лишається як був. Тому перегрупування — чиста
+// функція поверх маніфесту, яку викликає лише планшетний сайдбар.
+
+/** Маршрут «Сьогодні» (Огляд) — пункт, що на планшеті стоїть над усіма групами. */
+export const OVERVIEW_ROUTE = '/(tabs)/today';
+
+/**
+ * Групи сайдбара планшета: «Сьогодні» (Огляд) винесено в окрему групу без
+ * заголовка НАД «Роботою»; «Інтеграції» переїхали з «Роботи» в кінець «Ще».
+ * Вхід — маніфест (або його відфільтровані варіанти); пункти не губляться й
+ * не дублюються. Якщо групи «Ще» немає (усе в ній вимкнено) — створюється.
+ */
+export function tabletNavGroups(groups: readonly NavGroup[]): NavGroup[] {
+  let overview: NavItem | undefined;
+  let integrations: NavItem | undefined;
+  const stripped: NavGroup[] = [];
+  for (const group of groups) {
+    const items: NavItem[] = [];
+    for (const item of group.items) {
+      if (item.route === OVERVIEW_ROUTE) overview = item;
+      else if (item.module === 'integrations' && group.id !== 'more') integrations = item;
+      else items.push(item);
+    }
+    if (items.length) stripped.push(items.length === group.items.length ? group : { ...group, items });
+  }
+  if (integrations) {
+    const moved = integrations;
+    const moreIndex = stripped.findIndex(group => group.id === 'more');
+    if (moreIndex >= 0) {
+      stripped[moreIndex] = { ...stripped[moreIndex], items: [...stripped[moreIndex].items, moved] };
+    } else {
+      // «Ще» стоїть перед «Розробкою» і нижньою групою налаштувань.
+      const devIndex = stripped.findIndex(group => group.id === 'dev' || (!group.titleKey && !group.kind));
+      const more: NavGroup = { id: 'more', titleKey: 'navGroupMore', items: [moved] };
+      if (devIndex >= 0) stripped.splice(devIndex, 0, more);
+      else stripped.push(more);
+    }
+  }
+  return overview ? [{ titleKey: null, kind: 'overview', items: [overview] }, ...stripped] : stripped;
+}
+
+/** Чи можна закріпити пункт: лише розділ-модуль (не системний і не вкладка). */
+export function isPinnableNavItem(item: Pick<NavItem, 'module' | 'tabOf' | 'route'>): item is NavItem & { module: ModuleId } {
+  return Boolean(item.module) && !item.tabOf && item.route !== OVERVIEW_ROUTE;
+}
+
+/**
+ * Збережений список закріплених → чистий масив модулів без дублікатів у
+ * порядку закріплення. Сміття (не масив, не рядки) — «нічого не закріплено».
+ */
+export function sanitizePinnedSections(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const id of raw) {
+    if (typeof id !== 'string') continue;
+    const trimmed = id.trim();
+    if (trimmed && !out.includes(trimmed)) out.push(trimmed);
+  }
+  return out;
+}
+
+/** Закріпити / відкріпити модуль. Нове закріплення стає в кінець списку. */
+export function togglePinnedSection(prev: unknown, module: string, pinned?: boolean): string[] {
+  const list = sanitizePinnedSections(prev);
+  if (!module) return list;
+  const has = list.includes(module);
+  const want = pinned ?? !has;
+  if (want === has) return list;
+  return want ? [...list, module] : list.filter(id => id !== module);
+}
+
+/**
+ * Закріплені розділи — окремою групою (kind 'pinned') одразу під «Оглядом»;
+ * з рідних груп вони на цей час зникають (відкріпили — повертаються на своє
+ * місце, бо порядок рідних груп не чіпається). Застосовується ПІСЛЯ
+ * visibleNavGroups/menuNavGroups: вимкнений модуль не з'являється, навіть
+ * якщо закріплений, а запис про закріплення лишається (увімкнули — і він
+ * знову вгорі). Група, що спорожніла, зникає.
+ */
+export function applyPinnedSections(groups: readonly NavGroup[], pinned: readonly string[]): NavGroup[] {
+  const ids = sanitizePinnedSections(pinned);
+  if (!ids.length) return [...groups];
+  const found = new Map<string, NavItem>();
+  const rest: NavGroup[] = [];
+  for (const group of groups) {
+    if (group.kind === 'pinned') continue;
+    const items = group.items.filter(item => {
+      if (isPinnableNavItem(item) && ids.includes(item.module) && !found.has(item.module)) {
+        found.set(item.module, item);
+        return false;
+      }
+      return true;
+    });
+    if (items.length) rest.push(items.length === group.items.length ? group : { ...group, items });
+  }
+  const pinnedItems = ids.map(id => found.get(id)).filter((item): item is NavItem => Boolean(item));
+  if (!pinnedItems.length) return rest;
+  const pinnedGroup: NavGroup = { titleKey: null, kind: 'pinned', items: pinnedItems };
+  const at = rest[0]?.kind === 'overview' ? 1 : 0;
+  return [...rest.slice(0, at), pinnedGroup, ...rest.slice(at)];
+}
+
 /** Чи підсвічувати пункт: сам маршрут або один із його підекранів (`activeOn`). */
 export function isNavItemActive(item: Pick<NavItem, 'route' | 'activeOn'>, pathname: string): boolean {
   return isRouteActive(item.route, pathname) || Boolean(item.activeOn?.includes(pathname));
@@ -323,9 +435,9 @@ export function moduleLabelKey(module: ModuleId): keyof Translations | undefined
   return undefined;
 }
 
-export function moduleSections(): ModuleSection[] {
+export function moduleSections(groups: readonly NavGroup[] = NAV_GROUPS): ModuleSection[] {
   const sections: ModuleSection[] = [];
-  for (const group of NAV_GROUPS) {
+  for (const group of groups) {
     if (!group.titleKey) continue;
     // Модулі ALWAYS_ON («Ідеї та баги») перемикача не мають: вимкнути їх не
     // можна, а рядок, що нічого не змінює, лише бреше. Група, де лишились

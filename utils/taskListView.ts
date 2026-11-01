@@ -14,6 +14,7 @@
 import { mergeTaskStatusColumns, orderColumnsForList, taskVisibleInList, type TaskStatusColumn } from './taskStatuses';
 import { buildStatusListSections, type TaskListScope } from './taskListSections';
 import { inTaskScope, isTodayTask } from './taskToday';
+import { inTaskPeriod, isExtraTaskPeriod, TASK_PERIOD_ORDER, type ExtraTaskPeriod, type TaskPeriod } from './taskPeriods';
 import {
   comparePriority,
   filterTasksByMonth,
@@ -66,6 +67,12 @@ export interface TaskListQuery {
    * (за замовчуванням) — лише з дедлайном. Див. inTaskScope.
    */
   noDeadline?: boolean;
+  /**
+   * Лише планшет (випадний список періоду, utils/taskPeriods.ts): звужує
+   * «Всі» до «Завтра» чи «Місяць». Телефон його не ставить — для нього
+   * конвеєр рівно той самий, що й до цього поля.
+   */
+  period?: ExtraTaskPeriod | null;
 }
 
 export interface TaskListGroup<T> {
@@ -155,12 +162,24 @@ export function filterTasksForList<T extends ListViewTask>(sorted: readonly T[],
 /** Денний скоуп поверх filterTasksForList. */
 export function applyTaskScope<T extends ListViewTask>(
   filteredAll: readonly T[],
-  q: Pick<TaskListQuery, 'scope' | 'filter' | 'sort' | 'noDeadline'>,
+  q: Pick<TaskListQuery, 'scope' | 'filter' | 'sort' | 'noDeadline' | 'period'>,
   columns: TaskStatusColumn[],
   today: Date,
   now: Date = new Date(),
 ): T[] {
+  // «Завтра» / «Місяць» (планшет) — надбудова над «Всі» з дедлайном.
+  const extra = q.scope === 'all' && !q.noDeadline && isExtraTaskPeriod(q.period) ? q.period : null;
   return filteredAll.filter(t => {
+    if (extra) {
+      // «Завтра» — денний погляд: свіже завершене лише сьогоднішнє, як на вебі
+      // (periodScope('tomorrow').doneScope === 'today').
+      if (t.status === 'done') {
+        return extra === 'tomorrow'
+          ? taskVisibleInList(t, q.filter, q.sort, now, 'today') && isTodayTask(t, columns, today)
+          : true;
+      }
+      return inTaskPeriod(t, columns, extra, today);
+    }
     // У денному режимі «Готово» — це закрите СЬОГОДНІ, а не за вікном у два
     // дні: вчорашня закрита справа серед сьогоднішніх вдає незавершену роботу.
     if (q.scope === 'today' && !taskVisibleInList(t, q.filter, q.sort, now, 'today')) return false;
@@ -186,6 +205,32 @@ export function taskScopeCounts<T extends ListViewTask>(
   const count = (scope: TaskListScope, noDeadline = false) =>
     applyTaskScope(active, { ...q, scope, noDeadline }, columns, today, now).length;
   return { today: count('today'), week: count('week'), all: count('all'), noDeadline: count('all', true) };
+}
+
+/**
+ * Лічильники випадного списку періоду (планшет) — лише НЕзавершене, тим
+ * самим applyTaskScope, що будує список. Ключі — TaskPeriod (як на вебі).
+ */
+export function taskPeriodCounts<T extends ListViewTask>(
+  filteredAll: readonly T[],
+  q: Pick<TaskListQuery, 'filter' | 'sort'>,
+  columns: TaskStatusColumn[],
+  today: Date,
+  now: Date = new Date(),
+): Record<TaskPeriod, number> {
+  const active = filteredAll.filter(t => t.status !== 'done');
+  const counts = {} as Record<TaskPeriod, number>;
+  for (const period of TASK_PERIOD_ORDER) {
+    const scope = period === 'today' ? 'today' : period === 'week' ? 'week' : 'all';
+    const query = {
+      ...q,
+      scope,
+      noDeadline: period === 'undated',
+      period: isExtraTaskPeriod(period) ? period : null,
+    } as const;
+    counts[period] = applyTaskScope(active, query, columns, today, now).length;
+  }
+  return counts;
 }
 
 /** Прострочене окремою секцією — лише у списку і не для фільтра «Виконані». */
@@ -348,6 +393,7 @@ export function taskListQueryToParams(q: TaskListQuery): TaskListRouteParams {
   if (q.priorities.length) params.priorities = q.priorities.join(',');
   if (q.dateFilter) params.date = q.dateFilter;
   if (q.scope === 'all' && q.noDeadline) params.noDeadline = '1';
+  if (q.scope === 'all' && !q.noDeadline && isExtraTaskPeriod(q.period)) params.period = q.period;
   return params;
 }
 
@@ -380,6 +426,8 @@ export function taskListQueryFromParams(params: Partial<Record<string, string | 
     priorities,
     dateFilter: one('date') || null,
     noDeadline: scope === 'all' && one('noDeadline') === '1',
+    // «Завтра» / «Місяць» планшета — лише поверх «Всі» з дедлайном.
+    ...(scope === 'all' && one('noDeadline') !== '1' && isExtraTaskPeriod(one('period')) ? { period: one('period') as ExtraTaskPeriod } : {}),
   };
 }
 

@@ -24,7 +24,7 @@ import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { moduleSections } from '@/constants/nav';
+import { NAV_GROUPS, moduleSections, tabletNavGroups } from '@/constants/nav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { dsTokens } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
@@ -44,7 +44,7 @@ export default function SettingsModulesScreen() {
    * колонці 960pt, як і головний екран налаштувань. Телефон і портрет —
    * одна колонка для читання.
    */
-  const { isExpanded } = useResponsive();
+  const { isExpanded, isWide } = useResponsive();
   const contentWidth = useMemo(
     () => (isExpanded ? { ...readingWidth, maxWidth: 960 } : readingWidth),
     [isExpanded, readingWidth],
@@ -55,7 +55,8 @@ export default function SettingsModulesScreen() {
 
   // Секції рахуються з маніфесту один раз: він статичний, а перемальовує
   // екран кожен дотик по перемикачу.
-  const sections = useMemo(() => moduleSections(), []);
+  // Планшет — групи як у його сайдбарі («Інтеграції» в «Ще»); телефон — як було.
+  const sections = useMemo(() => moduleSections(isWide ? tabletNavGroups(NAV_GROUPS) : NAV_GROUPS), [isWide]);
 
   const k = dsTokens(isDark);
 

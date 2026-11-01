@@ -4,6 +4,14 @@
  * Документація — docs/design-system-v2.md, розділ «Layout System (v2.4)».
  */
 export { ZoneLayout, zoneWidths, type ZoneLayoutProps, type ZoneWidths } from './ZoneLayout';
+export {
+  ZONE_MIN_WIDTH, ZONE_KEY_STEP, ZONE_HANDLE_WIDTH, resizeZoneWidth, sanitizeZoneSize, defaultDynamicWidth,
+  type ZoneSizes,
+} from './zoneWidths';
+export { ZoneResizeHandle, type ZoneResizeHandleProps } from './ZoneResizeHandle';
+export {
+  useZoneSizes, setZoneSize, getZoneSizes, parseZoneSizes, ZONE_SIZES_KEY, DEFAULT_ZONE_SIZE_KEY,
+} from './zoneSizes';
 export { BottomSheet, type BottomSheetProps } from './BottomSheet';
 export { SwipeRow, type SwipeAction, type SwipeActionTone, type SwipeRowA11y } from './SwipeRow';
 export { KanbanPager, type KanbanColumn } from './KanbanPager';

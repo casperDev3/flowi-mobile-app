@@ -9,11 +9,20 @@
  *     проєкту; спринти без дат не малюються, а підказують «вкажіть дати».
  *
  * Види: Місяць / Тиждень / День. Телефон стартує з місяця (крапки + список
- * обраного дня під сіткою); планшет (≥600pt) — з тижня з погодинною сіткою,
- * а на `expanded` праворуч стоїть колонка: деталь зустрічі або, коли нічого
- * не вибрано, список обраного дня.
+ * обраного дня під сіткою); планшет (≥600pt) — з тижня з погодинною сіткою.
  *
- * «+» (один: FAB на телефоні, кнопка в шапці на планшеті) питає, що
+ * Планшет (не compact) — три зони Layout System v2.4 (ZoneLayout):
+ *   • статична (вікно ≥1280, CalendarStaticPane) — міні-місяць (крім виду
+ *     «Місяць») і список обраного дня лише для читання;
+ *   • головна — шапка, панель виду й сітка; FAB «+» у правому нижньому куті,
+ *     три крапки панелей під нею;
+ *   • динамічна — деталі події праворуч після вибору (✕ закриває), а де
+ *     панель не вміщається — нижній аркуш.
+ *   Коли статичної зони поруч немає, список дня стоїть під місячною сіткою,
+ *   а тап по дню в «Тижні» відкриває «День» — як і раніше.
+ * Телефон (compact) — без змін: DetailPane-аркуш, FAB, список під сіткою.
+ *
+ * «+» (один: FAB) питає, що
  * створити — Зустріч чи Завдання — і підставляє обраний день (і годину, якщо
  * тапнули слот сітки). Завдання створюється тут же, аркушем поверх
  * календаря (CalendarTaskCreate — та сама коротка форма TaskQuickCreate, що й
@@ -21,7 +30,7 @@
  * Перетягування — лише на вебі.
  *
  * Лупа в шапці — пошук по зустрічах (разом з історією) і завданнях.
- * Права колонка планшета зі списком дня — лише для читання.
+ * Список дня у статичній зоні планшета — лише для читання.
  *
  * Старий маршрут /meetings лишився редиректом сюди (app/meetings.tsx).
  */
@@ -49,10 +58,13 @@ import { PERSONAL_TASK_COLOR, useCalendarColors } from '@/components/calendar/pa
 import { RecordingModal } from '@/components/calendar/RecordingModal';
 import { TimeGrid } from '@/components/calendar/TimeGrid';
 import { useGoogleCalendar } from '@/components/calendar/useGoogleCalendar';
+import { CalendarStaticPane } from '@/components/calendar/CalendarStaticPane';
+import { useCalendarZoneStrings } from '@/components/calendar/calendarZoneStrings';
+import { setZonePrefs, useZonePrefs, ZoneLayout, zoneWidths, type ZonePanel } from '@/components/layout-zones';
 import { WeekStrip } from '@/components/calendar/WeekStrip';
 import { MeetingDetailBody, MeetingDetailHeader } from '@/components/meetings/MeetingDetail';
 import { useInPlaceProjectTask } from '@/components/projects/ProjectTaskSheet';
-import { DETAIL_COLUMN_WIDTH, DetailPane } from '@/components/shared/DetailPane';
+import { DetailPane } from '@/components/shared/DetailPane';
 import { MEETING_COLORS, MeetingFormSheet, type MeetingFormData } from '@/components/shared/MeetingFormSheet';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -61,7 +73,7 @@ import { dsTokens } from '@/hooks/use-ds';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { useProjectRoles } from '@/hooks/use-project-roles';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useTodayKey } from '@/hooks/use-today-key';
 import { setAdvertisingRecording } from '@/store/advertising-safety';
@@ -80,8 +92,6 @@ import { isTaskDoneByType, type TaskStatusColumn } from '@/utils/taskStatuses';
 import type { Task } from '@/utils/taskUtils';
 import { KpiCounter, MeshBackground } from '@/components/ds';
 import { AppHeader } from '@/components/shared/AppHeader';
-import { glassFill } from '@/components/shared/dsTheme';
-import { useReduceTransparency } from '@/hooks/use-reduce-transparency';
 
 /** Мінімум локального проєкту: чип, поле «Проєкт» форми, фільтр, колір смуг. */
 interface LocalProject { id: string; name: string; color: string; archivedAt?: string }
@@ -95,13 +105,19 @@ const DATA_KEYS = ['meetings', 'projects', 'workspace_projects', 'tasks', 'sprin
 export default function CalendarScreen() {
   const isDark = useColorScheme() === 'dark';
   const c = useCalendarColors(isDark);
-  const rt = useReduceTransparency();
   // Задача ПРОЄКТУ відкривається тут же, карткою проєкту — не в особистому редакторі.
   const { openProjectTask, projectTaskSheet } = useInPlaceProjectTask(isDark);
   const router = useRouter();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const { isWide, isExpanded, height } = useResponsive();
+  const { isWide, height, width } = useResponsive();
+  const screenWidth = useScreenWidth();
+  const zs = useCalendarZoneStrings();
+  // Видимість зон планшета — звичка пристрою (layout_zones_prefs_v1), як у «Завдань».
+  const zonePrefs = useZonePrefs('calendar');
+  const toggleZonePanel = useCallback((panel: ZonePanel) => {
+    setZonePrefs('calendar', panel === 'static' ? { static: !zonePrefs.static } : { dynamic: !zonePrefs.dynamic });
+  }, [zonePrefs.static, zonePrefs.dynamic]);
   const { user } = useAuth();
   const myUserId = user?.id !== undefined && user?.id !== null ? String(user.id) : null;
   const roles = useProjectRoles();
@@ -559,19 +575,37 @@ export default function CalendarScreen() {
 
   const onMeetingRecord = useCallback((m: Meeting) => setRecordingMtgId(resolveOrig(m).id), [resolveOrig]);
 
-  // На вузькому деталь — модальний лист; iOS не покаже другу модалку, доки
-  // перша не зникла. У колонці деталь нікуди не дівається.
+  // ─── Зони планшета (Layout System v2.4) ──────────────────────────────────
+  // Телефон: isWide=false → статичної зони й панелі немає, усе як раніше.
+  // Чи стоїть зона поруч, вирішують типові ширини (zoneWidths) — так само,
+  // як вирішує сам ZoneLayout.
+  const staticShown = zoneWidths({
+    windowWidth: width, screenWidth, wide: isWide, wantStatic: zonePrefs.static, wantDynamic: !!selectedMtg && zonePrefs.dynamic,
+  }).showStatic;
+  const detailIsPanel = isWide && zoneWidths({
+    windowWidth: width, screenWidth, wide: isWide, wantStatic: false, wantDynamic: true,
+  }).dynamicMode === 'panel';
+  const detailOpen = !!selectedMtg && (!isWide || zonePrefs.dynamic);
+  // Вибір події при вимкненій панелі деталей вмикає її назад (як select у
+  // useZoneState): інакше тап по зустрічі «нічого не робив» би.
+  useEffect(() => {
+    if (isWide && selectedKey && !zonePrefs.dynamic) setZonePrefs('calendar', { dynamic: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey, isWide]);
+
+  // Аркуш деталі — модальний; iOS не покаже другу модалку, доки перша не
+  // зникла. Панель праворуч нікуди не дівається.
   const openOverDetail = useCallback((run: () => void) => {
-    if (isExpanded) { run(); return; }
+    if (detailIsPanel) { run(); return; }
     setSelectedKey(null);
     setTimeout(run, 300);
-  }, [isExpanded]);
+  }, [detailIsPanel]);
 
   const selectedOrig = selectedMtg ? resolveOrig(selectedMtg) : null;
   const selectedTimer = selectedOrig ? findTimerForMeeting(activeTimers, selectedOrig.id) : undefined;
 
   // ─── Список дня ───────────────────────────────────────────────────────────
-  // `readOnly` — права колонка планшета: без кошика й мікрофона в рядках
+  // `readOnly` — статична зона планшета: без кошика й мікрофона в рядках
   // (тап відкриває деталь, де ці дії й живуть) і без власного «+».
   const renderAgenda = (day: string, readOnly = false) => (
     <DayAgenda
@@ -626,7 +660,8 @@ export default function CalendarScreen() {
     </View>
   ) : null;
 
-  const showSideColumn = isExpanded;
+  // Список дня поруч (статична зона) — тоді під сіткою його не дублюємо.
+  const showSideColumn = staticShown;
   const bottomPad = Platform.OS === 'ios' ? 48 : 28;
 
   let content: React.ReactNode;
@@ -652,7 +687,7 @@ export default function CalendarScreen() {
     );
   } else if (view === 'month') {
     content = (
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad + (isWide ? 24 : 72) }}
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad + (isWide ? 88 : 72) }}
         showsVerticalScrollIndicator={false}>
         {/* DS v2: сітка місяця — у білій картці на canvas. */}
         <View style={{ backgroundColor: c.card, borderRadius: radius.cardCompact, padding: 12 }}>
@@ -692,7 +727,8 @@ export default function CalendarScreen() {
     );
   } else {
     content = (
-      <View style={{ flex: 1, marginHorizontal: 16, marginBottom: 12, backgroundColor: c.card, borderRadius: radius.cardCompact, overflow: 'hidden', paddingTop: 8, paddingRight: 4 }}>
+      // Планшет: місце під трьома крапками панелей (PanelToggles) під сіткою.
+      <View style={{ flex: 1, marginHorizontal: 16, marginBottom: isWide ? 64 : 12, backgroundColor: c.card, borderRadius: radius.cardCompact, overflow: 'hidden', paddingTop: 8, paddingRight: 4 }}>
         <TimeGrid
           days={range.days}
           todayKey={todayKey}
@@ -713,149 +749,186 @@ export default function CalendarScreen() {
     );
   }
 
+  // Головна зона: шапка, панель виду, підказка й сітка. «+» — FAB у правому
+  // нижньому куті головної на всіх розмірах (Layout System v2.4); на
+  // планшеті він більше не стоїть у шапці.
+  const mainColumn = (
+    <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
+      {/* Omni (DS v2.2): AppHeader = ScreenHeader + дзвіник і аватар
+          (планшет — рядок інструментів із таймером), KPI — у шапці. */}
+      <AppHeader
+        title={tr.calendar}
+        kpis={!searchOpen && initialized ? (
+          <>
+            <KpiCounter value={periodStats.today} label={tr.today} onPress={goToday} accessibilityLabel={`${tr.today}: ${periodStats.today}`} />
+            <KpiCounter value={periodStats.periodMeetings} label={tr.calSectionMeetings} />
+            <KpiCounter value={periodStats.periodTasks} label={tr.tasks} />
+          </>
+        ) : undefined}
+        back={{
+          onPress: () => router.back(),
+          label: tr.back,
+          color: c.sub,
+          style: { backgroundColor: c.card, borderColor: 'transparent' },
+        }}
+        actions={
+          <>
+            <HeaderButton
+              onPress={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+              accessibilityLabel={tr.calSearch}
+              style={{ borderColor: 'transparent', backgroundColor: searchOpen ? c.action : c.card }}>
+              <IconSymbol name="magnifyingglass" size={16} color={searchOpen ? c.onAction : c.text} />
+            </HeaderButton>
+            <HeaderButton
+              onPress={() => { closeSearch(); goToday(); }}
+              accessibilityLabel={tr.today}
+              style={{ borderColor: 'transparent', backgroundColor: c.card }}>
+              <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? c.accent : c.text} />
+            </HeaderButton>
+            <HeaderButton
+              onPress={() => setShowGcalSheet(true)}
+              accessibilityLabel="Google Calendar"
+              style={{ borderColor: 'transparent', backgroundColor: c.card }}>
+              {gcal.importing
+                ? <ActivityIndicator size="small" color={dsTokens(isDark).status.success} />
+                : <IconSymbol name={gcal.token ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={17} color={gcal.token ? dsTokens(isDark).status.success : c.text} />}
+            </HeaderButton>
+          </>
+        }
+      />
+      {!searchOpen ? <CalendarToolbar
+        view={view}
+        onViewChange={setView}
+        title={title}
+        onPrev={goPrev}
+        onNext={goNext}
+        projects={projects}
+        filter={filter}
+        onFilterChange={setFilter}
+        showDone={showDone}
+        onToggleDone={() => setShowDone(v => !v)}
+        onlyMine={onlyMine}
+        onToggleOnlyMine={() => setOnlyMine(v => !v)}
+        canFilterMine={projects.length > 0 && Boolean(myUserId)}
+        wide={isWide}
+        c={c}
+        tr={tr}
+      /> : null}
+      {undatedHint}
+      {content}
+    </SafeAreaView>
+  );
+
+  const fabButton = !searchOpen ? (
+    <TouchableOpacity
+      onPress={() => openCreate({ day: anchor })}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={tr.calCreateTitle}
+      testID="calendar-fab"
+      style={[st.fab, isWide ? st.fabWide : null, { backgroundColor: c.action }, shadow[isDark ? 'dark' : 'light'].popover]}>
+      <IconSymbol name="plus" size={26} color={c.onAction} />
+    </TouchableOpacity>
+  ) : null;
+
+  const detailHeader = selectedMtg && selectedOrig ? (
+    <MeetingDetailHeader
+      meeting={selectedMtg}
+      original={selectedOrig}
+      onEdit={() => openOverDetail(() => openEdit(selectedOrig))}
+      onClose={() => setSelectedKey(null)}
+      // Телефон — ручка в шапці аркуша DetailPane; планшет — ручку (якщо
+      // це аркуш) дає BottomSheet, панель праворуч — без ручки.
+      isExpanded={isWide}
+      colors={c}
+      tr={tr}
+    />
+  ) : null;
+  const detailBody = selectedMtg && selectedOrig ? (
+    <MeetingDetailBody
+      meeting={selectedMtg}
+      original={selectedOrig}
+      project={meetingProject(selectedOrig, projects)}
+      timer={selectedTimer}
+      onToggleTimer={() => { void toggleMeetingTimer(selectedOrig); }}
+      onEdit={() => openOverDetail(() => openEdit(selectedOrig))}
+      onRecord={() => openOverDetail(() => setRecordingMtgId(selectedOrig.id))}
+      onPlayRecording={uri => { void playRecording(uri); }}
+      onDeleteRecording={uri => deleteRecording(selectedOrig.id, uri)}
+      playingUri={playingUri}
+      colors={c}
+      tr={tr}
+      locale={locale}
+    />
+  ) : null;
+
+  // Статична зона планшета: міні-місяць (крім виду «Місяць») + список дня
+  // лише для читання. Поки дані вантажаться — нічого (головна має спінер).
+  const staticPane = isWide && initialized ? (
+    <CalendarStaticPane
+      showMiniMonth={view !== 'month'}
+      monthTitle={periodTitle('month', anchor, tr)}
+      monthRows={monthRows}
+      month={anchorDate.getMonth()}
+      todayKey={todayKey}
+      selectedKey={anchor}
+      tasksByDay={tasksByDay}
+      meetingsByDay={meetingsByDay}
+      sprintBars={sprintBars}
+      onSelectDay={setAnchor}
+      onPrevMonth={() => setAnchor(a => shiftAnchor('month', a, -1))}
+      onNextMonth={() => setAnchor(a => shiftAnchor('month', a, 1))}
+      agenda={renderAgenda(anchor, true)}
+      c={c}
+      tr={tr}
+    />
+  ) : null;
+
+  const layout = isWide ? (
+    <ZoneLayout
+      testID="calendar-zones"
+      main={mainColumn}
+      static={staticPane}
+      showStatic={zonePrefs.static}
+      dynamic={detailBody}
+      dynamicOpen={detailOpen}
+      onCloseDynamic={() => setSelectedKey(null)}
+      dynamicHeader={detailHeader}
+      dynamicLabel={selectedMtg?.title ?? zs.eventDetails}
+      dynamicScrollRef={detailScrollRef}
+      // ✕ і «Редагувати» дає сама шапка події (MeetingDetailHeader).
+      dynamicChrome={false}
+      panels={{ static: zonePrefs.static, dynamic: zonePrefs.dynamic }}
+      onTogglePanel={toggleZonePanel}
+      fab={fabButton}
+    />
+  ) : (
+    // Телефон (compact) — розкладка без змін: головна + FAB + аркуш деталі.
+    <View style={{ flex: 1, flexDirection: 'column' }}>
+      <View style={{ flex: 1 }}>
+        {mainColumn}
+        {fabButton}
+      </View>
+
+      <DetailPane
+        open={!!selectedMtg}
+        wide={false}
+        onClose={() => setSelectedKey(null)}
+        isDark={isDark}
+        sheetColor={c.sheet}
+        borderColor={c.border}
+        maxHeight={height * 0.86}
+        scrollRef={detailScrollRef}
+        header={detailHeader}>
+        {detailBody}
+      </DetailPane>
+    </View>
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: c.bg1 }}>
       <MeshBackground />
-      <View style={{ flex: 1, flexDirection: showSideColumn ? 'row' : 'column' }}>
-        <View style={{ flex: 1 }}>
-          <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
-            {/* Omni (DS v2.2): AppHeader = ScreenHeader + дзвіник і аватар
-                (планшет — рядок інструментів із таймером), KPI — у шапці. */}
-            <AppHeader
-              title={tr.calendar}
-              kpis={!searchOpen && initialized ? (
-                <>
-                  <KpiCounter value={periodStats.today} label={tr.today} onPress={goToday} accessibilityLabel={`${tr.today}: ${periodStats.today}`} />
-                  <KpiCounter value={periodStats.periodMeetings} label={tr.calSectionMeetings} />
-                  <KpiCounter value={periodStats.periodTasks} label={tr.tasks} />
-                </>
-              ) : undefined}
-              back={{
-                onPress: () => router.back(),
-                label: tr.back,
-                color: c.sub,
-                style: { backgroundColor: c.card, borderColor: 'transparent' },
-              }}
-              actions={
-                <>
-                  <HeaderButton
-                    onPress={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
-                    accessibilityLabel={tr.calSearch}
-                    style={{ borderColor: 'transparent', backgroundColor: searchOpen ? c.action : c.card }}>
-                    <IconSymbol name="magnifyingglass" size={16} color={searchOpen ? c.onAction : c.text} />
-                  </HeaderButton>
-                  <HeaderButton
-                    onPress={() => { closeSearch(); goToday(); }}
-                    accessibilityLabel={tr.today}
-                    style={{ borderColor: 'transparent', backgroundColor: c.card }}>
-                    <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? c.accent : c.text} />
-                  </HeaderButton>
-                  <HeaderButton
-                    onPress={() => setShowGcalSheet(true)}
-                    accessibilityLabel="Google Calendar"
-                    style={{ borderColor: 'transparent', backgroundColor: c.card }}>
-                    {gcal.importing
-                      ? <ActivityIndicator size="small" color={dsTokens(isDark).status.success} />
-                      : <IconSymbol name={gcal.token ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={17} color={gcal.token ? dsTokens(isDark).status.success : c.text} />}
-                  </HeaderButton>
-                  {isWide ? (
-                    <HeaderButton
-                      onPress={() => openCreate({ day: anchor })}
-                      accessibilityLabel={tr.calCreateTitle}
-                      style={{ borderColor: 'transparent', backgroundColor: c.action }}>
-                      <IconSymbol name="plus" size={18} color={c.onAction} />
-                    </HeaderButton>
-                  ) : null}
-                </>
-              }
-            />
-            {!searchOpen ? <CalendarToolbar
-              view={view}
-              onViewChange={setView}
-              title={title}
-              onPrev={goPrev}
-              onNext={goNext}
-              projects={projects}
-              filter={filter}
-              onFilterChange={setFilter}
-              showDone={showDone}
-              onToggleDone={() => setShowDone(v => !v)}
-              onlyMine={onlyMine}
-              onToggleOnlyMine={() => setOnlyMine(v => !v)}
-              canFilterMine={projects.length > 0 && Boolean(myUserId)}
-              wide={isWide}
-              c={c}
-              tr={tr}
-            /> : null}
-            {undatedHint}
-            {content}
-          </SafeAreaView>
-
-          {/* FAB — лише на телефоні; на планшеті «+» стоїть у шапці. */}
-          {!isWide && !searchOpen ? (
-            <TouchableOpacity
-              onPress={() => openCreate({ day: anchor })}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel={tr.calCreateTitle}
-              testID="calendar-fab"
-              style={[st.fab, { backgroundColor: c.action }, shadow[isDark ? 'dark' : 'light'].popover]}>
-              <IconSymbol name="plus" size={26} color={c.onAction} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        {showSideColumn && !selectedMtg ? (
-          <View style={[st.sideColumn, { width: DETAIL_COLUMN_WIDTH, borderLeftColor: c.border }, glassFill(isDark, 'card', rt)]}>
-            <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
-              <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-                {renderAgenda(anchor, true)}
-              </ScrollView>
-            </SafeAreaView>
-          </View>
-        ) : null}
-
-        {(selectedMtg || !showSideColumn) ? (
-          <DetailPane
-            open={!!selectedMtg}
-            wide={showSideColumn}
-            onClose={() => setSelectedKey(null)}
-            isDark={isDark}
-            sheetColor={c.sheet}
-            borderColor={c.border}
-            maxHeight={height * 0.86}
-            scrollRef={detailScrollRef}
-            header={selectedMtg && selectedOrig ? (
-              <MeetingDetailHeader
-                meeting={selectedMtg}
-                original={selectedOrig}
-                onEdit={() => openOverDetail(() => openEdit(selectedOrig))}
-                onClose={() => setSelectedKey(null)}
-                isExpanded={showSideColumn}
-                colors={c}
-                tr={tr}
-              />
-            ) : null}>
-            {selectedMtg && selectedOrig ? (
-              <MeetingDetailBody
-                meeting={selectedMtg}
-                original={selectedOrig}
-                project={meetingProject(selectedOrig, projects)}
-                timer={selectedTimer}
-                onToggleTimer={() => { void toggleMeetingTimer(selectedOrig); }}
-                onEdit={() => openOverDetail(() => openEdit(selectedOrig))}
-                onRecord={() => openOverDetail(() => setRecordingMtgId(selectedOrig.id))}
-                onPlayRecording={uri => { void playRecording(uri); }}
-                onDeleteRecording={uri => deleteRecording(selectedOrig.id, uri)}
-                playingUri={playingUri}
-                colors={c}
-                tr={tr}
-                locale={locale}
-              />
-            ) : null}
-          </DetailPane>
-        ) : null}
-      </View>
+      {layout}
 
       <CreateChooser
         visible={!!createTarget}
@@ -924,7 +997,8 @@ const st = StyleSheet.create({
     position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 48 : 28, width: 56, height: 56,
     borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
   },
-  sideColumn: { borderLeftWidth: StyleSheet.hairlineWidth },
+  // Планшет: FAB над трьома крапками панелей (PanelToggles під головною).
+  fabWide: { bottom: 68 },
   hint: {
     minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8,
     borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 10,

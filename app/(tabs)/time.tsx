@@ -18,14 +18,19 @@ import { fontFamily } from '@/constants/theme';
  * звичне), з «Обрізати до …» одним дотиком. Рядок бере той самий звіт
  * `detectAnomalies`, що й блок, тож вони не розходяться.
  *
- * Компонування за шириною (рішення 5 аудиту планшета):
- *  • телефон — одна колонка, як і було;
- *  • портрет планшета (medium, 600–839) — одна колонка, але активні таймери
- *    сіткою у 2 колонки (KPI і так стоять рядком у 4);
- *  • широко (expanded і ≥720pt вмісту поруч із сайдбаром) — KPI рядком угорі,
- *    під ними дві колонки: зліва історія з фільтрами, справа липка панель
- *    «таймери → почати таймер → перевірка → розподіл». Правка запису
- *    відкривається В ЦІЙ ПАНЕЛІ, а не аркушем: список лишається видно.
+ * Компонування за шириною:
+ *  • телефон (compact) — одна колонка, як і було (без змін);
+ *  • планшет (medium/expanded) — три зони Layout System v2.4, як «Завдання»
+ *    (components/layout-zones):
+ *      [статична: KPI періоду · таймери · почати таймер · по днях · перевірка
+ *       · розподіл] ┃ [головна: історія записів] ┃ [динамічна: запис]
+ *    – статична стоїть поруч лише там, де вистачає ширини (ZoneLayout
+ *      вирішує сам); інакше ті самі картки — над історією в головній, а KPI —
+ *      у шапці;
+ *    – тап по запису (і «+») відкриває форму в динамічній зоні праворуч (у
+ *      вузькому вікні — нижній аркуш ZoneLayout), ✕ закриває, список
+ *      розтягується. Вибраний запис — у параметрі `?entry=` (диплінк),
+ *      видимість панелей — вибір пристрою (hooks/use-zone-state.ts).
  *
  * Чого тут навмисно НЕМАЄ:
  *  • вільного секундоміра — таймер стартує лише із задачі або зустрічі, бо
@@ -39,8 +44,6 @@ import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   SectionList,
   StyleSheet,
@@ -52,7 +55,9 @@ import {
 } from 'react-native';
 
 import { PressableScale } from '@/components/shared/PressableScale';
-import { SwipeRow, type SwipeAction } from '@/components/layout-zones';
+import {
+  DEFAULT_ZONE_SIZE_KEY, SwipeRow, ZONE_HANDLE_WIDTH, ZoneLayout, useZoneSizes, zoneWidths, type SwipeAction,
+} from '@/components/layout-zones';
 import { useFinanceLayoutStrings } from '@/components/finance/layoutStrings';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 // Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
@@ -70,13 +75,14 @@ import type { TimerCandidateTask } from '@/components/time/timerCandidates';
 import { useTimerProjects } from '@/components/time/useTimerProjects';
 import { timeColors } from '@/components/time/TimePalette';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Layout, detailColumnWidthFor } from '@/constants/tokens';
-import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
+import { TimeZoneKpiCard } from '@/components/time/TimeZoneKpiCard';
+import { useContentWidth } from '@/hooks/use-content-width';
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { useZoneState } from '@/hooks/use-zone-state';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import type { Translations } from '@/store/translations';
@@ -140,30 +146,16 @@ interface Section {
  */
 let migrationRan = false;
 
-/**
- * Від цієї ширини ВМІСТУ (вікно мінус сайдбар) — дві колонки. Рахуємо від
- * вмісту, а не від класу вікна: на 840pt з повним сайдбаром лишається ~600pt,
- * і дві колонки там були б тісніші за одну.
- */
-const TWO_PANE_MIN = 720;
-
-type PanelState = { mode: 'none' } | { mode: 'new' } | { mode: 'edit'; entry: TimeRecord };
-
 export default function TimeScreen() {
   const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
-  const { width, height, isWide, isExpanded } = useResponsive();
+  const { width, height, isWide } = useResponsive();
   const screenWidth = useScreenWidth();
-  /** Широко: KPI рядком, історія зліва, панель справа. */
-  const twoPane = isExpanded && screenWidth >= TWO_PANE_MIN;
   /**
-   * «+» на широкому — у правому нижньому куті КОЛОНКИ історії: відступ справа
-   * = поле центрованого тіла + гуттер + права панель + проміжок колонок.
+   * Планшет — три зони Layout System v2.4. Телефон (compact) сюди не
+   * потрапляє ніколи: його розмітка й поведінка лишаються як були.
    */
-  const wideFabRight = Math.max(screenWidth - WIDE_CONTENT_MAX_WIDTH, 0) / 2
-    + Layout.gutter.expanded + detailColumnWidthFor(width) + 20 + 16;
-  /** Портрет планшета: одна колонка, таймери сіткою в 2. */
-  const timerColumns = isWide && !twoPane ? 2 : 1;
+  const zoneMode = isWide;
   const { user } = useAuth();
   const projectRoles = useProjectRoles();
   // DS v2: canvas, білі картки без рамок, головна дія — action.primary.
@@ -203,8 +195,13 @@ export default function TimeScreen() {
   const [fsOpen, setFsOpen] = useState(false);
   const [sheetEntry, setSheetEntry] = useState<TimeRecord | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  /** Права панель широкого екрана: таймери або форма запису. */
-  const [panel, setPanel] = useState<PanelState>({ mode: 'none' });
+  /**
+   * Динамічна зона планшета: вибраний запис — у `?entry=` (useZoneState),
+   * новий запис — локально (порожня форма не має id для диплінка).
+   */
+  const zone = useZoneState({ section: 'time', selectedParam: 'entry', label: tr.navTimeTracker });
+  const zoneSizes = useZoneSizes(DEFAULT_ZONE_SIZE_KEY);
+  const [creating, setCreating] = useState(false);
   const panelScrollRef = React.useRef<ScrollView>(null);
 
   /**
@@ -436,42 +433,62 @@ export default function TimeScreen() {
       {
         text: tr.delete,
         style: 'destructive',
-        onPress: () => {
-          setEntries(prev => prev.filter(e => e.id !== entry.id));
-          // Запис, відкритий у панелі, щойно зник — форма над ним уже ні до чого.
-          setPanel(current => (current.mode === 'edit' && current.entry.id === entry.id ? { mode: 'none' } : current));
-        },
+        // Запис, відкритий у панелі, щойно зник — панель закриває ефект нижче
+        // (вибраного запису більше немає серед entries).
+        onPress: () => setEntries(prev => prev.filter(e => e.id !== entry.id)),
       },
     ]);
   }, [tr.cancel, tr.cannotUndo, tr.delete, tr.deletePermanently]);
 
+  const selectInZone = zone.select;
+  const closeZone = zone.closePanel;
+  /** Запис, відкритий у динамічній зоні (лише планшет). */
+  const zoneEntry = useMemo(
+    () => (zoneMode && zone.selectedId ? entries.find(e => e.id === zone.selectedId) ?? null : null),
+    [zoneMode, zone.selectedId, entries],
+  );
+  const dynamicOpen = zoneMode && (creating || (zone.panelOpen && !!zoneEntry));
+
   const openEntry = useCallback((entry: TimeRecord | null) => {
     haptic.light();
-    if (twoPane) {
-      setPanel(entry ? { mode: 'edit', entry } : { mode: 'new' });
+    if (zoneMode) {
+      if (entry) { setCreating(false); selectInZone(entry.id); }
+      else { closeZone(); setCreating(true); }
       return;
     }
     setSheetEntry(entry);
     setSheetOpen(true);
-  }, [twoPane]);
+  }, [zoneMode, selectInZone, closeZone]);
 
-  const closePanel = useCallback(() => setPanel({ mode: 'none' }), []);
+  const closePanel = useCallback(() => { setCreating(false); closeZone(); }, [closeZone]);
 
-  // Нова правка — з верху панелі: форма замінює таймери, і прокрутка, що
-  // лишилась від них, ховала б заголовок і поле задачі.
-  const panelKey = panel.mode === 'edit' ? panel.entry.id : panel.mode;
+  // Вибраний запис зник (видалили, синк прибрав) — панель закриваємо.
   useEffect(() => {
-    if (panel.mode !== 'none') panelScrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, [panelKey, panel.mode]);
+    if (zoneMode && initialized && zone.selectedId && !zoneEntry) closeZone();
+  }, [zoneMode, initialized, zone.selectedId, zoneEntry, closeZone]);
 
-  // Поворот / Split View звузив екран, поки форма була в панелі: панелі більше
-  // немає, тож правка переїжджає в аркуш, а не губиться разом із набраним.
+  // Нова правка — з верху панелі: прокрутка, що лишилась від попереднього
+  // запису, ховала б заголовок і поле задачі.
+  const panelKey = creating ? 'new' : zoneEntry?.id ?? '';
   useEffect(() => {
-    if (twoPane || panel.mode === 'none') return;
-    setSheetEntry(panel.mode === 'edit' ? panel.entry : null);
+    if (dynamicOpen) panelScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [panelKey, dynamicOpen]);
+
+  // Split View / Stage Manager звузив вікно до телефонного, поки форма була в
+  // зоні: зони більше немає, тож правка переїжджає в аркуш, а не губиться.
+  // Лише на ПЕРЕХОДІ планшет → телефон: телефон сам по собі зон не має.
+  const wasZoneMode = React.useRef(zoneMode);
+  useEffect(() => {
+    const was = wasZoneMode.current;
+    wasZoneMode.current = zoneMode;
+    if (zoneMode || !was || (!creating && !zone.selectedId)) return;
+    const pending = zone.selectedId ? entries.find(e => e.id === zone.selectedId) ?? null : null;
+    setCreating(false);
+    closeZone();
+    if (!creating && !pending) return;
+    setSheetEntry(pending);
     setSheetOpen(true);
-    setPanel({ mode: 'none' });
-  }, [twoPane, panel]);
+  }, [zoneMode, creating, zone.selectedId, entries, closeZone]);
 
   // «Почати таймер» — лише МОЇ задачі: трекати чужу задачу проєкту з
   // особистого екрана означало б записати свій час під роботу колеги.
@@ -542,6 +559,25 @@ export default function TimeScreen() {
     [locale],
   );
 
+  // ─── Зони планшета ─────────────────────────────────────────────────────────
+
+  const zoneFit = zoneWidths({
+    windowWidth: width,
+    screenWidth,
+    wide: isWide,
+    wantStatic: zone.panels.static,
+    wantDynamic: dynamicOpen,
+    sizes: zoneSizes,
+    handles: { static: ZONE_HANDLE_WIDTH, dynamic: ZONE_HANDLE_WIDTH },
+  });
+  /** Статична зона стоїть поруч: KPI й картки несе вона, а не шапка/головна. */
+  const staticBeside = zoneMode && zoneFit.showStatic;
+  /**
+   * Таймери сіткою в 2 — лише в широкій головній зоні планшета (без статичної
+   * поруч і без відкритої панелі). Телефон — одна колонка, як і було.
+   */
+  const timerColumns = zoneMode && !staticBeside && !dynamicOpen ? 2 : 1;
+
   // ─── Шматки розмітки, спільні для обох компонувань ─────────────────────────
 
   const activeTimersBlock = activeTimers.length > 0 ? (
@@ -599,7 +635,7 @@ export default function TimeScreen() {
   // Omni: шапка розділу «Історія» — icon-chip + назва, праворуч — період
   // (і «за проєктами») та кількість сесій вибірки.
   const historyTitle = (
-    <View style={[s.historyHead, { marginTop: twoPane ? 4 : 24 }]}>
+    <View style={[s.historyHead, { marginTop: staticBeside ? 8 : 24 }]}>
       <View style={[s.headChip, { backgroundColor: g.accent.amber.tint }]}>
         <IconSymbol name="clock.fill" size={16} color={g.accent.amber.ink} />
       </View>
@@ -612,7 +648,7 @@ export default function TimeScreen() {
     </View>
   );
 
-  const selectedId = twoPane && panel.mode === 'edit' ? panel.entry.id : null;
+  const selectedId = dynamicOpen && !creating ? zoneEntry?.id ?? null : null;
 
   const renderSectionHeader = ({ section }: { section: Section }) => (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, marginTop: 14 }}>
@@ -700,7 +736,7 @@ export default function TimeScreen() {
         accessibilityLabel={tr.history}
         style={{ flex: 1, minWidth: 0 }}
       />
-      {twoPane && (
+      {zoneMode && (
         <TouchableOpacity
           onPress={() => setShowFilters(true)}
           accessibilityRole="button"
@@ -747,209 +783,269 @@ export default function TimeScreen() {
     </BentoCard>
   );
 
-  const rightPanel = (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ width: detailColumnWidthFor(width), flexShrink: 0 }}>
-      <ScrollView
-        ref={panelScrollRef}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: tabBarInset + 24, gap: 14 }}>
-        {panel.mode !== 'none' ? (
-          <View
-            style={[s.panelCard, { backgroundColor: t.surface.card }]}
-            accessibilityLabel={panel.mode === 'edit' ? tr.timeEditEntry : tr.timeNewEntry}>
-            <TimeEntryForm
-              active
-              entry={panel.mode === 'edit' ? panel.entry : null}
-              c={c}
-              tr={tr}
-              tasks={taskChoices}
-              projects={projects}
-              taskProjects={taskProjects}
-              onClose={closePanel}
-              onSubmit={entry => { upsertEntry(entry); closePanel(); }}
-            />
-          </View>
-        ) : (
-          <>
-            {activeTimersCard(
-              <View style={[s.panelEmpty, { backgroundColor: t.surface.subtle }]}>
-                <IconSymbol name="stop.fill" size={12} color={c.sub} />
-                <Text style={{ color: c.sub, fontSize: 13, marginLeft: 8, flex: 1 }}>{tr.timeNothingRunning}</Text>
-              </View>,
-            )}
-            <StartTimerCard
-              c={c}
-              tr={tr}
-              tasks={myTimerTasks}
-              running={runningTaskIds}
-              projectById={projectById}
-              onStart={task => { void startFromPanel(task); }}
-            />
-            {daysCard}
-            {anomalyBlock}
-            <TimeProjectBreakdown {...kpiProps} />
-          </>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+  /** Картки контексту: статична зона, а без неї — над історією в головній. */
+  const contextCards = (
+    <>
+      {activeTimersCard(
+        <View style={[s.panelEmpty, { backgroundColor: t.surface.subtle }]}>
+          <IconSymbol name="stop.fill" size={12} color={c.sub} />
+          <Text style={{ color: c.sub, fontSize: 13, marginLeft: 8, flex: 1 }}>{tr.timeNothingRunning}</Text>
+        </View>,
+      )}
+      <StartTimerCard
+        c={c}
+        tr={tr}
+        tasks={myTimerTasks}
+        running={runningTaskIds}
+        projectById={projectById}
+        onStart={task => { void startFromPanel(task); }}
+      />
+      {daysCard}
+      {anomalyBlock}
+      <TimeProjectBreakdown {...kpiProps} />
+    </>
   );
+
+  const zoneStatic = (
+    <View style={{ gap: 14 }} testID="time-static-zone">
+      <TimeZoneKpiCard
+        title={periodLabels[period]}
+        total={initialized && total > 0 ? fmtDur(total) : '—'}
+        average={initialized && average > 0 ? fmtDur(average) : '—'}
+        typical={initialized && typical > 0 ? fmtDur(typical) : '—'}
+        tr={tr}
+      />
+      {contextCards}
+    </View>
+  );
+
+  const zoneForm = dynamicOpen ? (
+    <TimeEntryForm
+      active
+      entry={creating ? null : zoneEntry}
+      c={c}
+      tr={tr}
+      tasks={taskChoices}
+      projects={projects}
+      taskProjects={taskProjects}
+      onClose={closePanel}
+      onSubmit={entry => { upsertEntry(entry); closePanel(); }}
+    />
+  ) : null;
+
+  const headerKpis = initialized ? (
+    <>
+      <KpiCounter value={total > 0 ? fmtDur(total) : '—'} label={tr.totalLabel} />
+      <KpiCounter value={average > 0 ? fmtDur(average) : '—'} label={tr.timeAverageTask} />
+      <KpiCounter value={typical > 0 ? fmtDur(typical) : '—'} label={tr.timeTypicalSession} />
+    </>
+  ) : undefined;
+
+  const fab = (
+    <PressableScale
+      onPress={() => openEntry(null)}
+      scaleTo={0.92}
+      accessibilityLabel={tr.timeAddEntry}
+      style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: t.action.primary }]}>
+      <IconSymbol name="plus" size={26} color={t.text.onAction} />
+    </PressableScale>
+  );
+
+  /** Аркуші й повноекранні таймери — спільні для обох компонувань. */
+  const sheets = (
+    <>
+        <TimeEntrySheet
+          visible={sheetOpen}
+          entry={sheetEntry}
+          c={c}
+          isDark={isDark}
+          height={height}
+          isWide={isWide}
+          tr={tr}
+          tasks={taskChoices}
+          projects={projects}
+          taskProjects={taskProjects}
+          onClose={() => { setSheetOpen(false); setSheetEntry(null); }}
+          onSubmit={upsertEntry}
+        />
+
+        <TimeFilterSheet
+          visible={showFilters}
+          c={c}
+          isDark={isDark}
+          height={height}
+          isWide={isWide}
+          period={period}
+          sort={sort}
+          grouping={grouping}
+          projectId={filterProjectId}
+          taskKey={filterTaskKey}
+          projects={projectsForFilter}
+          tasks={tasksForFilter}
+          periodLabels={periodLabels}
+          tr={tr}
+          onChange={next => {
+            if (next.period !== undefined) setPeriod(next.period);
+            if (next.sort !== undefined) setSort(next.sort);
+            if (next.grouping !== undefined) setGrouping(next.grouping);
+            if (next.projectId !== undefined) setFilterProjectId(next.projectId);
+            if (next.taskKey !== undefined) setFilterTaskKey(next.taskKey);
+          }}
+          onReset={resetFilters}
+          onClose={() => setShowFilters(false)}
+        />
+
+        <FullscreenTimers visible={fsOpen} onClose={() => setFsOpen(false)} />
+    </>
+  );
+
+  // Omni: глобальна шапка (☰ · дзвіник · акаунт; рядок інструментів на
+  // планшеті) + KPI обраного періоду. «Середнє на задачу» і «Звичайна
+  // сесія» стоять поруч навмисно (див. components/time/TimeKpi.tsx).
+  const appHeader = (
+    <AppHeader
+      title={tr.navTimeTracker}
+      paddingBottom={14}
+      // Статична зона поруч несе ті самі KPI — шапка їх не дублює.
+      kpis={staticBeside ? undefined : headerKpis}
+      actions={
+        <>
+          {/* Режим зосередження показує те, що йде просто зараз, тож вхід у
+              порожню сітку обіцяв би, що там щось є. */}
+          {activeTimers.length > 0 && (
+            <HeaderButton
+              onPress={() => { haptic.light(); setFsOpen(true); }}
+              accessibilityLabel={`${tr.fullscreenTimers}, ${tr.activeTimers}: ${activeTimers.length}`}>
+              <IconSymbol name="timer" size={17} color={c.indigo} />
+            </HeaderButton>
+          )}
+          {/* На широкому фільтри стоять над самою історією (вкладки
+              періоду + «Ще фільтри»), тож кнопка в шапці дублювала б їх. */}
+          {!zoneMode && (
+            <HeaderButton
+              onPress={() => setShowFilters(true)}
+              accessibilityLabel={tr.filtersAndSort}
+              style={hasFilters ? { backgroundColor: c.indigo + '20' } : undefined}>
+              <IconSymbol name="slider.horizontal.3" size={17} color={hasFilters ? c.indigo : c.sub} />
+            </HeaderButton>
+          )}
+        </>
+      }
+    />
+  );
+
+  if (zoneMode) {
+    // ── Планшет: три зони (Layout System v2.4) ─────────────────────────────
+    const mainZone = (
+      <View style={{ flex: 1 }}>
+        {appHeader}
+        <SectionList
+          sections={sections}
+          keyExtractor={item => item.id}
+          // Місце під плаваючу «+» (56 + відступ 20) із запасом.
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 96 }}
+          showsVerticalScrollIndicator={false}
+          stickySectionHeadersEnabled={false}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          renderSectionFooter={() => <View style={{ height: 6 }} />}
+          renderSectionHeader={renderSectionHeader}
+          renderItem={renderItem}
+          ListEmptyComponent={emptyList}
+          ListHeaderComponent={
+            <View style={{ gap: 14 }}>
+              {periodTabs}
+              {/* Статичної зони поруч немає — її картки стоять над історією
+                  (порожньої «Активні (0)» тут немає, як і на телефоні). */}
+              {!staticBeside && (
+                <>
+                  {activeTimersBlock && activeTimersCard(null)}
+                  <StartTimerCard
+                    c={c}
+                    tr={tr}
+                    tasks={myTimerTasks}
+                    running={runningTaskIds}
+                    projectById={projectById}
+                    onStart={task => { void startFromPanel(task); }}
+                  />
+                  {daysCard}
+                  <TimeProjectBreakdown {...kpiProps} />
+                  {anomalyBlock}
+                </>
+              )}
+              {historyTitle}
+            </View>
+          }
+        />
+      </View>
+    );
+    return (
+      <View style={{ flex: 1 }}>
+        <MeshBackground />
+        <ZoneLayout
+          testID="time-zones"
+          main={mainZone}
+          dynamic={zoneForm}
+          dynamicOpen={dynamicOpen}
+          onCloseDynamic={closePanel}
+          dynamicLabel={creating ? tr.timeNewEntry : tr.timeEditEntry}
+          dynamicScrollRef={panelScrollRef}
+          // ✕ і заголовок дає сама форма (TimeEntryForm).
+          dynamicChrome={false}
+          static={zoneStatic}
+          showStatic={zone.panels.static}
+          panels={zone.panels}
+          onTogglePanel={zone.togglePanel}
+          fab={fab}
+        />
+        {sheets}
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
       <MeshBackground />
       <View style={{ flex: 1 }}>
-        {/* Omni: глобальна шапка (☰ · дзвіник · акаунт; рядок інструментів на
-            планшеті) + KPI обраного періоду. «Середнє на задачу» і «Звичайна
-            сесія» стоять поруч навмисно (див. components/time/TimeKpi.tsx). */}
-        <AppHeader
-          title={tr.navTimeTracker}
-          paddingBottom={14}
-          kpis={initialized ? (
-            <>
-              <KpiCounter value={total > 0 ? fmtDur(total) : '—'} label={tr.totalLabel} />
-              <KpiCounter value={average > 0 ? fmtDur(average) : '—'} label={tr.timeAverageTask} />
-              <KpiCounter value={typical > 0 ? fmtDur(typical) : '—'} label={tr.timeTypicalSession} />
-            </>
-          ) : undefined}
-          actions={
-            <>
-              {/* Режим зосередження показує те, що йде просто зараз, тож вхід у
-                  порожню сітку обіцяв би, що там щось є. */}
-              {activeTimers.length > 0 && (
-                <HeaderButton
-                  onPress={() => { haptic.light(); setFsOpen(true); }}
-                  accessibilityLabel={`${tr.fullscreenTimers}, ${tr.activeTimers}: ${activeTimers.length}`}>
-                  <IconSymbol name="timer" size={17} color={c.indigo} />
-                </HeaderButton>
-              )}
-              {/* На широкому фільтри стоять над самою історією (вкладки
-                  періоду + «Ще фільтри»), тож кнопка в шапці дублювала б їх. */}
-              {!twoPane && (
-                <HeaderButton
-                  onPress={() => setShowFilters(true)}
-                  accessibilityLabel={tr.filtersAndSort}
-                  style={hasFilters ? { backgroundColor: c.indigo + '20' } : undefined}>
-                  <IconSymbol name="slider.horizontal.3" size={17} color={hasFilters ? c.indigo : c.sub} />
-                </HeaderButton>
-              )}
-            </>
+        {appHeader}
+        <SectionList
+          sections={sections}
+          keyExtractor={item => item.id}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }]}
+          showsVerticalScrollIndicator={false}
+          stickySectionHeadersEnabled={false}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          renderSectionFooter={() => <View style={{ height: 6 }} />}
+          renderSectionHeader={renderSectionHeader}
+          renderItem={renderItem}
+          ListEmptyComponent={emptyList}
+          ListHeaderComponent={
+            <View style={{ gap: 14 }}>
+              {/* Період — вкладки розділу одразу під шапкою (Omni). */}
+              {periodTabs}
+
+              {/* 1. Що йде ЗАРАЗ. Порожньої картки немає навмисно: «Активні
+                  (0)» щодня займали б екран ні за що. */}
+              {activeTimersBlock && activeTimersCard(null)}
+
+              {/* 2. Підсумки: стовпці «По днях» і розподіл за проєктами
+                  (самі KPI періоду — у шапці). */}
+              {daysCard}
+              <TimeProjectBreakdown {...kpiProps} />
+
+              {/* 3. Що треба перевірити. */}
+              {anomalyBlock}
+
+              {/* 4. Самі записи. */}
+              {historyTitle}
+            </View>
           }
         />
-
-        {twoPane ? (
-          <View style={[s.wideBody, { maxWidth: WIDE_CONTENT_MAX_WIDTH, paddingHorizontal: Layout.gutter.expanded }]}>
-            {/* KPI періоду — у шапці (Omni), тож тут одразу дві колонки. */}
-            <View style={s.wideColumns}>
-              <SectionList
-                style={{ flex: 1, minWidth: 0 }}
-                sections={sections}
-                keyExtractor={item => item.id}
-                contentContainerStyle={{ paddingTop: 4, paddingBottom: tabBarInset + 24 }}
-                showsVerticalScrollIndicator={false}
-                stickySectionHeadersEnabled={false}
-                ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-                renderSectionFooter={() => <View style={{ height: 6 }} />}
-                renderSectionHeader={renderSectionHeader}
-                renderItem={renderItem}
-                ListEmptyComponent={emptyList}
-                ListHeaderComponent={<>{historyTitle}{periodTabs}</>}
-              />
-              {rightPanel}
-            </View>
-          </View>
-        ) : (
-          <SectionList
-            sections={sections}
-            keyExtractor={item => item.id}
-            contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }]}
-            showsVerticalScrollIndicator={false}
-            stickySectionHeadersEnabled={false}
-            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-            renderSectionFooter={() => <View style={{ height: 6 }} />}
-            renderSectionHeader={renderSectionHeader}
-            renderItem={renderItem}
-            ListEmptyComponent={emptyList}
-            ListHeaderComponent={
-              <View style={{ gap: 14 }}>
-                {/* Період — вкладки розділу одразу під шапкою (Omni). */}
-                {periodTabs}
-
-                {/* 1. Що йде ЗАРАЗ. Порожньої картки немає навмисно: «Активні
-                    (0)» щодня займали б екран ні за що. */}
-                {activeTimersBlock && activeTimersCard(null)}
-
-                {/* 2. Підсумки: стовпці «По днях» і розподіл за проєктами
-                    (самі KPI періоду — у шапці). */}
-                {daysCard}
-                <TimeProjectBreakdown {...kpiProps} />
-
-                {/* 3. Що треба перевірити. */}
-                {anomalyBlock}
-
-                {/* 4. Самі записи. */}
-                {historyTitle}
-              </View>
-            }
-          />
-        )}
       </View>
 
-      {/* Layout System v2.4: «+» — плаваюча в правому нижньому куті СПИСКУ на
-          всіх розмірах. На широкому список — ліва колонка, тож кнопка стоїть
-          лівіше від правої панелі, а не посеред екрана. */}
-      <PressableScale
-        onPress={() => openEntry(null)}
-        scaleTo={0.92}
-        accessibilityLabel={tr.timeAddEntry}
-        style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: t.action.primary }, twoPane && { right: wideFabRight }]}>
-        <IconSymbol name="plus" size={26} color={t.text.onAction} />
-      </PressableScale>
+      {/* Layout System v2.4: «+» — плаваюча в правому нижньому куті списку. */}
+      {fab}
 
-      <TimeEntrySheet
-        visible={sheetOpen}
-        entry={sheetEntry}
-        c={c}
-        isDark={isDark}
-        height={height}
-        isWide={isWide}
-        tr={tr}
-        tasks={taskChoices}
-        projects={projects}
-        taskProjects={taskProjects}
-        onClose={() => { setSheetOpen(false); setSheetEntry(null); }}
-        onSubmit={upsertEntry}
-      />
-
-      <TimeFilterSheet
-        visible={showFilters}
-        c={c}
-        isDark={isDark}
-        height={height}
-        isWide={isWide}
-        period={period}
-        sort={sort}
-        grouping={grouping}
-        projectId={filterProjectId}
-        taskKey={filterTaskKey}
-        projects={projectsForFilter}
-        tasks={tasksForFilter}
-        periodLabels={periodLabels}
-        tr={tr}
-        onChange={next => {
-          if (next.period !== undefined) setPeriod(next.period);
-          if (next.sort !== undefined) setSort(next.sort);
-          if (next.grouping !== undefined) setGrouping(next.grouping);
-          if (next.projectId !== undefined) setFilterProjectId(next.projectId);
-          if (next.taskKey !== undefined) setFilterTaskKey(next.taskKey);
-        }}
-        onReset={resetFilters}
-        onClose={() => setShowFilters(false)}
-      />
-
-      <FullscreenTimers visible={fsOpen} onClose={() => setFsOpen(false)} />
+      {sheets}
     </View>
   );
 }

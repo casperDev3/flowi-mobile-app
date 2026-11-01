@@ -19,6 +19,8 @@ jest.mock('expo-secure-store', () => ({
 }));
 jest.mock('expo-web-browser', () => ({ openAuthSessionAsync: jest.fn() }));
 jest.mock('expo-av', () => ({ Audio: null }));
+// Аудіо наради вантажить нативні модулі через import() — у jest їх немає.
+jest.mock('@/components/meetings/MeetingAudio', () => ({ MeetingAudio: () => null }));
 jest.mock('expo-blur', () => ({ BlurView: 'BlurView' }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('@/components/shared/SheetModal', () => ({
@@ -183,5 +185,45 @@ describe('CalendarScreen', () => {
     const t = texts(tree).join('|');
     expect(t).toContain('Планування');
     expect(t).not.toContain('Здати звіт');
+  });
+  describe('планшет: три зони (Layout System v2.4)', () => {
+    const { ZoneLayout } = require('@/components/layout-zones');
+    const { TimeGrid } = require('@/components/calendar/TimeGrid');
+
+    it('телефон: без ZoneLayout і без статичної зони — розкладка як раніше', async () => {
+      const tree = await mount(390);
+      expect(tree.root.findAllByType(ZoneLayout)).toHaveLength(0);
+      expect(tree.root.findAll((n: any) => n.props.testID === 'calendar-static-pane')).toHaveLength(0);
+    });
+
+    it('широке вікно ≥1280: статична зона з міні-місяцем і списком дня поруч із тижнем', async () => {
+      const tree = await mount(1366);
+      const zones = tree.root.findByType(ZoneLayout);
+      expect(zones.props.static).toBeTruthy();
+      expect(tree.root.findAll((n: any) => n.props.testID === 'calendar-static-pane').length).toBeGreaterThan(0);
+      expect(tree.root.findAll((n: any) => n.props.testID === 'calendar-mini-month').length).toBeGreaterThan(0);
+      // «+» — FAB головної зони, а не кнопка в шапці.
+      expect(zones.props.fab).toBeTruthy();
+      expect(tree.root.findAll((n: any) => n.props.testID === 'calendar-fab' && n.props.onPress).length).toBeGreaterThan(0);
+    });
+
+    it('вибір зустрічі відкриває динамічну зону з деталями, ✕ — закриває', async () => {
+      const tree = await mount(1366);
+      const grid = tree.root.findByType(TimeGrid);
+      const mtg = Object.values(grid.props.meetingsByDay as Record<string, any[]>).flat().find((m: any) => m.title === 'Планування');
+      await act(async () => { grid.props.onMeetingPress(mtg); });
+      let zones = tree.root.findByType(ZoneLayout);
+      expect(zones.props.dynamicOpen).toBe(true);
+      expect(zones.props.dynamicLabel).toBe('Планування');
+      await act(async () => { zones.props.onCloseDynamic(); });
+      zones = tree.root.findByType(ZoneLayout);
+      expect(zones.props.dynamicOpen).toBe(false);
+    });
+
+    it('iPad 1024: статичної зони поруч немає (менше 1280), сітка тижня лишається', async () => {
+      const tree = await mount(1024);
+      expect(tree.root.findAll((n: any) => n.props.testID === 'calendar-static-pane')).toHaveLength(0);
+      expect(texts(tree).join('|')).toContain('09:00');
+    });
   });
 });

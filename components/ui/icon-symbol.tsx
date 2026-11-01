@@ -210,6 +210,9 @@ const MAPPING: Record<string, MaterialIconName> = {
   'list.bullet.clipboard': 'assignment',
   'location.fill': 'location-on',
   'mappin': 'place',
+  // Шпилька сайдбара планшета (закріпити меню / розділ).
+  'pin': 'push-pin',
+  'pin.fill': 'push-pin',
   'mic.fill': 'mic',
   'number': 'tag',
   'paperplane': 'near-me',

@@ -33,11 +33,34 @@ import { Image } from 'expo-image';
  * accessibilityLabel), заголовки груп — кнопки-шеврони. Кнопка вгорі
  * розгортає/згортає сайдбар; вибір запам'ятовується окремо для кожного класу
  * вікна (components/shared/sidebar-mode.ts — його ж читає useScreenWidth()).
+ *
+ * ШПИЛЬКА (планшет, 11.2026). Повний сайдбар буває у двох станах:
+ *   • ЗАКРІПЛЕНИЙ (шпилька залита) — стоїть поруч із вмістом і штовхає його,
+ *     як і раніше; не згортається сам. Це режим 'full' у sidebar-mode;
+ *   • НЕЗАКРІПЛЕНИЙ — під ним лежить рейка 76pt, а розгорнутий сайдбар
+ *     виїжджає ПОВЕРХ вмісту («брудне скло» OverlaySurface + легке
+ *     затемнення). Тап поза ним, «Назад» (Android), жест VoiceOver «Escape»
+ *     (і Esc на вебі) або перехід на пункт — згортають назад у рейку.
+ * Кнопка-шпилька стоїть поруч зі шевроном «згорнути». Вибір запам'ятовується
+ * локально для класу вікна (той самий ключ 'nav_sidebar_mode', що й раніше:
+ * закріплений = 'full', ні = 'rail'), тож наявні налаштування не губляться.
+ *
+ * ГРУПИ ПЛАНШЕТА: «Сьогодні» (Огляд) — над «Роботою», «Інтеграції» — у «Ще»,
+ * закріплені розділи — одразу під Оглядом зі шпилькою (tabletNavGroups,
+ * applyPinnedSections у constants/nav.ts; закріплення — синхронізоване поле
+ * ui_preferences.pinnedSections, components/shared/pinned-sections.ts).
+ * Шухляда телефона (variant="drawer") лишається з маніфестом як є.
  */
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AccessibilityInfo, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeIn, SlideInLeft } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { OverlayScrim, OverlaySurface } from '@/components/ds/OverlaySurface';
+import { usePinnedSections } from '@/components/shared/pinned-sections';
+import { useSidebarStrings } from '@/components/shared/sidebar-strings';
+import { useMotion } from '@/hooks/use-motion';
 
 import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 import {
@@ -60,12 +83,15 @@ import { useTimerContext } from '@/store/timer-context';
 import {
   DEFAULT_COLLAPSED_GROUP_IDS,
   SIDEBAR_WIDTH,
+  applyPinnedSections,
   groupHasActiveItem,
+  isPinnableNavItem,
   isGroupCollapsed,
   isNavItemActive,
   menuNavGroups,
   navGroupsFor,
   sanitizeCollapsedGroupIds,
+  tabletNavGroups,
   toggleCollapsedGroupId,
   visibleNavGroups,
 } from '@/constants/nav';
@@ -129,11 +155,49 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
   const mode = useNavSidebarMode(sizeClass, windowWidth);
   const drawer = variant === 'drawer';
   const rail = !drawer && mode === 'rail';
+  /** Повний сайдбар стоїть поруч із вмістом (шпилька залита). */
+  const pinnedSidebar = !drawer && mode === 'full';
+  /** Незакріплений сайдбар розгорнуто поверх вмісту. */
+  const [peek, setPeek] = useState(false);
+  const overlayOpen = rail && peek;
+  const motion = useMotion();
+  const ss = useSidebarStrings();
+  const expandRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
+
+  const closePeek = useCallback(() => {
+    setPeek(false);
+    // Фокус VoiceOver — назад на кнопку, що відкрила сайдбар.
+    requestAnimationFrame(() => {
+      const node = expandRef.current;
+      if (node) {
+        try { AccessibilityInfo.sendAccessibilityEvent(node as never, 'focus'); } catch { /* немає a11y-модуля (тести) */ }
+      }
+    });
+  }, []);
+
   const go = useCallback((route: string) => {
     router.push(route as never);
     onNavigate?.();
+    // Незакріплений сайдбар після переходу згортається — вміст знову видно.
+    setPeek(false);
   }, [router, onNavigate]);
   const { activeTimers } = useTimerContext();
+
+  // Закріпили (режим 'full') або змінився клас вікна — розгорнутого поверх
+  // сайдбара більше немає.
+  useEffect(() => { if (!rail) setPeek(false); }, [rail]);
+  useEffect(() => { setPeek(false); }, [sizeClass]);
+  // Перехід, зроблений НЕ з сайдбара (кнопка в екрані, сповіщення), теж
+  // згортає незакріплений сайдбар.
+  useEffect(() => { setPeek(false); }, [pathname]);
+
+  // Esc на вебі (react-native-web) — те саме, що тап поза сайдбаром.
+  useEffect(() => {
+    if (!overlayOpen || Platform.OS !== 'web' || typeof document === 'undefined') return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closePeek(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [overlayOpen, closePeek]);
 
   useEffect(() => {
     loadData<SidebarOverrides>(MODE_KEY, {})
@@ -144,12 +208,37 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
       .catch(e => { if (__DEV__) console.warn('[nav] режим сайдбара не прочитався:', e); });
   }, []);
 
-  const toggleRail = useCallback(() => {
-    const next = setSidebarOverride(sizeClass, rail ? 'full' : 'rail');
-    void saveData(MODE_KEY, next).catch(e => {
+  const saveMode = useCallback((next: 'full' | 'rail') => {
+    const all = setSidebarOverride(sizeClass, next);
+    void saveData(MODE_KEY, all).catch(e => {
       if (__DEV__) console.warn('[nav] режим сайдбара не зберігся:', e);
     });
-  }, [sizeClass, rail]);
+  }, [sizeClass]);
+
+  /** Шпилька: закріпити (поруч із вмістом) / відкріпити (лишається розгорнутим поверх). */
+  const togglePin = useCallback(() => {
+    if (pinnedSidebar) {
+      saveMode('rail');
+      setPeek(true);
+    } else {
+      saveMode('full');
+      setPeek(false);
+    }
+  }, [pinnedSidebar, saveMode]);
+
+  /** Шеврон: рейка → розгорнути поверх; розгорнутий → згорнути в рейку. */
+  const toggleRail = useCallback(() => {
+    if (rail) {
+      if (peek) closePeek();
+      else setPeek(true);
+      return;
+    }
+    // Закріплений сайдбар згортається в рейку і відкріплюється.
+    saveMode('rail');
+    setPeek(false);
+  }, [rail, peek, closePeek, saveMode]);
+
+  const { isPinned, setPinned, pinned: pinnedSections } = usePinnedSections();
 
   // Вимкнені модулі — з акаунта (синхронізований 'ui_preferences'), а не з
   // цього пристрою: користувач вимкнув розділ на телефоні, і на планшеті його
@@ -158,12 +247,15 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
 
   // «Адміністрування workspace» — лише адміну, у групі «Особисте» (та сама
   // умова й те саме місце, що на вебі — див. constants/nav.ts).
-  const navGroups = useMemo(
+  const navGroups = useMemo(() => {
     // menuNavGroups — без пунктів-вкладок «Фінансів» (бюджет, підписки,
     // рахунки): вони живуть на екрані Фінансів як вкладки (§2.3).
-    () => menuNavGroups(visibleNavGroups(navGroupsFor(!!user?.isAdmin), disabledModules)),
-    [user?.isAdmin, disabledModules],
-  );
+    const base = menuNavGroups(visibleNavGroups(navGroupsFor(!!user?.isAdmin), disabledModules));
+    // Телефон (шухляда) — маніфест як є; планшет — Огляд угорі, Інтеграції в
+    // «Ще», закріплені під Оглядом. Вимкнені модулі відфільтровано ВИЩЕ,
+    // тож закріплений, але вимкнений розділ не з'являється.
+    return drawer ? base : applyPinnedSections(tabletNavGroups(base), pinnedSections);
+  }, [user?.isAdmin, disabledModules, drawer, pinnedSections]);
 
   const [collapsed, setCollapsed] = useState<readonly string[]>(DEFAULT_COLLAPSED_GROUP_IDS);
   // Писати лише після дії людини: інакше перше ж читання записувало б себе ж.
@@ -242,113 +334,94 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
     </>
   );
 
-  const toggleLabel = rail ? tr.navSidebarExpand : tr.navSidebarCollapse;
-  const toggleButton = drawer ? (
-    onClose ? (
-      <TouchableOpacity
-        onPress={onClose}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-        accessibilityLabel={tr.close}
-        hitSlop={4}
-        style={st.iconBtn}>
-        <IconSymbol name="xmark" size={16} color={c.sub} />
-      </TouchableOpacity>
-    ) : null
-  ) : (
+  const closeButton = drawer && onClose ? (
     <TouchableOpacity
+      onPress={onClose}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={tr.close}
+      hitSlop={4}
+      style={st.iconBtn}>
+      <IconSymbol name="xmark" size={16} color={c.sub} />
+    </TouchableOpacity>
+  ) : null;
+
+  // Рейка: шеврон «розгорнути» (поверх вмісту).
+  const expandButton = (
+    <TouchableOpacity
+      ref={expandRef}
       onPress={toggleRail}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={toggleLabel}
-      accessibilityState={{ expanded: !rail }}
+      accessibilityLabel={tr.navSidebarExpand}
+      accessibilityState={{ expanded: overlayOpen }}
       hitSlop={4}
       style={st.iconBtn}>
-      <IconSymbol name={rail ? 'chevron.right' : 'chevron.left'} size={16} color={c.sub} />
+      <IconSymbol name="chevron.right" size={16} color={c.sub} />
     </TouchableOpacity>
   );
 
-  if (rail) {
-    return (
-      <View
-        style={[st.root, st.railRoot, { width: Layout.railWidth, backgroundColor: reduceTransparency ? c.bg : 'transparent', paddingTop: insets.top + 14 }]}
-        accessibilityRole="menu">
-        {glassLayer}
-        <Image source={require('@/assets/logo_app.png')} style={st.railLogo} accessible={false} />
-        {toggleButton}
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, alignItems: 'center' }}>
-          {navGroups.map((group, gi) => {
-            const hidden = isGroupCollapsed(group, collapsed);
-            const collapsible = Boolean(group.id);
-            // Згорнута група з поточним розділом — крапка на шевроні, щоб було
-            // видно, де ви, навіть коли пункт сховано.
-            const activeInside = hidden && groupHasActiveItem(group, pathname);
-            const groupTitle = group.titleKey ? String(tr[group.titleKey] ?? '') : '';
-            return (
-              <View key={group.id ?? `g${gi}`} style={[st.railGroup, gi > 0 && st.railGroupGap]}>
-                {collapsible && (
-                  <TouchableOpacity
-                    onPress={() => toggleGroup(group.id)}
-                    activeOpacity={0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel={groupTitle}
-                    accessibilityState={{ expanded: !hidden, selected: activeInside }}
-                    style={st.iconBtn}>
-                    <IconSymbol name={hidden ? 'chevron.right' : 'chevron.down'} size={13} color={activeInside ? c.accent : c.sub} />
-                    {hidden && <Text style={[st.railCount, { color: activeInside ? c.accent : c.sub }]}>{group.items.length}</Text>}
-                    {activeInside && <View style={[st.activeDot, st.railActiveDot, { backgroundColor: c.accent }]} />}
-                  </TouchableOpacity>
-                )}
-                {!hidden && group.items.map(item => {
-                  const active = isNavItemActive(item, pathname);
-                  const accent = navItemAccent(item);
-                  return (
-                    <TouchableOpacity
-                      key={item.route}
-                      onPress={() => go(item.route)}
-                      activeOpacity={0.7}
-                      accessibilityRole="menuitem"
-                      accessibilityLabel={String(tr[item.labelKey] ?? '')}
-                      accessibilityState={{ selected: active }}
-                      style={[st.railItem, active && activeStyle(accent)]}>
-                      <View style={[st.railChip, active ? null : iconChip(accent, false)]}>
-                        <IconSymbol name={item.icon} size={19} color={active ? activeIcon(accent) : idleIcon(accent)} />
-                      </View>
-                      {item.route === '/(tabs)/settings' && (
-                        <NotificationBadge variant="dot" style={st.railBadge} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            );
-          })}
-        </ScrollView>
-        {/* Повна картка таймерів у 76pt не влазить — лишаємо вхід у Трекер
-            часу з лічильником, щоб зупинити таймер можна було звідусіль. */}
-        {activeTimers.length > 0 && (
-          <View style={{ paddingBottom: insets.bottom + 10, alignItems: 'center' }}>
-            <TouchableOpacity
-              onPress={() => go('/(tabs)/time')}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={`${tr.navTime}: ${activeTimers.length}`}
-              style={[st.railItem, { backgroundColor: timerCardColors.activeBg }]}>
-              <IconSymbol name="timer" size={21} color={c.accent} />
-              <Text style={[st.railTimerCount, { color: c.accent }]}>{activeTimers.length}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
-  }
+  // Повний сайдбар (закріплений або поверх): шпилька + шеврон «згорнути».
+  const pinControls = drawer ? closeButton : (
+    <View style={st.headBtns}>
+      <TouchableOpacity
+        onPress={togglePin}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={pinnedSidebar ? ss.unpinSidebar : ss.pinSidebar}
+        accessibilityHint={ss.pinSidebarHint}
+        accessibilityState={{ selected: pinnedSidebar }}
+        testID="nav-sidebar-pin"
+        style={[st.iconBtn, pinnedSidebar && { backgroundColor: t.surface.subtle }]}>
+        <IconSymbol name={pinnedSidebar ? 'pin.fill' : 'pin'} size={15} color={pinnedSidebar ? c.text : c.sub} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={pinnedSidebar ? toggleRail : closePeek}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={tr.navSidebarCollapse}
+        accessibilityState={{ expanded: true }}
+        testID="nav-sidebar-collapse"
+        style={st.iconBtn}>
+        <IconSymbol name="chevron.left" size={16} color={c.sub} />
+      </TouchableOpacity>
+    </View>
+  );
 
-  return (
+  /** Дії доступності для пункту, який можна закріпити. */
+  const pinA11y = (item: NavItem) => {
+    if (drawer || !isPinnableNavItem(item)) return null;
+    const on = isPinned(item.module);
+    return {
+      accessibilityActions: [{ name: 'togglePin', label: on ? ss.unpinAction : ss.pinAction }],
+      onAccessibilityAction: (e: { nativeEvent: { actionName: string } }) => {
+        if (e.nativeEvent.actionName === 'togglePin') setPinned(item.module);
+      },
+      // Утримання пункту — закріпити / відкріпити (швидкий шлях поза налаштуваннями).
+      onLongPress: () => setPinned(item.module),
+      delayLongPress: 450,
+    };
+  };
+
+  // ── Повний сайдбар: закріплений (docked), поверх вмісту (overlay) або шухляда ──
+  const renderFull = (overlay: boolean) => (
     <View
-      style={[st.root, { width: drawer ? (width ?? SIDEBAR_WIDTH) : SIDEBAR_WIDTH, backgroundColor: reduceTransparency && !drawer ? t.surface.card : 'transparent', paddingTop: insets.top + 14 }, drawer && { flex: 1 }]}
+      style={[
+        st.root,
+        {
+          width: drawer ? (width ?? SIDEBAR_WIDTH) : SIDEBAR_WIDTH,
+          backgroundColor: reduceTransparency && !drawer && !overlay ? t.surface.card : 'transparent',
+          paddingTop: insets.top + 14,
+        },
+        (drawer || overlay) && { flex: 1 },
+      ]}
       accessibilityRole="menu">
-      {drawer ? null : glassLayer}
-      <View style={{flexDirection:'row',alignItems:'center',gap:10,marginBottom:12}}><Image source={require('@/assets/logo_app.png')} style={{width:34,height:34,borderRadius:Atlas.radius.medium}} accessible={false}/><Text style={[st.brand, { color: c.text, marginBottom:0, flex: 1 }]}>Flowi</Text>{toggleButton}</View>
+      {drawer || overlay ? null : glassLayer}
+      <View style={st.headRow}>
+        <Image source={require('@/assets/logo_app.png')} style={st.headLogo} accessible={false} />
+        <Text style={[st.brand, { color: c.text, marginBottom: 0, flex: 1 }]}>Flowi</Text>
+        {pinControls}
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
         {navGroups.map((group, gi) => {
@@ -358,9 +431,13 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
           const collapsible = Boolean(group.id);
           const activeInside = hidden && groupHasActiveItem(group, pathname);
           const title = group.titleKey ? String(tr[group.titleKey] ?? '').toUpperCase() : '';
+          const pinnedGroup = group.kind === 'pinned';
 
           return (
-            <View key={group.id ?? `g${gi}`} style={{ marginBottom: hidden ? 6 : 14 }}>
+            <View
+              key={group.id ?? group.kind ?? `g${gi}`}
+              style={{ marginBottom: hidden ? 6 : group.kind ? 8 : 14 }}
+              accessibilityLabel={pinnedGroup ? ss.pinnedGroup : undefined}>
               {group.titleKey && (
                 collapsible ? (
                   <TouchableOpacity
@@ -394,26 +471,46 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
               {!hidden && group.items.map(item => {
                 const active = isNavItemActive(item, pathname);
                 const accent = navItemAccent(item);
-                return (
+                const label = String(tr[item.labelKey] ?? '');
+                const row = (
                   <TouchableOpacity
                     key={item.route}
                     onPress={() => go(item.route)}
                     activeOpacity={0.7}
                     accessibilityRole="menuitem"
                     accessibilityState={{ selected: active }}
-                    style={[st.row, active && activeStyle(accent)]}>
+                    {...pinA11y(item)}
+                    style={[st.row, pinnedGroup && { flex: 1 }, active && activeStyle(accent)]}>
                     <View style={[st.rowChip, iconChip(accent, active)]}>
                       <IconSymbol name={item.icon} size={16} color={active ? activeIcon(accent) : idleIcon(accent)} />
                     </View>
                     <Text
                       numberOfLines={1}
                       style={[st.label, { color: active ? activeText(accent) : c.text, fontFamily: active ? fontFamily.semibold : fontFamily.medium }]}>
-                      {String(tr[item.labelKey] ?? '')}
+                      {label}
                     </Text>
                     {/* Непрочитані сповіщення — на пункті «Налаштування», звідки
                         ведуть і центр сповіщень, і їхні налаштування (§11). */}
                     {item.route === '/(tabs)/settings' && <NotificationBadge />}
                   </TouchableOpacity>
+                );
+                if (!pinnedGroup || !item.module) return row;
+                // Закріплений розділ: шпилька праворуч — тап відкріплює, і
+                // розділ повертається на своє місце в групі.
+                const mod = item.module;
+                return (
+                  <View key={item.route} style={st.pinnedRow}>
+                    {row}
+                    <TouchableOpacity
+                      onPress={() => setPinned(mod, false)}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={ss.unpinSection(label)}
+                      testID={`nav-unpin-${mod}`}
+                      style={st.iconBtn}>
+                      <IconSymbol name="pin.fill" size={13} color={c.sub} />
+                    </TouchableOpacity>
+                  </View>
                 );
               })}
             </View>
@@ -431,6 +528,122 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
       </View>
     </View>
   );
+
+  // Незакріплений сайдбар, розгорнутий ПОВЕРХ вмісту. Modal, а не абсолютний
+  // шар у слоті 76pt: дотики за межами батька на Android не доходять, а тут
+  // затемнення ловить будь-який тап поза панеллю.
+  const overlay = rail ? (
+    <Modal
+      visible={overlayOpen}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
+      onRequestClose={closePeek}>
+      <View style={StyleSheet.absoluteFill}>
+        <Animated.View entering={motion.entering(FadeIn.duration(160))} style={StyleSheet.absoluteFill}>
+          {/* Легке затемнення без блюру: вміст лишається видно, але ясно, що
+              тап сюди — «згорнути». */}
+          <OverlayScrim onPress={closePeek} accessibilityLabel={tr.navSidebarCollapse} blur={false} style={st.lightScrim} />
+        </Animated.View>
+        <Animated.View entering={motion.entering(SlideInLeft.duration(200))} style={[st.overlayWrap, { width: SIDEBAR_WIDTH }]}>
+          <OverlaySurface
+            accessibilityViewIsModal
+            onAccessibilityEscape={closePeek}
+            radius={24}
+            testID="nav-sidebar-overlay"
+            style={[st.overlayPanel, { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }]}>
+            {renderFull(true)}
+          </OverlaySurface>
+        </Animated.View>
+      </View>
+    </Modal>
+  ) : null;
+
+  if (rail) {
+    return (
+      <View
+        style={[st.root, st.railRoot, { width: Layout.railWidth, backgroundColor: reduceTransparency ? c.bg : 'transparent', paddingTop: insets.top + 14 }]}
+        accessibilityRole="menu">
+        {glassLayer}
+        <Image source={require('@/assets/logo_app.png')} style={st.railLogo} accessible={false} />
+        {expandButton}
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, alignItems: 'center' }}>
+          {navGroups.map((group, gi) => {
+            const hidden = isGroupCollapsed(group, collapsed);
+            const collapsible = Boolean(group.id);
+            // Згорнута група з поточним розділом — крапка на шевроні, щоб було
+            // видно, де ви, навіть коли пункт сховано.
+            const activeInside = hidden && groupHasActiveItem(group, pathname);
+            const groupTitle = group.titleKey ? String(tr[group.titleKey] ?? '') : '';
+            return (
+              <View key={group.id ?? group.kind ?? `g${gi}`} style={[st.railGroup, gi > 0 && st.railGroupGap]}>
+                {collapsible && (
+                  <TouchableOpacity
+                    onPress={() => toggleGroup(group.id)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={groupTitle}
+                    accessibilityState={{ expanded: !hidden, selected: activeInside }}
+                    style={st.iconBtn}>
+                    <IconSymbol name={hidden ? 'chevron.right' : 'chevron.down'} size={13} color={activeInside ? c.accent : c.sub} />
+                    {hidden && <Text style={[st.railCount, { color: activeInside ? c.accent : c.sub }]}>{group.items.length}</Text>}
+                    {activeInside && <View style={[st.activeDot, st.railActiveDot, { backgroundColor: c.accent }]} />}
+                  </TouchableOpacity>
+                )}
+                {!hidden && group.items.map(item => {
+                  const active = isNavItemActive(item, pathname);
+                  const accent = navItemAccent(item);
+                  return (
+                    <TouchableOpacity
+                      key={item.route}
+                      onPress={() => go(item.route)}
+                      activeOpacity={0.7}
+                      accessibilityRole="menuitem"
+                      accessibilityLabel={String(tr[item.labelKey] ?? '')}
+                      accessibilityState={{ selected: active }}
+                      {...pinA11y(item)}
+                      style={[st.railItem, active && activeStyle(accent)]}>
+                      <View style={[st.railChip, active ? null : iconChip(accent, false)]}>
+                        <IconSymbol name={item.icon} size={19} color={active ? activeIcon(accent) : idleIcon(accent)} />
+                      </View>
+                      {item.route === '/(tabs)/settings' && (
+                        <NotificationBadge variant="dot" style={st.railBadge} />
+                      )}
+                      {/* Закріплений розділ у рейці — крихітна шпилька в куті. */}
+                      {group.kind === 'pinned' && (
+                        <View pointerEvents="none" style={st.railPin}>
+                          <IconSymbol name="pin.fill" size={9} color={active ? activeIcon(accent) : c.sub} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            );
+          })}
+        </ScrollView>
+        {/* Повна картка таймерів у 76pt не влазить — лишаємо вхід у Трекер
+            часу з лічильником, щоб зупинити таймер можна було звідусіль. */}
+        {activeTimers.length > 0 && (
+          <View style={{ paddingBottom: insets.bottom + 10, alignItems: 'center' }}>
+            <TouchableOpacity
+              onPress={() => go('/(tabs)/time')}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`${tr.navTime}: ${activeTimers.length}`}
+              style={[st.railItem, { backgroundColor: timerCardColors.activeBg }]}>
+              <IconSymbol name="timer" size={21} color={c.accent} />
+              <Text style={[st.railTimerCount, { color: c.accent }]}>{activeTimers.length}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {overlay}
+      </View>
+    );
+  }
+
+  return renderFull(false);
 }
 
 const st = StyleSheet.create({
@@ -466,4 +679,13 @@ const st = StyleSheet.create({
   activeDot:  { width: 6, height: 6, borderRadius: 3, marginBottom: 6 },
   railActiveDot: { position: 'absolute', top: 9, right: 9, marginBottom: 0 },
   railTimerCount: { position: 'absolute', bottom: 3, right: 8, fontSize: 10, fontFamily: fontFamily.bold, fontVariant: ['tabular-nums'] },
+  railPin:    { position: 'absolute', top: 5, right: 7 },
+  headRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  headLogo:   { width: 34, height: 34, borderRadius: Atlas.radius.medium, marginRight: 4 },
+  headBtns:   { flexDirection: 'row', alignItems: 'center', marginRight: -8 },
+  pinnedRow:  { flexDirection: 'row', alignItems: 'center' },
+  // Затемнення під незакріпленим сайдбаром — легше за модальне (вміст видно).
+  lightScrim: { opacity: 0.45 },
+  overlayWrap: { position: 'absolute', top: 0, bottom: 0, left: 0 },
+  overlayPanel: { flex: 1 },
 });

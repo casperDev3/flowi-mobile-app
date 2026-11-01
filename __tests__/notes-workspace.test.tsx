@@ -40,6 +40,14 @@ jest.mock('@/components/layout-zones/SwipeRow', () => ({
   SwipeRow: ({ children }: { children: unknown }) =>
     (typeof children === 'function' ? children({ accessibilityActions: [], onAccessibilityAction: () => {} }) : children),
 }));
+// Оболонки аркушів (жести, Modal) поза нативом не монтуються — підмінено
+// прозорими: видимий аркуш = його вміст.
+jest.mock('@/components/shared/SheetModal', () => ({
+  SheetModal: ({ visible, children }: { visible: boolean; children: unknown }) => (visible ? children : null),
+}));
+jest.mock('@/components/layout-zones/BottomSheet', () => ({
+  BottomSheet: ({ visible, children }: { visible: boolean; children: unknown }) => (visible ? children : null),
+}));
 
 jest.mock('@/hooks/use-project-roles', () => ({
   useProjectRoles: () => mockRoles,
@@ -160,4 +168,38 @@ test('createRequested (/notes?create=1 з віджета) відкриває р�
   expect(handled).toHaveBeenCalledTimes(1);
   await act(async () => { tree.update(<NotesWorkspace isDark={false} createRequested onCreateHandled={() => handled()} />); });
   expect(handled).toHaveBeenCalledTimes(1);
+});
+
+test('«Перетворити на задачу» (планшет): поля з нотатки, задача записана, нотатка отримує зв\'язок', async () => {
+  mockStore.set('notes', JSON.stringify([note('conv')]));
+  await mount(); await press('note-conv');
+  await press('notes-convert');
+  expect(find('note-to-task-title').props.value).toBe('Title conv');
+  expect(find('note-to-task-description').props.value).toBe('Body conv');
+  await press('note-to-task-submit');
+  const tasks = JSON.parse(mockStore.get('tasks') ?? '[]');
+  expect(tasks).toHaveLength(1);
+  expect(tasks[0]).toMatchObject({ title: 'Title conv', description: 'Body conv', status: 'active' });
+  expect(stored()[0].linkedTaskId).toBe(tasks[0].id);
+  expect(find('notes-task-created')).toBeDefined();
+  expect(find('notes-open-task')).toBeDefined();
+});
+
+test('«Перетворити на задачу» з видаленням нотатки', async () => {
+  mockStore.set('notes', JSON.stringify([note('gone'), note('stay')]));
+  await mount(); await press('note-gone');
+  await press('notes-convert');
+  await press('note-to-task-delete');
+  await press('note-to-task-submit');
+  expect(JSON.parse(mockStore.get('tasks') ?? '[]')).toHaveLength(1);
+  expect(stored().map(n => n.id)).toEqual(['stay']);
+});
+
+test('телефон: у читалці немає «Перетворити на задачу» (панель інструментів як була)', async () => {
+  mockExpanded = false;
+  mockStore.set('notes', JSON.stringify([note('phone')]));
+  await mount(); await press('note-phone');
+  expect(find('notes-reader')).toBeDefined();
+  expect(find('notes-convert')).toBeUndefined();
+  expect(find('notes-static')).toBeUndefined();
 });

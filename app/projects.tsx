@@ -81,6 +81,17 @@ import { dsTokens, useDS } from '@/hooks/use-ds';
 import { BentoCard, KpiCounter, MeshBackground, PageHeader, SectionTabs, SegmentedProgress } from '@/components/ds';
 import { glassOf, glassRim, glassRimFor } from '@/components/shared/dsTheme';
 import { AccentIcon } from '@/components/shared/GlassBits';
+import {
+  DEFAULT_ZONE_SIZE_KEY, ZONE_HANDLE_WIDTH, ZoneLayout, useZoneSizes, zoneWidths,
+} from '@/components/layout-zones';
+import { useZoneState } from '@/hooks/use-zone-state';
+import {
+  OpenProjectButton, ProjectZoneDetails, ProjectZoneFooter, ProjectZoneStatic,
+} from '@/components/projects/ProjectZones';
+import {
+  isProjectAtRisk, keyProjectTasks, roleSummary, upcomingDeadlines,
+} from '@/components/projects/projectsZoneModel';
+import { useProjectZoneStrings } from '@/components/projects/projectZoneStrings';
 
 export interface Project {
   appearance?: import("@/utils/projectAppearance").ProjectAppearance;
@@ -283,6 +294,14 @@ interface ProjectCardProps {
    */
   canManage: boolean;
   onPress: (project: Project) => void;
+  /**
+   * Планшет (три зони): тап по картці лише ВИБИРАЄ проєкт, а вхід у простір —
+   * окремою кнопкою «Відкрити проєкт» на картці. Без пропа (телефон) кнопки
+   * немає, і тап, як і раніше, одразу відкриває проєкт.
+   */
+  onOpen?: (project: Project) => void;
+  /** Підказка VoiceOver для тапу по картці (планшет: «показує зведення»). */
+  pressHint?: string;
   onEdit: (project: Project) => void;
   onDelete: (id: string) => void;
   onLeave: (project: Project) => void;
@@ -296,6 +315,7 @@ export const ProjectCard = React.memo(function ProjectCard({
   project, stats, counters, sprintCard, sprintsEnabled, canEditContent, onOpenSprints,
   buckets, selected, locale, tr, isDark,
   borderColor, textColor, subColor, surfaceColor, accentColor, canManage, onPress, onEdit, onDelete, onLeave,
+  onOpen, pressHint,
 }: ProjectCardProps) {
   const pct = stats.pct;
   const overdueColor = OVERDUE_COLOR;
@@ -331,6 +351,7 @@ export const ProjectCard = React.memo(function ProjectCard({
       onPress={() => onPress(project)}
       accessibilityRole="button"
       accessibilityLabel={project.name}
+      accessibilityHint={pressHint}
       accessibilityState={{ selected }}>
       {/* DS v2: картка surface.card без рамки. На широкому екрані деталь
           стоїть поруч, і вибрану картку видно з рамки action.primary. */}
@@ -488,6 +509,12 @@ export const ProjectCard = React.memo(function ProjectCard({
             </View>
           </>
         )}
+
+        {onOpen ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 14 }}>
+            <OpenProjectButton name={project.name} onPress={() => onOpen(project)} testID={`project-open-${project.id}`} />
+          </View>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -496,10 +523,15 @@ export const ProjectCard = React.memo(function ProjectCard({
 export default function ProjectsScreen() {
   // Планшет: стелю читабельної колонки (720pt) тут знято — картки лягають у
   // колонки на всю ширину екрана (вікно мінус сайдбар), як дашборд «Сьогодні».
-  const { isWide } = useResponsive();
+  const { isWide, width: windowWidth } = useResponsive();
+  const screenWidth = useScreenWidth();
+  // Планшет, три зони: колонки masonry рахуються від РЕАЛЬНОЇ ширини головної
+  // зони (поруч можуть стояти «Портфель» і панель деталей, межі тягнуться).
+  // До першого виміру — ширина екрана, як і раніше.
+  const [mainZoneWidth, setMainZoneWidth] = useState(0);
   // Стеля «широкого» вмісту (Layout.wideMaxWidth): на iPad Pro у ландшафті
   // картки інакше розтягувались до ~450pt кожна.
-  const columnCount = masonryColumnCount(Math.min(useScreenWidth(), Layout.wideMaxWidth));
+  const columnCount = masonryColumnCount(Math.min(isWide && mainZoneWidth > 0 ? mainZoneWidth : screenWidth, Layout.wideMaxWidth));
   // Форма проєкту на планшеті — центрований діалог, як SheetModal 'auto'.
   const wm = wideModalStyles(isWide);
   const isDark = useColorScheme() === 'dark';
@@ -969,11 +1001,71 @@ export default function ProjectsScreen() {
     router.push(projectRoute(project.id, 'sprints') as never);
   }, [router]);
 
-  /** Тап по картці — повна зміна контексту (план §3): вхід у простір проєкту. */
-  const selectProject = useCallback((project: Project) => {
+  /** Вхід у простір проєкту — повна зміна контексту (план §3). */
+  const openProject = useCallback((project: Project) => {
     haptic.light();
     router.push(`/project/${encodeURIComponent(project.id)}` as never);
   }, [router]);
+
+  /**
+   * Layout System v2.4 — три зони на ПЛАНШЕТІ: [«Портфель»] [картки]
+   * [зведення вибраного проєкту]. Вибраний проєкт — у параметрі `?project=`
+   * (диплінк відкриває той самий стан), видимість панелей — вибір пристрою
+   * (hooks/use-zone-state.ts, не ui_preferences). Телефон цього не бачить.
+   */
+  const zs = useProjectZoneStrings();
+  const zoneState = useZoneState({ section: 'projects', selectedParam: 'project', label: tr.projects });
+  const selectInZone = zoneState.select;
+  const closeZonePanel = zoneState.closePanel;
+  const zoneSizes = useZoneSizes(DEFAULT_ZONE_SIZE_KEY);
+  const selectedStats = useMemo(
+    () => (isWide && zoneState.selectedId ? statsList.find(stat => stat.project.id === zoneState.selectedId) ?? null : null),
+    [isWide, zoneState.selectedId, statsList],
+  );
+  const zoneFit = zoneWidths({
+    windowWidth,
+    screenWidth,
+    wide: isWide,
+    wantStatic: zoneState.panels.static,
+    wantDynamic: zoneState.panelOpen && !!selectedStats,
+    sizes: zoneSizes,
+    handles: { static: ZONE_HANDLE_WIDTH, dynamic: ZONE_HANDLE_WIDTH },
+  });
+  // «Портфель» поруч — KPI-рядок шапки не дублює ті самі числа.
+  const staticBeside = isWide && zoneFit.showStatic && projects.length > 0;
+
+  // Вибраний проєкт зник (видалили, вийшли, синк прибрав) — закриваємо панель.
+  useEffect(() => {
+    if (isWide && initialized && zoneState.selectedId && !selectedStats) closeZonePanel();
+  }, [isWide, initialized, zoneState.selectedId, selectedStats, closeZonePanel]);
+
+  /**
+   * Тап по картці. Телефон — як і раніше, одразу в простір проєкту. Планшет —
+   * лише ВИБІР (зведення в динамічній зоні); вхід — кнопкою «Відкрити проєкт»
+   * на картці або в панелі.
+   */
+  const selectProject = useCallback((project: Project) => {
+    if (!isWide) { openProject(project); return; }
+    haptic.light();
+    selectInZone(project.id);
+  }, [isWide, openProject, selectInZone]);
+
+  const zoneSelectById = useCallback((id: string) => { haptic.light(); selectInZone(id); }, [selectInZone]);
+
+  // Дані статичної й динамічної зон — лише на планшеті.
+  const zoneAtRisk = useMemo(
+    () => (isWide ? visibleStats.filter(stat => isProjectAtRisk(stat, sprintCards.get(stat.project.id), now)).length : 0),
+    [isWide, visibleStats, sprintCards, now],
+  );
+  const zoneDeadlines = useMemo(() => (isWide ? upcomingDeadlines(visibleStats, now) : []), [isWide, visibleStats, now]);
+  const zoneRoles = useMemo(
+    () => (isWide ? roleSummary(visibleStats.map(stat => projectRoles[stat.project.id] ?? 'owner')) : []),
+    [isWide, visibleStats, projectRoles],
+  );
+  const zoneKeyTasks = useMemo(
+    () => (selectedStats ? keyProjectTasks(tasks, selectedStats.project.id, now) : []),
+    [selectedStats, tasks, now],
+  );
 
   // Шапка їде разом зі списком, як і раніше, — тому вона ListHeaderComponent,
   // а не окремий фіксований блок над FlatList.
@@ -1013,7 +1105,7 @@ export default function ProjectsScreen() {
 
       {/* Omni KPI — великі тонкі числа по видимому набору (той самий kpi,
           що й у «Портфелі»): проєкти · прогрес · прострочені задачі. */}
-      {kpi.projects > 0 ? (
+      {kpi.projects > 0 && !staticBeside ? (
         <PageHeader
           bleed={isWide ? 0 : 20}
           style={{ marginBottom: 18 }}
@@ -1102,7 +1194,7 @@ export default function ProjectsScreen() {
       canEditContent={(projectRoles[item.project.id] ?? 'owner') !== 'viewer'}
       onOpenSprints={openSprints}
       buckets={timelines.get(item.project.id) ?? EMPTY_BUCKETS}
-      selected={false}
+      selected={isWide && zoneState.panelOpen && item.project.id === zoneState.selectedId}
       locale={locale}
       tr={tr}
       isDark={isDark}
@@ -1116,6 +1208,8 @@ export default function ProjectsScreen() {
       onEdit={openEdit}
       onDelete={deleteProject}
       onLeave={leaveProject}
+      onOpen={isWide ? openProject : undefined}
+      pressHint={isWide ? zs.selectHint : undefined}
     />
   );
 
@@ -1173,21 +1267,70 @@ export default function ProjectsScreen() {
   return (
     <View style={{ flex: 1 }}>
       <MeshBackground />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        {isWide ? (
-          // Планшет: колонки masonry (2 від 600pt, 3 від 1100pt) на всю ширину
-          // екрана — без стелі 720pt, яка лишала пів екрана порожнім.
-          <ScrollView
-            contentContainerStyle={st.wideContent}
-            showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
-            {listHeader}
-            {visibleStats.length > 0
-              ? <MasonryColumns items={masonryItems} columnCount={columnCount} />
-              : listEmpty}
-            {listFooter}
-          </ScrollView>
-        ) : (
+      {isWide ? (
+        /*
+          Планшет — Layout System v2.4: [«Портфель» (≥1280)] [картки masonry]
+          [зведення вибраного проєкту — панель праворуч з ✕ / нижній аркуш у
+          вузькому вікні]. Тап по картці лише вибирає; вхід у проєкт — кнопкою.
+        */
+        <ZoneLayout
+          testID="projects-zones"
+          main={
+            <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+              <ScrollView
+                onLayout={e => setMainZoneWidth(Math.round(e.nativeEvent.layout.width))}
+                contentContainerStyle={st.wideContent}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
+                {listHeader}
+                {visibleStats.length > 0
+                  ? <MasonryColumns items={masonryItems} columnCount={columnCount} />
+                  : listEmpty}
+                {listFooter}
+              </ScrollView>
+            </SafeAreaView>
+          }
+          dynamic={selectedStats ? (
+            <ProjectZoneDetails
+              stats={selectedStats}
+              counters={counters.get(selectedStats.project.id) ?? EMPTY_COUNTERS}
+              sprint={sprintCards.get(selectedStats.project.id) ?? null}
+              sprintsEnabled={projectModules(selectedStats.project as Project).sprints}
+              role={projectRoles[selectedStats.project.id] ?? 'owner'}
+              atRisk={isProjectAtRisk(selectedStats, sprintCards.get(selectedStats.project.id), now)}
+              keyTasks={zoneKeyTasks}
+              now={now}
+              locale={locale}
+            />
+          ) : null}
+          dynamicOpen={zoneState.panelOpen && !!selectedStats}
+          onCloseDynamic={closeZonePanel}
+          dynamicLabel={zs.details}
+          dynamicFooter={selectedStats ? (
+            <ProjectZoneFooter
+              name={selectedStats.project.name}
+              onOpen={() => openProject(selectedStats.project as Project)}
+              onEdit={isProjectOwner(selectedStats.project.id) ? () => openEdit(selectedStats.project as Project) : undefined}
+            />
+          ) : undefined}
+          static={projects.length > 0 ? (
+            <ProjectZoneStatic
+              scopeLabel={showArchived ? zs.scopeArchive : zs.scopeLive}
+              kpi={kpi}
+              atRisk={zoneAtRisk}
+              deadlines={zoneDeadlines}
+              roles={zoneRoles}
+              selectedId={zoneState.panelOpen ? zoneState.selectedId : null}
+              locale={locale}
+              onSelect={zoneSelectById}
+            />
+          ) : undefined}
+          showStatic={zoneState.panels.static}
+          panels={zoneState.panels}
+          onTogglePanel={zoneState.togglePanel}
+        />
+      ) : (
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
           <FlatList
             data={visibleStats}
             keyExtractor={stat => stat.project.id}
@@ -1204,8 +1347,8 @@ export default function ProjectsScreen() {
             renderItem={({ item }) => renderCard(item)}
             ListEmptyComponent={listEmpty}
           />
-        )}
-      </SafeAreaView>
+        </SafeAreaView>
+      )}
 
       {/* Add/Edit Modal */}
       <Modal visible={showModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeModal}>
@@ -1358,7 +1501,8 @@ const st = StyleSheet.create({
   progressFill:{ height: '100%', borderRadius: radius.pill },
   overlay:     { flex: 1, justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
-  wideContent: { width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 40 },
+  // Лише планшет: низ із запасом під перемикачі панелей (три крапки під main).
+  wideContent: { width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 96 },
   // Стеля висоти — числом із useSheetSurface(): відсоток від батька з
   // height:auto у Yoga не рахується, аркуш ріс на всю висоту вмісту, а
   // ScrollView усередині нічого не гортав (NAT-01).

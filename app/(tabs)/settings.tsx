@@ -33,6 +33,8 @@ import { getAllScheduledNotifications } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
 import { ThemeOption, useTheme } from '@/store/theme-context';
 import { isModuleEnabled, useUiModules } from '@/store/ui-preferences';
+import { usePinnedSections } from '@/components/shared/pinned-sections';
+import { useSidebarStrings } from '@/components/shared/sidebar-strings';
 import { Lang, type Translations } from '@/store/translations';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
@@ -102,6 +104,8 @@ export default function SettingsScreen() {
   // бувають модулі без перемикача на цій платформі, і лічильник «2» при
   // жодному вимкненому перемикачі читався б як збій.
   const { disabledModules } = useUiModules();
+  const sidebarStr = useSidebarStrings();
+  const { pinned: pinnedSections } = usePinnedSections();
   const unreadCount = useUnreadNotificationsCount();
   const disabledCount = useMemo(() => disabledModuleCount(disabledModules), [disabledModules]);
   const visibleTools = useMemo(
@@ -309,6 +313,22 @@ export default function SettingsScreen() {
                 border={c.border}
                 last={false}
               />
+              {/* Закріплені розділи — лише планшет: на телефоні сайдбара немає
+                  (шухляда ☰ лишається як є). */}
+              {isWide ? (
+                <SettingRow
+                  icon="pin.fill"
+                  iconColor="#8B5CF6"
+                  label={sidebarStr.pinnedSettingsRow}
+                  value={pinnedSections.length ? String(pinnedSections.length) : undefined}
+                  route={'/settings-sidebar' as Href}
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+              ) : null}
               <NotifRow
                 label={tr.notifications}
                 scheduledCount={scheduledCount}

@@ -44,7 +44,16 @@ export function useFinanceFilter(primary: string): FinanceFilterState {
       loadDataResult<unknown>(MONEY_SCOPE_KEY, null),
     ]).then(([p, cur, sc]) => {
       if (!alive.current) return;
-      if (p.ok) setPeriodState(parseStoredPeriod(p.value, new Date()));
+      if (p.ok) {
+        // Відновлюємо лише пресети («Цей місяць», «Тиждень»…), які завжди
+        // рахуються від сьогодні. Конкретний місяць, обраний стрілками, після
+        // перезапуску не повертаємо — інакше 1 листопада екран відкривався на
+        // жовтні й сьогоднішніх операцій «не було» (11.2026).
+        const stored = parseStoredPeriod(p.value, new Date());
+        if (stored.preset !== 'custom' && resolvePeriod(stored.preset, '', new Date()).key === stored.key) {
+          setPeriodState(stored);
+        }
+      }
       if (cur.ok && typeof cur.value === 'string' && cur.value) setCurrencyState(cur.value);
       if (sc.ok) setScopeState(normalizeMoneyScope(sc.value));
       setReady(true);

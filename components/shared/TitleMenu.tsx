@@ -102,7 +102,7 @@ export function TitleMenuButton({ menu, title }: { menu: TitleMenuConfig; title:
         // 11.2026: лише три риски — без кружка, тла, обідка й скла. Кнопка
         // 44×44 лишається невидимою ціллю дотику.
         style={({ pressed }) => [st.button, { opacity: pressed ? 0.5 : 1 }]}>
-        <IconSymbol name="line.3.horizontal" size={22} color={t.text.primary} />
+        <IconSymbol name="line.3.horizontal" size={28} color={t.text.primary} />
         {/* Є активні фільтри — крапка біля рисок (замість суцільної кнопки). */}
         {menu.active ? (
           <View testID="title-menu-active-dot" style={[st.activeDot, { backgroundColor: t.text.primary }]} />

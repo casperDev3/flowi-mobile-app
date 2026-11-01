@@ -112,7 +112,7 @@ function BellButton() {
   const router = useRouter();
   return (
     <HeaderButton onPress={() => router.push('/notifications' as Href)} accessibilityLabel={tr.notifications}>
-      <IconSymbol name="bell" size={18} color={t.text.primary} />
+      <IconSymbol name="bell" size={24} color={t.text.primary} />
       <NotificationBadge variant="dot" style={st.bellDot} />
     </HeaderButton>
   );
@@ -216,7 +216,7 @@ export function AppHeader({
       <View style={st.toolbar}>
         {showMenu && !back ? (
           <HeaderButton onPress={() => setDrawer(true)} accessibilityLabel={tr.navSidebarExpand}>
-            <IconSymbol name="sidebar.left" size={18} color={t.text.primary} />
+            <IconSymbol name="sidebar.left" size={24} color={t.text.primary} />
           </HeaderButton>
         ) : null}
         <View style={{ flex: 1 }} />
@@ -224,7 +224,7 @@ export function AppHeader({
           {/* Layout System v2.4: телефон — [☰] заголовок [пошук]. */}
           {onSearch ? (
             <HeaderButton onPress={onSearch} accessibilityLabel={searchLabel ?? tr.searchPlaceholder}>
-              <IconSymbol name="magnifyingglass" size={18} color={t.text.primary} />
+              <IconSymbol name="magnifyingglass" size={22} color={t.text.primary} />
             </HeaderButton>
           ) : null}
           {actions}
@@ -358,7 +358,7 @@ const st = StyleSheet.create({
   // Лічильники — підпис під числом (KpiCounter), тож вирівнювання по верху.
   kpiRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 28 },
   titleRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  bellDot: { position: 'absolute', top: 8, right: 8 },
+  bellDot: { position: 'absolute', top: 6, right: 6 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   // Нерухома смуга кнопок телефона: 36 + 8 знизу; hairline прозора, доки
   // вміст не заїхав під смугу (тоді — border.hairline).

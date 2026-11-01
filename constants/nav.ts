@@ -676,7 +676,7 @@ export function tabBarInsetFor(isWide: boolean, timersCount: number, bottomSafe 
  * TAB_BAR_HEIGHT — її острівець не стосується.
  *
  *   ┌──────────── екран ────────────┐
- *   │  ≥16 ╭─ ≤336pt, 64pt ─╮ ≥16   │
+ *   │  ≥16 ╭─ ≤320pt, 64pt ─╮ ≥16   │
  *   │      ╰────────────────╯       │
  *   │      8pt                       │
  *   │      safe-area bottom          │
@@ -690,7 +690,8 @@ export const TAB_ISLAND_SIDE = 16;
  * тягнеться на всю ширину мінус 16 — вона облягає 4 вкладки (~84pt на
  * кожну) і стоїть по центру. На 390pt це ~27pt поля з кожного боку.
  */
-export const TAB_ISLAND_MAX_WIDTH = 336;
+// 11.2026 (на пристрої): вужче — 320pt за рішенням власника.
+export const TAB_ISLAND_MAX_WIDTH = 320;
 
 /**
  * Бічні відступи острівця для вікна шириною `windowW`: по центру, не ширше

@@ -302,10 +302,8 @@ export function ScreenHeader({
             <Text
               style={[styles.pageTitle, titleStyle, { color }]}
               numberOfLines={1}
-              // Omni: справа до 4 кнопок (☰/дії/🔔/аватар) — довгий заголовок
-              // («Неділя, 1 листопада») спершу зменшується, а вже потім «…».
-              adjustsFontSizeToFit
-              minimumFontScale={0.72}
+              // Без adjustsFontSizeToFit: на iOS у рядку з бургером він
+              // стискав заголовок майже до нуля (11.2026). Довгий — «…».
               maxFontSizeMultiplier={TITLE_MAX_FONT_SCALE}>
               {title}
             </Text>
@@ -330,10 +328,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    flexShrink: 1,
+    flex: 1,
+    minWidth: 0,
   },
   titleBox: {
+    flex: 1,
     flexShrink: 1,
+    minWidth: 0,
   },
   crumbs: {
     flexDirection: 'row',

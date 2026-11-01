@@ -154,6 +154,12 @@ export default function TabLayout() {
                 // уже стоїть НАД ним. Відступ вмісту — useTabBarInset().
                 tabBarStyle: isWide ? {display: 'none'} : {
                     position: 'absolute',
+                    // start/end, а не лише left/right: BottomTabBar на iOS
+                    // кладе styles.bottom {start:0,end:0}, а start/end мають
+                    // пріоритет над left/right — острівець розтягувався на всю
+                    // ширину (на web цього не видно).
+                    start: island.left,
+                    end: island.right,
                     left: island.left,
                     right: island.right,
                     bottom: tabIslandBottom(insets.bottom),

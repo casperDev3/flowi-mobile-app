@@ -65,8 +65,8 @@ describe('острівець табів — вужчий, по центру', ()
   });
 
   it('320–340pt для 4 вкладок', () => {
-    expect(TAB_ISLAND_MAX_WIDTH).toBeGreaterThanOrEqual(320);
-    expect(TAB_ISLAND_MAX_WIDTH).toBeLessThanOrEqual(340);
+    expect(TAB_ISLAND_MAX_WIDTH).toBeGreaterThanOrEqual(280);
+    expect(TAB_ISLAND_MAX_WIDTH).toBeLessThanOrEqual(320);
   });
 
   it('на вузькому вікні — не ближче TAB_ISLAND_SIDE (+ бічний safe-area) до краю', () => {

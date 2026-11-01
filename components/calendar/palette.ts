@@ -1,8 +1,10 @@
 /**
  * components/calendar/palette.ts — кольори екрана «Календар».
  *
- * DS v2.1: фон — mesh, картки — скло (glassOf(t).surface), аркуші — щільне скло,
- * акцент — info (ink). Нижче — історичний опис v2.
+ * Omni (DS v2.2): вміст — на СУЦІЛЬНИХ картках (surface.card, вкладене —
+ * surface.subtle; скло лишилось лише аркушам — функціональний шар), вибраний
+ * стан (вид, день, чип) — чорна pill action.primary + text.onAction.
+ * DS v2.1: фон — mesh, акцент — info (ink). Нижче — історичний опис v2.
  * DS v2: фон — bg.canvas, картки — surface.card, вкладені/неактивні —
  * surface.subtle, текст — text.primary/secondary. Акцент календаря — та сама
  * глибока лаванда, що в «Завдань»/«Часу» (getScreenColors): нею позначено
@@ -38,9 +40,9 @@ export interface CalendarColors {
   onAction: string;
   /** Плейсхолдер / декоративний текст (НЕ підписи). */
   muted: string;
-  /** DS v2.1: вибраний сегмент / день / чип — суцільний info (акцент календаря). */
+  /** Omni: вибраний сегмент / день / чип — action.primary (чорна pill). */
   select: string;
-  /** Текст і іконки на `select` (onSolid, #111113). */
+  /** Текст і іконки на `select` (text.onAction). */
   onSelect: string;
   /** Тонована info-змивка (сьогодні, активні мітки). */
   tint: string;
@@ -53,10 +55,10 @@ export function calendarColors(isDark: boolean): CalendarColors {
   return {
     bg1:    t.bg.canvas,
     bg2:    t.bg.canvas,
-    card:   glassOf(t).surface,
+    card:   t.surface.card,
     sheet:  glassOf(t).sheet,
     border: t.border.hairline,
-    dim:    glassOf(t).surfaceSubtle,
+    dim:    t.surface.subtle,
     text:   t.text.primary,
     sub:    t.text.secondary,
     // DS v2.1: акцент календаря/зустрічей — info (glass.moduleAccent.calendar).
@@ -65,8 +67,9 @@ export function calendarColors(isDark: boolean): CalendarColors {
     action: t.action.primary,
     onAction: t.text.onAction,
     muted:  t.text.muted,
-    select:   glassOf(t).accent.info.solid,
-    onSelect: glassOf(t).accent.info.onSolid,
+    // Omni: «ви тут» — чорна pill (у темній — біла), як таб-бар і сайдбар.
+    select:   t.action.primary,
+    onSelect: t.text.onAction,
     tint:     glassOf(t).accent.info.tint,
   };
 }

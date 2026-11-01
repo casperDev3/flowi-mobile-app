@@ -1,12 +1,18 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import { fontFamily, radius, shadow, type as dsType } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 import type { Currency, TxGroup, Transaction } from '@/utils/financeUtils';
 import { accountById, creditedAmount, isTransfer, resolveTxCurrency, type Account } from '@/utils/accounts';
-import { useGlassStyles } from '@/components/finance/finPalette';
+
+/*
+ * Omni (DS v2.2): день — ОДНА суцільна картка (surface.card + м'яка тінь), у
+ * ній рядки, розділені волосяною лінією; дата й денні підсумки — над карткою.
+ * Скло лишається функціональному шару — на білій картці скляний subtle
+ * зникав, тож вкладені чипи — surface.subtle.
+ */
 
 interface Colors {
   sub: string;
@@ -53,7 +59,9 @@ export function TransactionGroup({
     group.label;
 
   const t = dsTokens(isDark);
-  const gs = useGlassStyles();
+  const sh = shadow[isDark ? 'dark' : 'light'].card;
+  // Денні підсумки й мітки — суцільні subtle-pill (не скло).
+  const pill = { backgroundColor: t.surface.subtle } as const;
   const curOf = (code: string): Currency =>
     currencyByCode[code] ?? { code, symbol: code, kind: 'fiat', decimals: 2 };
 
@@ -69,7 +77,7 @@ export function TransactionGroup({
         </Text>
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {incomeCodes.map(code => (
-            <View key={'in_' + code} style={{ ...gs.card, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <View key={'in_' + code} style={{ ...pill, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
               <IconSymbol name="arrow.up" size={9} color={t.status.success} />
               <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.semibold, ...dsType.numeric }}>
                 {fmt(group.dayIncomeByCur[code], curOf(code))}
@@ -77,7 +85,7 @@ export function TransactionGroup({
             </View>
           ))}
           {expenseCodes.map(code => (
-            <View key={'ex_' + code} style={{ ...gs.card, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <View key={'ex_' + code} style={{ ...pill, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
               <IconSymbol name="arrow.down" size={9} color={t.status.danger} />
               <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.semibold, ...dsType.numeric }}>
                 {fmt(group.dayExpenseByCur[code], curOf(code))}
@@ -88,7 +96,7 @@ export function TransactionGroup({
       </View>
 
       {/* Transactions */}
-      <View style={{ gap: compact ? 8 : 2 }}>
+      <View style={compact ? { gap: 8 } : [{ backgroundColor: t.surface.card, borderRadius: radius.cardCompact, paddingVertical: 4 }, sh]}>
         {group.items.map((tx, idx) => {
           // Вигляд переказу вмикає САМ `type`, а не звужувач `isTransfer`:
           // запис без адресата — зламані дані, але малювати його червоною
@@ -102,8 +110,7 @@ export function TransactionGroup({
             : getCatIcon(tx.category, isIncome ? 'income' : 'expense');
           const txDate = new Date(tx.date);
           const isFirst = idx === 0;
-          const isLast = idx === group.items.length - 1;
-          const cur = curOf(resolveTxCurrency(tx, accounts));
+                  const cur = curOf(resolveTxCurrency(tx, accounts));
 
           const fromAccount = accountById(accounts, tx.accountId);
           const toAccount = transfer ? accountById(accounts, tx.toAccountId) : undefined;
@@ -122,7 +129,7 @@ export function TransactionGroup({
           if (compact) {
             return (
               <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => onSelect(tx)}>
-                <View style={[{ ...gs.card, borderRadius: radius.nested, paddingLeft: 14, paddingRight: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center' }, shadow[isDark ? 'dark' : 'light'].card]}>
+                <View style={[{ backgroundColor: t.surface.card, borderRadius: radius.cardCompact, paddingLeft: 14, paddingRight: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center' }, sh]}>
                   <View style={{ width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '24' : '14') }}>
                     <IconSymbol name={iconName} size={19} color={color} />
                   </View>
@@ -135,13 +142,13 @@ export function TransactionGroup({
                         {txDate.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
                       </Text>
                       <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: t.text.muted }} />
-                      <View style={{ ...gs.subtle, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 1 }}>
+                      <View style={{ ...pill, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 1 }}>
                         <Text style={{ color: t.text.secondary, fontSize: 10, fontFamily: fontFamily.semibold }}>
                           {transfer ? transferLabel : isIncome ? incomeLabel : expenseLabel}
                         </Text>
                       </View>
                       {cur.code !== primaryCode && (
-                        <View style={{ ...gs.subtle, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 1 }}>
+                        <View style={{ ...pill, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 1 }}>
                           <Text style={{ color: t.text.secondary, fontSize: 10, fontFamily: fontFamily.semibold }}>{cur.code}</Text>
                         </View>
                       )}
@@ -166,17 +173,17 @@ export function TransactionGroup({
             <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => onSelect(tx)}>
               <View
                 style={{
-                  paddingHorizontal: 14, paddingVertical: 10, ...gs.card,
-                  flexDirection: 'row', alignItems: 'center', minHeight: 52,
-                  borderTopLeftRadius:    isFirst ? radius.nested : 4,
-                  borderTopRightRadius:   isFirst ? radius.nested : 4,
-                  borderBottomLeftRadius: isLast  ? radius.nested : 4,
-                  borderBottomRightRadius:isLast  ? radius.nested : 4,
+                  paddingHorizontal: 16, paddingVertical: 10,
+                  flexDirection: 'row', alignItems: 'center', minHeight: 56,
+                  // Omni-список: рядки в одній картці дня, між ними — волосина
+                  // з відступом від іконки (як у системних списках).
+                  borderTopWidth: isFirst ? 0 : StyleSheet.hairlineWidth,
+                  borderTopColor: t.border.hairline,
                 }}>
-                <View style={{ width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '24' : '14') }}>
-                  <IconSymbol name={iconName} size={14} color={color} />
+                <View style={{ width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '24' : '14') }}>
+                  <IconSymbol name={iconName} size={15} color={color} />
                 </View>
-                <View style={{ flex: 1, marginLeft: 9 }}>
+                <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={{ fontSize: 14, fontFamily: fontFamily.medium, color: t.text.primary }} numberOfLines={1}>{title}</Text>
                   {tx.note ? <Text style={{ ...dsType.caption, marginTop: 1, color: t.text.secondary }} numberOfLines={1}>{tx.note}</Text> : null}
                 </View>

@@ -44,8 +44,7 @@ import { HEALTH_ACCENTS, fmtSleep } from '@/utils/healthTheme';
 import { getHealthDSColors } from '@/components/health/palette';
 import { fontFamily, shadow } from '@/constants/theme';
 import { dsTokens, useDS } from '@/hooks/use-ds';
-import { useGlassStyles } from '@/components/finance/finPalette';
-import { MeshBackground } from '@/components/ds';
+import { BentoCard, HatchedBars, MeshBackground } from '@/components/ds';
 
 
 const WORKOUT_NAMES: Record<number, string> = {
@@ -111,25 +110,6 @@ function parseDayKey(key: string): Date {
 
 /** Проміжок між картками метрик; від нього рахується їхня ширина. */
 const GRID_GAP = 12;
-
-function MiniBarChart({ values, color, maxVal, height = 48 }: { values: (number | null)[]; color: string; maxVal?: number; height?: number }) {
-  const { t } = useDS();
-  // DS v2: сьогоднішній (активний) стовпець — лайм, решта — тонований колір метрики.
-  const max = maxVal ?? Math.max(...values.map(v => v ?? 0), 1);
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, height }}>
-      {values.map((v, i) => (
-        <View key={i} style={{ flex: 1, height, justifyContent: 'flex-end' }}>
-          <View style={{
-            height: Math.max(3, ((v ?? 0) / max) * height),
-            borderRadius: 999,
-            backgroundColor: i === values.length - 1 ? t.accent.lime : color + '55',
-          }} />
-        </View>
-      ))}
-    </View>
-  );
-}
 
 function HRSparkline({ samples, color }: { samples: HKHeartRateSample[]; color: string }) {
   // Ширина — виміряна ширина картки, а не вікна: на планшеті картка вужча
@@ -279,7 +259,6 @@ export default function AppleHealthScreen() {
   // не збивався новим обʼєктом на кожен ререндер (а їх тут багато: синхронізація
   // оновлює стан чотири рази поспіль).
   const c = useMemo(() => getHealthDSColors(isDark), [isDark]);
-  const gs = useGlassStyles();
   const k = dsTokens(isDark);
 
   const weekLabels = week.map(d => {
@@ -445,9 +424,8 @@ export default function AppleHealthScreen() {
 
             <HealthColumns twoCol={lay.twoCol && week.length > 0} left={<>
             {/* Heart rate */}
-            <Text style={[s.sectionTitle, { color: c.text, marginTop: 24, marginBottom: 12 }]}>{tr.pulse}</Text>
-            <View
-              style={[s.card, { ...gs.card }]}>
+            {/* Omni (DS v2.2): суцільна BentoCard із шапкою «icon-chip + назва». */}
+            <BentoCard compact title={tr.pulse} icon="waveform.path.ecg" accent="coral" style={{ marginTop: 24 }}>
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
                 <HRStatBox label={tr.hautoHrAvgShort} value={today?.heartRateAvg} unit={tr.hautoBpm} color={HEALTH_ACCENTS.pulse} c={c} />
                 <HRStatBox label={tr.hautoHrMin} value={today?.heartRateMin} unit={tr.hautoBpm} color={HEALTH_ACCENTS.cal} c={c} />
@@ -464,7 +442,7 @@ export default function AppleHealthScreen() {
               )}
               {/* Фази ночі, що закінчилась сьогодні (якщо джерело їх дало). */}
               {today?.sleep && today.sleep.deep != null && (
-                <View style={[s.hkvRow, { backgroundColor: c.dim, marginTop: 8, flexWrap: 'wrap', gap: 8 }]}>
+                <View style={[s.hkvRow, { backgroundColor: k.surface.subtle, marginTop: 8, flexWrap: 'wrap', gap: 8 }]}>
                   <IconSymbol name="moon.fill" size={15} color={HEALTH_ACCENTS.sleep} />
                   <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.bold, flex: 1 }}>{tr.hautoSleepPhases}</Text>
                   <Text style={{ color: c.sub, fontSize: 12, width: '100%' }}>
@@ -472,33 +450,38 @@ export default function AppleHealthScreen() {
                   </Text>
                 </View>
               )}
-            </View>
+            </BentoCard>
             </>} right={<>
             {/* Week charts */}
             {week.length > 0 && (
               <>
-                <Text style={[s.sectionTitle, { color: c.text, marginTop: 24, marginBottom: 12 }]}>{tr.hautoWeek}</Text>
-                <View
-                  style={[s.card, { ...gs.card }]}>
-
-                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, marginBottom: 10 }}>{tr.steps}</Text>
-                  <MiniBarChart values={week.map(d => d.steps)} color={HEALTH_ACCENTS.steps} />
-                  <View style={{ flexDirection: 'row', marginTop: 4, marginBottom: 18 }}>
-                    {weekLabels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 10, fontFamily: fontFamily.medium }}>{l}</Text>)}
-                  </View>
-
-                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, marginBottom: 10 }}>{tr.hautoActiveCalories}</Text>
-                  <MiniBarChart values={week.map(d => d.activeCalories)} color={HEALTH_ACCENTS.cal} />
-                  <View style={{ flexDirection: 'row', marginTop: 4, marginBottom: 18 }}>
-                    {weekLabels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 10, fontFamily: fontFamily.medium }}>{l}</Text>)}
-                  </View>
-
-                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, marginBottom: 10 }}>{tr.hautoPulseAvg}</Text>
-                  <MiniBarChart values={week.map(d => d.heartRateAvg)} color={HEALTH_ACCENTS.pulse} maxVal={200} />
-                  <View style={{ flexDirection: 'row', marginTop: 4 }}>
-                    {weekLabels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 10, fontFamily: fontFamily.medium }}>{l}</Text>)}
-                  </View>
-                </View>
+                {/* Omni: тиждень — штриховані стовпці, сьогодні — фірмовий градієнт
+                    із pill-підказкою значення (замість лаймового стовпця). */}
+                <BentoCard compact title={tr.hautoWeek} icon="chart.bar.fill" accent="coral" style={{ marginTop: 24 }}>
+                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, marginBottom: 6 }}>{tr.steps}</Text>
+                  <HatchedBars
+                    data={week.map((d, i) => ({ label: weekLabels[i] ?? '', value: d.steps ?? 0 }))}
+                    activeIndex={week.length - 1}
+                    height={56}
+                    accessibilityLabel={`${tr.hautoWeek}: ${tr.steps}`}
+                    style={{ marginBottom: 14 }}
+                  />
+                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, marginBottom: 6 }}>{tr.hautoActiveCalories}</Text>
+                  <HatchedBars
+                    data={week.map((d, i) => ({ label: weekLabels[i] ?? '', value: d.activeCalories ?? 0 }))}
+                    activeIndex={week.length - 1}
+                    height={56}
+                    accessibilityLabel={`${tr.hautoWeek}: ${tr.hautoActiveCalories}`}
+                    style={{ marginBottom: 14 }}
+                  />
+                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, marginBottom: 6 }}>{tr.hautoPulseAvg}</Text>
+                  <HatchedBars
+                    data={week.map((d, i) => ({ label: weekLabels[i] ?? '', value: d.heartRateAvg ?? 0 }))}
+                    activeIndex={week.length - 1}
+                    height={56}
+                    accessibilityLabel={`${tr.hautoWeek}: ${tr.hautoPulseAvg}`}
+                  />
+                </BentoCard>
               </>
             )}
             </>} />
@@ -527,10 +510,10 @@ const MetricCard = React.memo(function MetricCard({ label, value, unit, note, ic
   width: number;
   isDark: boolean; border: string; text: string; sub: string;
 }) {
-  const gs = useGlassStyles();
+  // Omni (DS v2.2): суцільна картка вмісту (не скло).
   return (
     <View
-      style={{ ...gs.card, width, borderRadius: 20, padding: 20, ...shadow[isDark ? 'dark' : 'light'].card }}>
+      style={{ backgroundColor: dsTokens(isDark).surface.card, width, borderRadius: 16, padding: 20, ...shadow[isDark ? 'dark' : 'light'].card }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
         <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name={icon} size={14} color={color} />
@@ -558,10 +541,9 @@ const WorkoutCard = React.memo(function WorkoutCard({ wo, isDark, border, text, 
   const dateStr = d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
   const timeStr = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 
-  const gs = useGlassStyles();
   return (
     <View
-      style={[s.workoutCard, { ...gs.card }]}>
+      style={[s.workoutCard, { backgroundColor: dsTokens(isDark).surface.card }, shadow[isDark ? 'dark' : 'light'].card]}>
       <View style={[s.workoutIcon, { backgroundColor: HEALTH_ACCENTS.water + '22' }]}>
         <IconSymbol name="figure.run" size={18} color={HEALTH_ACCENTS.water} />
       </View>
@@ -652,6 +634,6 @@ const s = StyleSheet.create({
   card:        { borderRadius: 20, padding: 20 },
   syncBtn:     { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   hkvRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: 16, padding: 16 },
-  workoutCard: { borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center' },
+  workoutCard: { borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center' },
   workoutIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 });

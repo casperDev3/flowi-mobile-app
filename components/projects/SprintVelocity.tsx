@@ -11,7 +11,9 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '@/store/i18n';
 import type { VelocityWindow } from '@/utils/projectStatsMetrics';
-import { fontFamily, radius } from '@/constants/theme';
+import { fontFamily } from '@/constants/theme';
+
+import { OmniPanel, OmniWeekBars } from './OmniPaletteKit';
 
 export interface VelocityPalette {
   text: string;
@@ -39,15 +41,26 @@ export function SprintVelocity({
     iso ? new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '';
 
   return (
-    <View style={[st.panel, { backgroundColor: palette.dim }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-        <Text style={[st.title, { color: palette.text, flex: 1 }]}>{tr.velocityTitle}</Text>
-        {velocity.sampleSize > 0 ? (
-          <Text style={[st.note, { color: palette.sub }]}>
-            {fill(tr.velocityAverage, { n: oneDecimal(velocity.avgVelocity), w: oneDecimal(velocity.avgWeeklyVelocity) })}
-          </Text>
-        ) : null}
-      </View>
+    // Omni (DS v2.2): суцільна bento-картка; над таблицею — штриховані
+    // стовпці велосіті, останній закритий спринт — фірмовий градієнт.
+    <OmniPanel
+      title={tr.velocityTitle}
+      subtitle={velocity.sampleSize > 0
+        ? fill(tr.velocityAverage, { n: oneDecimal(velocity.avgVelocity), w: oneDecimal(velocity.avgWeeklyVelocity) })
+        : undefined}
+      palette={palette}
+      style={{ marginTop: 8 }}>
+      {velocity.rows.length > 1 ? (
+        <View accessible={false} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={{ marginBottom: 10 }}>
+          <OmniWeekBars
+            // Рядки — від найновішого; стовпці читаються зліва направо в часі.
+            data={[...velocity.rows].reverse().map(row => ({ key: row.sprint.id, label: row.sprint.name, value: row.velocity }))}
+            activeIndex={velocity.rows.length - 1}
+            height={64}
+            palette={palette}
+          />
+        </View>
+      ) : null}
 
       {velocity.rows.length === 0 ? (
         <Text style={[st.note, { color: palette.sub }]}>{tr.velocityEmpty}</Text>
@@ -77,13 +90,11 @@ export function SprintVelocity({
           {fill(tr.velocityUndated, { n: velocity.undatedClosed })}
         </Text>
       ) : null}
-    </View>
+    </OmniPanel>
   );
 }
 
 const st = StyleSheet.create({
-  panel: { borderRadius: radius.nested, padding: 16, marginTop: 8 },
-  title: { fontSize: 16, fontFamily: fontFamily.semibold },
   note:  { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.regular },
   row:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, borderTopWidth: StyleSheet.hairlineWidth },
   num:   { fontSize: 12, fontFamily: fontFamily.regular, textAlign: 'right', fontVariant: ['tabular-nums'], minWidth: 58 },

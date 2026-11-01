@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
 
+import { KpiCounter } from '@/components/ds';
 import { GroupScreenShell } from '@/components/training/GroupScreenShell';
 import { useGroupStream, useGroupSummary } from '@/components/training/hooks';
 import { InvitePanel } from '@/components/training/InvitePanel';
@@ -57,6 +58,7 @@ export default function MembersScreen() {
       groupId={groupId}
       groupName={group?.name}
       issue={m.issue}
+      kpis={m.members.length ? <KpiCounter value={m.members.length} label={tr.tgMembers} /> : undefined}
       onRefresh={() => { void m.load(); void stream.sync(); }}>
       {m.error ? <Notice c={c} text={m.error} tone="error" /> : null}
       {isCoach ? <Notice c={c} text={tr.tgPrivacyNote} tone="info" /> : null}

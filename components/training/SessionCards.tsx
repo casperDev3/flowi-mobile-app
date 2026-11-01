@@ -5,6 +5,7 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
+import { BentoCard, useBentoColors } from '@/components/ds';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useI18n } from '@/store/i18n';
 import type { Translations } from '@/store/translations';
@@ -70,15 +71,31 @@ export function TodaySessionCard({ c, session, next, onOpen, noPlanText }: {
       </Card>
     );
   }
+  // Omni: сьогоднішнє тренування — ЄДИНА «темна» картка сторінки групи
+  // (як Meeting card в Omni): білий текст, біла pill-дія.
+  return (
+    <BentoCard variant="dark" title={tr.tgTodaySession} icon="figure.run">
+      <TodaySessionBody c={c} session={session} onOpen={onOpen} />
+    </BentoCard>
+  );
+}
+
+function TodaySessionBody({ c, session, onOpen }: {
+  c: TrainingColors;
+  session: TrainingSession;
+  onOpen: (s: TrainingSession) => void;
+}) {
+  const { tr } = useI18n();
+  const bc = useBentoColors();
   const open = session.status === 'planned';
+  // Статус на темній картці — світлий текст, колір статусу лише в крапці.
   const color = statusColor(session.status, c);
   return (
-    <Card c={c} accent={TG_ACCENT}>
-      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase' }}>{tr.tgTodaySession}</Text>
-      <Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.semibold, marginTop: 6 }} numberOfLines={2}>
+    <>
+      <Text style={{ color: bc.text, fontSize: 22, fontFamily: fontFamily.semibold }} numberOfLines={2}>
         {session.title || session.programName || tr.workoutsLabel}
       </Text>
-      <Text style={{ color: c.sub, fontSize: 13, marginTop: 4 }}>
+      <Text style={{ color: bc.textSecondary, fontSize: 13, marginTop: 4 }}>
         {[
           session.programName,
           fmt(tr.tgExercisesCount, { n: session.plannedExercises.length }),
@@ -87,20 +104,24 @@ export function TodaySessionCard({ c, session, next, onOpen, noPlanText }: {
       </Text>
       <View style={{ marginTop: 10, gap: 4 }}>
         {session.plannedExercises.slice(0, 4).map(p => (
-          <Text key={`${p.exerciseId}:${p.order}`} style={{ color: c.text, fontSize: 14 }} numberOfLines={1}>
+          <Text key={`${p.exerciseId}:${p.order}`} style={{ color: bc.text, fontSize: 14 }} numberOfLines={1}>
             {`• ${p.name} — ${p.sets ?? 1}×${p.reps}${p.weightG ? ` · ${formatKg(p.weightG)} ${tr.tgUnitKg}` : ''}`}
           </Text>
         ))}
       </View>
       {open ? (
-        <PrimaryButton label={tr.tgStart} icon="play.fill" onPress={() => onOpen(session)} style={{ marginTop: 14 }} />
+        <PrimaryButton label={tr.tgStart} icon="play.fill" onPress={() => onOpen(session)} color={bc.actionBg}
+          style={{ marginTop: 14 }} textColor={bc.actionText} />
       ) : (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
-          <Text style={{ color, fontFamily: fontFamily.semibold }}>{statusLabel(tr, session.status)}</Text>
-          <PrimaryButton label={tr.tgView} variant="soft" onPress={() => onOpen(session)} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+            <Text style={{ color: bc.text, fontFamily: fontFamily.semibold }}>{statusLabel(tr, session.status)}</Text>
+          </View>
+          <PrimaryButton label={tr.tgView} onPress={() => onOpen(session)} color={bc.actionBg} textColor={bc.actionText} />
         </View>
       )}
-    </Card>
+    </>
   );
 }
 

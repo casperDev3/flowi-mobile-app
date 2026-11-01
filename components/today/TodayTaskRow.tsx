@@ -12,7 +12,7 @@ import { useMotion } from '@/hooks/use-motion';
 import type { Translations } from '@/store/translations';
 import { Task, isOverdue, normalizePriority } from '@/utils/taskUtils';
 import { fontFamily } from '@/constants/theme';
-import { dsTheme, glassOf } from '@/components/shared/dsTheme';
+import { dsTheme } from '@/components/shared/dsTheme';
 
 interface Props {
   tasks: Task[];
@@ -79,7 +79,9 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen, project }: RowProps)
       accessibilityRole="button"
       accessibilityLabel={task.title}>
       <View
-        style={[s.row, { backgroundColor: glassOf(t).surfaceSubtle }]}>
+        // Omni (DS v2.2): рядок усередині суцільної bento-картки — тихий
+        // surface.subtle (скляний subtle на білій картці зникав повністю).
+        style={[s.row, { backgroundColor: t.surface.subtle }]}>
         <AnimatedCheck
           checked={localChecked}
           size={20}

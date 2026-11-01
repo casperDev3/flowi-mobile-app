@@ -50,12 +50,11 @@ import {
   latestValue,
 } from '@/utils/healthUtils';
 import { HealthColumns, useHealthTabLayout } from '@/components/health/HealthLayout';
-import { getHealthDSColors } from '@/components/health/palette';
+import { getHealthCardColors } from '@/components/health/palette';
 import { dsTokens } from '@/hooks/use-ds';
 import { HEALTH_ACCENTS } from '@/utils/healthTheme';
 import { fontFamily } from '@/constants/theme';
-import { useGlassStyles } from '@/components/finance/finPalette';
-import { MeshBackground } from '@/components/ds';
+import { BentoCard, MeshBackground, useBentoColors } from '@/components/ds';
 
 const ACCENT = HEALTH_ACCENTS.water;
 
@@ -102,8 +101,7 @@ export default function HealthProfileScreen() {
 
   // Палітра — у useMemo: інакше кожен ререндер (а тут їх багато, бо
   // поля вводу пишуть у стан на кожен символ) створює новий обʼєкт.
-  const c = useMemo(() => getHealthDSColors(isDark), [isDark]);
-  const gs = useGlassStyles();
+  const c = useMemo(() => getHealthCardColors(isDark), [isDark]);
   const k = dsTokens(isDark);
 
   const sexOpts: { key: Sex; label: string }[] = [
@@ -150,8 +148,9 @@ export default function HealthProfileScreen() {
           <ScrollView contentContainerStyle={[lay.contentStyle, { paddingBottom: 120 }]} showsVerticalScrollIndicator={false}>
             <HealthColumns twoCol={lay.twoCol} left={<>
 
-            {/* Профіль — перша з двох налаштовок розділу */}
-            <Text style={[s.sectionTitle, { color: c.text }]}>{tr.healthProfile}</Text>
+            {/* Профіль — перша з двох налаштовок розділу. Omni (DS v2.2): форма —
+                у суцільній BentoCard із шапкою «icon-chip + назва». */}
+            <BentoCard compact title={tr.healthProfile} icon="person.fill" accent="coral" style={{ marginTop: 8 }}>
 
             {/* Стать */}
             <Text style={[s.label, { color: c.sub }]}>{tr.sexLabel}</Text>
@@ -210,22 +209,22 @@ export default function HealthProfileScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            </BentoCard>
 
             </>} right={<>
-            {/* Превʼю розрахованих цілей */}
-            <View style={[s.preview, { ...gs.card }, lay.twoCol && { marginTop: 8 }]}>
-              <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginBottom: 12 }}>
-                {tr.todayLabel} · TDEE {tdee} кк
-              </Text>
-              <PreviewRow label={tr.dailyLimit} value={`${goals.calories} кк`} color={HEALTH_ACCENTS.cal} text={c.text} sub={c.sub} />
-              <PreviewRow label={tr.protein} value={`${goals.protein} г`} color={HEALTH_ACCENTS.weight} text={c.text} sub={c.sub} />
-              <PreviewRow label={tr.water} value={`${goals.water} мл`} color={ACCENT} text={c.text} sub={c.sub} />
-              {latestWeight == null && (
-                <Text style={{ color: c.sub, fontSize: 12, marginTop: 8 }}>
-                  {`ℹ️ ${tr.recordWeight} — ${FALLBACK_WEIGHT} кг (за замовч.)`}
-                </Text>
-              )}
-            </View>
+            {/* Превʼю розрахованих цілей — ЄДИНА темна картка сторінки (Omni):
+                це результат, заради якого профіль і заповнюють. */}
+            <BentoCard compact variant="dark" title={`TDEE ${tdee} кк`} icon="flame.fill" subtitle={tr.todayLabel}
+              style={{ marginTop: lay.twoCol ? 8 : 24 }}>
+              <PreviewRows
+                rows={[
+                  { label: tr.dailyLimit, value: `${goals.calories} кк`, color: HEALTH_ACCENTS.cal },
+                  { label: tr.protein, value: `${goals.protein} г`, color: HEALTH_ACCENTS.weight },
+                  { label: tr.water, value: `${goals.water} мл`, color: ACCENT },
+                ]}
+                note={latestWeight == null ? `ℹ️ ${tr.recordWeight} — ${FALLBACK_WEIGHT} кг (за замовч.)` : null}
+              />
+            </BentoCard>
 
             <TouchableOpacity onPress={save} disabled={!initialized}
               accessibilityRole="button" accessibilityState={{ disabled: !initialized }}
@@ -242,13 +241,11 @@ export default function HealthProfileScreen() {
               Connect (Android) ще не підключено — рядка під нього теж немає,
               бо неактивний пункт меню читається як зламаний, а не як «скоро».
             */}
-            <Text style={[s.sectionTitle, { color: c.text, marginTop: 28 }]}>
-              {lang === 'uk' ? 'Джерела даних' : 'Data sources'}
-            </Text>
+            <BentoCard compact title={lang === 'uk' ? 'Джерела даних' : 'Data sources'} icon="heart.fill" accent="coral" style={{ marginTop: 24 }}>
             {HK_AVAILABLE ? (
               <TouchableOpacity onPress={() => router.push('/apple-health')} activeOpacity={0.85}
                 accessibilityRole="button" accessibilityLabel="Apple Health"
-                style={[s.sourceRow, { ...gs.card }]}>
+                style={[s.sourceRow, { backgroundColor: k.surface.subtle }]}>
                 <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
                   <IconSymbol name="heart.fill" size={16} color={ACCENT} />
                 </View>
@@ -267,12 +264,24 @@ export default function HealthProfileScreen() {
                   : 'No automatic sources on this device — metrics are entered manually.'}
               </Text>
             )}
+            </BentoCard>
             </>} />
 
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
+  );
+}
+
+/** Рядки превʼю на темній картці — кольори з useBentoColors (інакше чорне по чорному). */
+function PreviewRows({ rows, note }: { rows: { label: string; value: string; color: string }[]; note: string | null }) {
+  const bc = useBentoColors();
+  return (
+    <>
+      {rows.map(r => <PreviewRow key={r.label} label={r.label} value={r.value} color={r.color} text={bc.text} sub={bc.textSecondary} />)}
+      {note ? <Text style={{ color: bc.textSecondary, fontSize: 12, marginTop: 8 }}>{note}</Text> : null}
+    </>
   );
 }
 
@@ -309,7 +318,7 @@ function clampInt(text: string, max: number, fallback: number): number {
 const s = StyleSheet.create({
   pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
   sectionTitle: { fontSize: 16, fontFamily: fontFamily.semibold, marginTop: 6 },
-  sourceRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, padding: 16, marginTop: 12 },
+  sourceRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 16 },
   label:     { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 18 },
   input:     { fontSize: 20, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], borderRadius: 12, minHeight: 48, paddingHorizontal: 14, paddingVertical: 12 },
   segBtn:    { flex: 1, borderRadius: 999, minHeight: 44, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },

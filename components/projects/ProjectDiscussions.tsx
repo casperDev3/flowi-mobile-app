@@ -24,9 +24,8 @@ import { projectShellColors } from './ProjectScreenShell';
 import { ProjectTaskSheet } from './ProjectTaskSheet';
 import { TeamInput } from './TeamTaskPanel';
 import { saveProjectRecord, useProjectRecords } from './useProjectRecords';
-import { fontFamily, radius, type } from '@/constants/theme';
+import { fontFamily, radius, shadow, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassOf, glassRim } from '@/components/shared/dsTheme';
 import { MeshBackground } from '@/components/ds';
 
 type Filter = 'all' | 'topic' | 'chat' | 'archive';
@@ -106,12 +105,15 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
           accessibilityRole="button"
           accessibilityState={{ selected: d.id === selected }}
           accessibilityLabel={`${d.kind === 'chat' ? tr.pdChat : tr.pdTopic} · ${d.title}`}
+          // Omni: рядок-картка з круглою icon-chip (як ліва панель «AI Assistant»).
           style={({ pressed }) => ({
-            minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10,
-            borderRadius: radius.nested, borderWidth: 1.5,
-            borderColor: d.id === selected ? tk.action.primary : 'transparent', backgroundColor: glassOf(tk).surface, opacity: pressed ? 0.7 : 1,
+            minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10,
+            borderRadius: radius.cardCompact, borderWidth: 1.5,
+            borderColor: d.id === selected ? tk.action.primary : 'transparent', backgroundColor: tk.surface.card, opacity: pressed ? 0.7 : 1,
           })}>
-          <IconSymbol name={d.kind === 'chat' ? 'bubble.left.and.bubble.right.fill' : 'text.alignleft'} size={15} color={c.sub} />
+          <View style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: tk.surface.subtle }}>
+            <IconSymbol name={d.kind === 'chat' ? 'bubble.left.and.bubble.right.fill' : 'text.alignleft'} size={14} color={c.text} />
+          </View>
           <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{d.title}</Text>
           <Text style={[type.caption, { color: c.sub }]}>{d.kind === 'chat' ? tr.pdChat : tr.pdTopic}</Text>
         </Pressable>
@@ -120,7 +122,7 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
   );
 
   const roomPart = room ? (
-    <View style={{ gap: 12, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), borderRadius: radius.cardCompact, padding: 20 }}>
+    <View style={[{ gap: 12, backgroundColor: tk.surface.card, borderRadius: radius.card, padding: 20 }, shadow[dark ? 'dark' : 'light'].card]}>
       <Text accessibilityRole="header" style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 20 }}>{room.title}</Text>
       {room.body ? <Text style={[type.body, { color: c.text }]}>{room.body}</Text> : null}
       {/* Дії теми — один рядок: вторинні ліворуч, «Створити завдання» праворуч. */}

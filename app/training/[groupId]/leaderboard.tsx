@@ -8,11 +8,12 @@ import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
+import { BentoCard, SectionTabs } from '@/components/ds';
 import { GroupScreenShell } from '@/components/training/GroupScreenShell';
 import { useGroupSummary, useTrainingScope, type LoadIssue } from '@/components/training/hooks';
 import { LeaderboardList } from '@/components/training/LeaderboardList';
-import { fmt, TG_ACCENT, useTrainingColors } from '@/components/training/theme';
-import { Card, Chip, EmptyState } from '@/components/training/TrainingBits';
+import { fmt, useTrainingColors } from '@/components/training/theme';
+import { Card, EmptyState } from '@/components/training/TrainingBits';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useI18n } from '@/store/i18n';
 import { getLeaderboard, isOffline } from '@/utils/trainingApi';
@@ -64,19 +65,24 @@ export default function LeaderboardScreen() {
       onRefresh={refresh}
       refreshing={refreshing}
       footer={data?.me ? (
-        <Card c={c} accent={TG_ACCENT}>
+        // Omni: «Ваше місце» — єдина темна (featured) картка сторінки.
+        <BentoCard variant="dark" compact>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>
+            <Text style={{ color: c.t.featured.text, fontSize: 15, fontFamily: fontFamily.semibold }}>
               {fmt(tr.tgYourPlace, { rank: data.me.rank, xp: data.me.xp })}
             </Text>
-            {meRow ? <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{`🔥${meRow.streak_days}`}</Text> : null}
+            {meRow ? <Text style={{ color: c.t.featured.text, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{`🔥${meRow.streak_days}`}</Text> : null}
           </View>
-        </Card>
+        </BentoCard>
       ) : undefined}>
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-        <Chip c={c} label={tr.tgPeriodWeek} active={period === 'week'} onPress={() => setPeriod('week')} />
-        <Chip c={c} label={tr.tgPeriodAll} active={period === 'all'} onPress={() => setPeriod('all')} />
-      </View>
+      {/* Omni SectionTabs: період лідерборда (чорна pill = обраний). */}
+      <SectionTabs
+        tabs={[{ key: 'week' as const, label: tr.tgPeriodWeek }, { key: 'all' as const, label: tr.tgPeriodAll }]}
+        value={period}
+        onChange={setPeriod}
+        accessibilityLabel={tr.tgLeaderboard}
+        style={{ marginBottom: 12 }}
+      />
       {period === 'week' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <TouchableOpacity onPress={() => setMonday(addDays(weekMonday, -7))} accessibilityRole="button" accessibilityLabel={tr.tgPrevWeek}

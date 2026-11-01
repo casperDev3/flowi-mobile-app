@@ -16,7 +16,7 @@ import { timerCandidates, type TimerCandidateTask } from '@/components/time/time
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { fontFamily, radius, space, touchTarget, type as dsType } from '@/constants/theme';
 import type { Translations } from '@/store/translations';
-import { GlassSurface, IconChip } from '@/components/ds';
+import { BentoCard } from '@/components/ds';
 
 /** Скільки задач видно без пошуку: панель — підказка, а не другий список задач. */
 const PREVIEW = 5;
@@ -39,12 +39,8 @@ export function StartTimerCard({ c, tr, tasks, running, projectById, onStart }: 
   const more = candidates.length - shown.length;
 
   return (
-    <GlassSurface radius={radius.cardCompact} style={s.card}>
-      <View style={s.head}>
-        {/* DS v2.1: icon-chip акценту модуля «Час» (amber). */}
-        <IconChip icon="play.fill" accent="amber" size="sm" />
-        <Text style={[s.title, { color: c.text }]} accessibilityRole="header">{tr.timeStartTimerTitle}</Text>
-      </View>
+    // Omni: bento-картка, шапка — icon-chip акценту «Часу» (amber) + назва.
+    <BentoCard compact icon="play.fill" accent="amber" title={tr.timeStartTimerTitle}>
       <TextInput
         value={query}
         onChangeText={setQuery}
@@ -53,7 +49,7 @@ export function StartTimerCard({ c, tr, tasks, running, projectById, onStart }: 
         accessibilityLabel={tr.timeStartTimerSearch}
         autoCorrect={false}
         returnKeyType="search"
-        style={[s.input, { backgroundColor: c.dim, color: c.text }]}
+        style={[s.input, { backgroundColor: c.t.surface.subtle, color: c.text }]}
       />
       {shown.length > 0 ? (
         shown.map(task => {
@@ -89,7 +85,7 @@ export function StartTimerCard({ c, tr, tasks, running, projectById, onStart }: 
         <Text style={[s.hint, { color: c.sub }]}>{tr.timeStartTimerMore.replace('{count}', String(more))}</Text>
       ) : null}
       <Text style={[s.hint, { color: c.sub }]}>{tr.timeStartTimerMeetingHint}</Text>
-    </GlassSurface>
+    </BentoCard>
   );
 }
 

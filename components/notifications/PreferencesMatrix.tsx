@@ -27,7 +27,6 @@ import { useDSTheme } from '@/components/shared/useDSTheme';
 import type { Translations } from '@/store/translations';
 
 import { categoryLabel, categoryLook, channelLabel, eventLabel, fillTemplate } from './labels';
-import { glassRimFor } from '@/components/shared/dsTheme';
 
 export interface MatrixColors {
   border: string;
@@ -78,7 +77,7 @@ export function PreferencesMatrix({ doc, channels, disabledModules, tr, colors: 
         const label = categoryLabel(tr, category.key, category.label);
         const isOpen = !!expanded[category.key];
         return (
-          <View key={category.key} style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+          <View key={category.key} style={[st.card, { backgroundColor: c.card }]}>
             <View style={st.row}>
               <View style={st.labelCol}>
                 <View style={[st.iconBox, { backgroundColor: look.color + '20' }]}>

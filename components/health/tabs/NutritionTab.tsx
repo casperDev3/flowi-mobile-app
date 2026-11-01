@@ -23,7 +23,7 @@ import { isSameDay } from '@/utils/dateUtils';
 import {
   ACCENT, ACCENT_CAL, ACCENT_PULSE, ACCENT_STEPS, ModalKey,
 } from '@/utils/healthTheme';
-import { getHealthDSColors } from '@/components/health/palette';
+import { getHealthCardColors } from '@/components/health/palette';
 import { dsTokens } from '@/hooks/use-ds';
 import { fontFamily } from '@/constants/theme';
 
@@ -33,7 +33,7 @@ export function NutritionTab({ h }: HealthTabProps) {
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const c = getHealthDSColors(isDark);
+  const c = getHealthCardColors(isDark);
   const k = dsTokens(isDark);
 
   const { today, goals, cal } = h;
@@ -54,7 +54,7 @@ export function NutritionTab({ h }: HealthTabProps) {
     {
       key: 'calories',
       node: (
-        <HealthCard c={c} title={tr.calories} right={<HealthAddButton onPress={() => setModal('calories')} label={tr.add} />}>
+        <HealthCard c={c} title={tr.calories} icon="flame.fill" right={<HealthAddButton onPress={() => setModal('calories')} label={tr.add} />}>
           {/* Велике число — ЗʼЇДЕНЕ, і смужка міряє теж його. Спалене сюди не
               входить: день без їжі й із 500 спаленими має показувати нуль
               зʼїдених, а не «500 / 2200». Вплив тренувань видно в залишку. */}
@@ -105,7 +105,7 @@ export function NutritionTab({ h }: HealthTabProps) {
     {
       key: 'protein',
       node: (
-        <HealthCard c={c} title={tr.protein}>
+        <HealthCard c={c} title={tr.protein} icon="fork.knife">
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
             <Text style={{ color: c.text, fontSize: 44, lineHeight: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.88 }}>{Math.round(today.protein)}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>/ {goals.protein} г</Text>
@@ -131,7 +131,7 @@ export function NutritionTab({ h }: HealthTabProps) {
     {
       key: 'water',
       node: (
-        <HealthCard c={c} title={tr.water}>
+        <HealthCard c={c} title={tr.water} icon="drop.fill">
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
             <Text style={{ color: c.text, fontSize: 32, lineHeight: 36, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.64 }}>
               {today.water >= 1000 ? `${(today.water / 1000).toFixed(1)} л` : `${today.water} мл`}
@@ -163,7 +163,7 @@ export function NutritionTab({ h }: HealthTabProps) {
     {
       key: 'reminders',
       node: (
-        <HealthCard c={c} title={tr.reminders}>
+        <HealthCard c={c} title={tr.reminders} icon="bell.fill">
           <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
             <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 }}>{tr.waterReminder}</Text>
             <Switch
@@ -191,7 +191,7 @@ export function NutritionTab({ h }: HealthTabProps) {
     items.push({
       key: 'food-log',
       node: (
-        <HealthCard c={c} title={`${tr.todayLabel} · ${tr.nutrition}`} style={{ paddingBottom: 8 }}>
+        <HealthCard c={c} title={`${tr.todayLabel} · ${tr.nutrition}`} icon="list.bullet" style={{ paddingBottom: 8 }}>
           {foodToday.map((e, i) => (
             <View key={e.id} style={[s.logRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
               <View style={{ width: 34, height: 34, borderRadius: 999, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>

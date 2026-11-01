@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { copyMeeting } from '@/utils/meetingSharing';
 import { Atlas } from '@/constants/atlas';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { fontFamily, radius } from '@/constants/theme';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { useSyncedList } from '@/hooks/use-synced-list';
@@ -63,7 +64,8 @@ export function MeetingWorkspace({ meeting, date, colors: c, section = "agenda" 
       {!agenda.length ? <Text style={{ color: c.sub }}>{t('Додайте теми для обговорення.', 'Add topics to discuss.')}</Text> : null}
       <View>{agenda.map(item => <View key={item.id} style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: item.done, disabled: !canEdit || busy }} accessibilityLabel={item.text} disabled={!canEdit || busy} onPress={() => void run(() => mutate({ kind: 'set', id: item.id, done: !item.done }))} style={{ flex: 1, flexDirection: 'row', gap: 10, minHeight: 44, alignItems: 'center' }}>
-          <Text style={{ color: c.text, fontSize: 24 }}>{item.done ? '☑' : '☐'}</Text><Text style={{ color: item.done ? c.sub : c.text, flex: 1, textDecorationLine: item.done ? 'line-through' : 'none' }}>{item.text}</Text>
+          {/* Omni-чекліст: виконаний — суцільне коло з галочкою, ні — порожнє коло. */}
+          <IconSymbol name={item.done ? 'checkmark.circle.fill' : 'circle'} size={22} color={item.done ? c.text : c.sub} /><Text style={{ color: item.done ? c.sub : c.text, flex: 1, textDecorationLine: item.done ? 'line-through' : 'none' }}>{item.text}</Text>
         </TouchableOpacity>
         {canEdit ? button(t('Видалити', 'Remove'), () => void run(() => mutate({ kind: 'remove', id: item.id }))) : null}
       </View>)}</View>
@@ -105,7 +107,7 @@ export function MeetingWorkspace({ meeting, date, colors: c, section = "agenda" 
   </View>;
 }
 const st = StyleSheet.create({
-  section: { borderRadius: radius.nested, padding: Atlas.space.s150, gap: 8 },
+  section: { borderRadius: radius.cardCompact, padding: Atlas.space.s150, gap: 8 },
   heading: { fontSize: 15, fontFamily: fontFamily.semibold },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   button: { minHeight: Atlas.controlHeight, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.pill, justifyContent: 'center', alignItems: 'center' },

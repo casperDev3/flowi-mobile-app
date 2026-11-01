@@ -54,7 +54,7 @@ import { MeetingDetailBody, MeetingDetailHeader } from '@/components/meetings/Me
 import { useInPlaceProjectTask } from '@/components/projects/ProjectTaskSheet';
 import { DETAIL_COLUMN_WIDTH, DetailPane } from '@/components/shared/DetailPane';
 import { MEETING_COLORS, MeetingFormSheet, type MeetingFormData } from '@/components/shared/MeetingFormSheet';
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { fontFamily, radius, shadow } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
@@ -78,8 +78,9 @@ import {
 import type { Sprint } from '@/utils/sprintUtils';
 import { isTaskDoneByType, type TaskStatusColumn } from '@/utils/taskStatuses';
 import type { Task } from '@/utils/taskUtils';
-import { MeshBackground } from '@/components/ds';
-import { glassFill, glassRimFor } from '@/components/shared/dsTheme';
+import { KpiCounter, MeshBackground } from '@/components/ds';
+import { AppHeader } from '@/components/shared/AppHeader';
+import { glassFill } from '@/components/shared/dsTheme';
 import { useReduceTransparency } from '@/hooks/use-reduce-transparency';
 
 /** Мінімум локального проєкту: чип, поле «Проєкт» форми, фільтр, колір смуг. */
@@ -254,6 +255,21 @@ export default function CalendarScreen() {
     () => activeSprints(sprints, projectMap, filter),
     [sprints, projectMap, filter],
   );
+
+  // Omni KPI шапки — з тих самих кошиків, що малює сітка: зустрічі й
+  // завдання показаного періоду (місяць — лише його власні дні) і сьогодні.
+  const periodStats = useMemo(() => {
+    const month = keyToDate(anchor).getMonth();
+    const days = view === 'month' ? range.days.filter(day => keyToDate(day).getMonth() === month) : range.days;
+    let periodMeetings = 0;
+    let periodTasks = 0;
+    for (const day of days) {
+      periodMeetings += meetingsByDay[day]?.length ?? 0;
+      periodTasks += tasksByDay[day]?.length ?? 0;
+    }
+    const today = (meetingsByDay[todayKey]?.length ?? 0) + (tasksByDay[todayKey]?.length ?? 0);
+    return { periodMeetings, periodTasks, today };
+  }, [view, anchor, range, meetingsByDay, tasksByDay, todayKey]);
 
   const title = useMemo(() => periodTitle(view, anchor, tr), [view, anchor, tr]);
   const anchorDate = keyToDate(anchor);
@@ -586,7 +602,7 @@ export default function CalendarScreen() {
   // лишав сітці годин ледь половину висоти — тепер його можна сховати (до
   // кінця сеансу екрана), а сам він — один рядок.
   const undatedHint = undated.length > 0 && !searchOpen && !undatedDismissed ? (
-    <View style={[st.hint, { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), marginHorizontal: 16, paddingVertical: 0, paddingRight: 0 }]}>
+    <View style={[st.hint, { backgroundColor: c.card, marginHorizontal: 16, paddingVertical: 0, paddingRight: 0 }]}>
       <TouchableOpacity
         testID="calendar-undated-hint"
         onPress={openUndated}
@@ -639,7 +655,7 @@ export default function CalendarScreen() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad + (isWide ? 24 : 72) }}
         showsVerticalScrollIndicator={false}>
         {/* DS v2: сітка місяця — у білій картці на canvas. */}
-        <View style={{ backgroundColor: c.card, ...glassRimFor(c.card, 'card'), borderRadius: radius.cardCompact, padding: 12 }}>
+        <View style={{ backgroundColor: c.card, borderRadius: radius.cardCompact, padding: 12 }}>
           <MonthGrid
             rows={monthRows}
             month={anchorDate.getMonth()}
@@ -676,7 +692,7 @@ export default function CalendarScreen() {
     );
   } else {
     content = (
-      <View style={{ flex: 1, marginHorizontal: 16, marginBottom: 12, backgroundColor: c.card, ...glassRimFor(c.card, 'card'), borderRadius: radius.cardCompact, overflow: 'hidden', paddingTop: 8, paddingRight: 4 }}>
+      <View style={{ flex: 1, marginHorizontal: 16, marginBottom: 12, backgroundColor: c.card, borderRadius: radius.cardCompact, overflow: 'hidden', paddingTop: 8, paddingRight: 4 }}>
         <TimeGrid
           days={range.days}
           todayKey={todayKey}
@@ -703,9 +719,17 @@ export default function CalendarScreen() {
       <View style={{ flex: 1, flexDirection: showSideColumn ? 'row' : 'column' }}>
         <View style={{ flex: 1 }}>
           <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
-            <ScreenHeader
+            {/* Omni (DS v2.2): AppHeader = ScreenHeader + дзвіник і аватар
+                (планшет — рядок інструментів із таймером), KPI — у шапці. */}
+            <AppHeader
               title={tr.calendar}
-              color={c.text}
+              kpis={!searchOpen && initialized ? (
+                <>
+                  <KpiCounter value={periodStats.today} label={tr.today} onPress={goToday} accessibilityLabel={`${tr.today}: ${periodStats.today}`} />
+                  <KpiCounter value={periodStats.periodMeetings} label={tr.calSectionMeetings} />
+                  <KpiCounter value={periodStats.periodTasks} label={tr.tasks} />
+                </>
+              ) : undefined}
               back={{
                 onPress: () => router.back(),
                 label: tr.back,

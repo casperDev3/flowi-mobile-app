@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/shared/ScreenHeader';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
-import { fontFamily, radius, space, type as dsType } from '@/constants/theme';
+import { fontFamily, radius, type as dsType } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 import { useAutoBackup } from '@/store/auto-backup';
 import { BACKUP_KEYS } from '@/store/backup-keys';
@@ -28,7 +28,8 @@ import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 import { localDateKey } from '@/utils/dateUtils';
 import { glassStyles } from '@/components/finance/finPalette';
-import { GlassSurface, MeshBackground } from '@/components/ds';
+import { BentoCard, BentoGrid, KpiCounter, MeshBackground, PageHeader } from '@/components/ds';
+import { useResponsive } from '@/hooks/use-responsive';
 
 const ALL_KEYS = [
   { key: 'tasks',             label: 'Завдання',    icon: 'checklist',          color: '#7C3AED' },
@@ -416,6 +417,7 @@ export default function DataScreen() {
     ), []);
 
   const totalItems = Object.values(counts).reduce((s, v) => s + v, 0);
+  const { isCompact } = useResponsive();
 
   return (
     <View style={{ flex: 1 }}>
@@ -441,14 +443,25 @@ export default function DataScreen() {
             { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
             { label: tr.dataManagement },
           ]}
-          crumbColor={c.sub}
-        />
+          crumbColor={c.sub}>
+          {/* Omni: KPI сторінки — з даних, що вже є на екрані. */}
+          <PageHeader
+            bleed={isCompact ? 20 : 0}
+            kpis={
+              <>
+                <KpiCounter value={totalItems} label="Всього записів" />
+                <KpiCounter value={formatBackupTime(lastBackup)} label="Остання копія" />
+              </>
+            }
+          />
+        </ScreenHeader>
 
         <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 }]} showsVerticalScrollIndicator={false}>
 
+          {/* Omni: розділи — bento-картки (1 колонка на телефоні, 2 на планшеті). */}
+          <BentoGrid columns={{ compact: 1, medium: 2, expanded: 2 }}>
           {/* ─── Auto-backup ─── */}
-          <Text style={[st.sectionLabel, { color: c.sub }]}>АВТО-РЕЗЕРВУВАННЯ</Text>
-          <GlassSurface radius={radius.cardCompact} style={[st.card, { marginBottom: 24 }]}>
+          <BentoCard title="Авто-резервування" icon="clock.arrow.2.circlepath" accent="lavender">
             <View style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
               <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
                 <IconSymbol name="clock.arrow.2.circlepath" size={17} color={c.accent} />
@@ -514,11 +527,10 @@ export default function DataScreen() {
               </View>
               <IconSymbol name="chevron.right" size={16} color={c.sub} />
             </TouchableOpacity>
-          </GlassSurface>
+          </BentoCard>
 
           {/* ─── Export / Import ─── */}
-          <Text style={[st.sectionLabel, { color: c.sub }]}>ВИВАНТАЖЕННЯ ТА ЗАВАНТАЖЕННЯ</Text>
-          <GlassSurface radius={radius.cardCompact} style={[st.card, { marginBottom: 24 }]}>
+          <BentoCard title="Вивантаження та завантаження" icon="square.and.arrow.up" accent="lavender">
             <TouchableOpacity onPress={handleExport} disabled={exporting} style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
               <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
                 <IconSymbol name="square.and.arrow.up" size={17} color={c.accent} />
@@ -548,11 +560,10 @@ export default function DataScreen() {
                 <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold }}>JSON</Text>
               </View>
             </TouchableOpacity>
-          </GlassSurface>
+          </BentoCard>
 
           {/* ─── Danger ─── */}
-          <Text style={[st.sectionLabel, { color: c.sub }]}>НЕБЕЗПЕЧНА ЗОНА</Text>
-          <GlassSurface radius={radius.cardCompact} style={st.card}>
+          <BentoCard title="Небезпечна зона" icon="exclamationmark.triangle.fill" accent="coral">
             {/* Небезпечна зона: корал — лише гліфами й тлом-тінтом; текст лишається читабельним (4.5:1). */}
             <View style={[st.dangerHint, { backgroundColor: c.danger + '12' }]}>
               <IconSymbol name="exclamationmark.triangle.fill" size={14} color={t.accent.coral} />
@@ -570,11 +581,10 @@ export default function DataScreen() {
               </View>
               <IconSymbol name="chevron.right" size={16} color={c.sub} />
             </TouchableOpacity>
-          </GlassSurface>
+          </BentoCard>
 
           {/* ─── Stats compact ─── */}
-          <Text style={[st.sectionLabel, { color: c.sub, marginTop: 24 }]}>СТАТИСТИКА ДАНИХ</Text>
-          <GlassSurface radius={radius.cardCompact} style={[st.card, { marginBottom: 24 }]}>
+          <BentoCard title="Статистика даних" icon="externaldrive.fill" accent="info">
             {/* Total */}
             <View style={[st.statRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
               <View style={[st.statDot, { backgroundColor: c.dim }]}>
@@ -597,7 +607,8 @@ export default function DataScreen() {
                 last={i === ALL_KEYS.length - 1}
               />
             ))}
-          </GlassSurface>
+          </BentoCard>
+          </BentoGrid>
         </ScrollView>
       </SafeAreaView>
 
@@ -634,14 +645,13 @@ const StatRow = React.memo(function StatRow(
 });
 
 const st = StyleSheet.create({
-  sectionLabel:{ fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, marginBottom: 10, marginLeft: 4 },
-  card:        { borderRadius: radius.cardCompact, overflow: 'hidden', marginBottom: 0 },
-  statRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 10, minHeight: 44 },
+  // Рядки лежать усередині BentoCard (вона дає бічні поля) — власних немає.
+  statRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 10, gap: 10, minHeight: 44 },
   statDot:     { width: 28, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   statLabel:   { flex: 1, fontSize: 14, fontFamily: fontFamily.regular },
   statVal:     { fontSize: 14, fontFamily: fontFamily.semibold, minWidth: 24, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, minHeight: 56 },
+  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 14, minHeight: 56 },
   iconBox:     { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   actionBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
-  dangerHint:  { flexDirection: 'row', alignItems: 'flex-start', borderRadius: radius.nestedCompact, padding: 12, margin: space[4], marginBottom: 0 },
+  dangerHint:  { flexDirection: 'row', alignItems: 'flex-start', borderRadius: radius.nestedCompact, padding: 12, marginBottom: 4 },
 });

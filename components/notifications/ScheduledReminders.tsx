@@ -1,6 +1,6 @@
 import { Atlas } from '@/constants/atlas';
 import { fontFamily, type } from '@/constants/theme';
-import { dsTheme, glassOf } from '@/components/shared/dsTheme';
+import { dsTheme } from '@/components/shared/dsTheme';
 /**
  * Вкладка «Нагадування» центру сповіщень — локально заплановані нагадування
  * ОС (notifications-module.md §10.4). Раніше це був увесь екран
@@ -280,9 +280,9 @@ export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: 
         </TouchableOpacity>
       )}
 
-      <View style={[st.card, { borderColor: c.border, marginBottom: 10 }, { backgroundColor: glassOf(t).surface }]}>
+      <View style={[st.card, { borderColor: c.border, marginBottom: 10 }, { backgroundColor: t.surface.card }]}>
         <View style={st.toggleRow}>
-          <View style={[st.iconBox, { backgroundColor: glassOf(t).surfaceSubtle }]}>
+          <View style={[st.iconBox, { backgroundColor: t.surface.subtle }]}>
             <IconSymbol name="bell.badge" size={17} color={t.text.primary} />
           </View>
           <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 12 }}>
@@ -312,7 +312,7 @@ export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: 
             ].map(stat => (
               <View
                 key={stat.label}
-                style={[st.statCard, { borderColor: c.border, flex: 1 }, { backgroundColor: glassOf(t).surface }]}>
+                style={[st.statCard, { borderColor: c.border, flex: 1 }, { backgroundColor: t.surface.card }]}>
                 <Text style={{ ...type.displaySm, fontSize: 32, lineHeight: 36, color: stat.color }}>{stat.value}</Text>
                 <Text style={{ ...type.caption, color: c.sub, marginTop: 4 }}>{stat.label}</Text>
               </View>
@@ -380,7 +380,7 @@ const ReminderCard = React.memo(function ReminderCard({ item, meta, dateText, is
   const handleDelete = useCallback(() => onDelete(item), [onDelete, item]);
   const t = dsTheme(isDark);
   return (
-    <View style={[st.itemCard, { borderColor: colors.border }, { backgroundColor: glassOf(t).surface }]}>
+    <View style={[st.itemCard, { borderColor: colors.border }, { backgroundColor: t.surface.card }]}>
       <View style={[st.iconBox, { backgroundColor: meta.color + '20' }]}>
         <IconSymbol name={meta.icon} size={17} color={meta.color} />
       </View>

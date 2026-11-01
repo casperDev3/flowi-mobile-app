@@ -39,25 +39,31 @@ export function GlassTabBarBackground() {
   );
 }
 
-export function GlassTabIcon({ name, color, focused, accent }: { name: IconSymbolName; color: string; focused: boolean; accent: GlassAccent }) {
-  const { g, isDark, reduceTransparency } = useDS();
-  const a = g.accent[accent];
+/**
+ * Іконка вкладки Omni (DS v2.2): активна — суцільна чорна pill action.primary
+ * (у темній — біла) з іконкою text.onAction (≥ 15:1), як активний пункт
+ * сайдбара й SectionTabs; неактивна — іконка кольору підпису (TAB_BAR_TINT).
+ * `accent` лишився в API (акцент модуля вкладки) — Omni тримає таб-бар
+ * монохромним, акцент модуля живе на сторінці.
+ */
+export function GlassTabIcon({ name, color, focused, accent, badge }: {
+  name: IconSymbolName; color: string; focused: boolean; accent: GlassAccent; badge?: React.ReactNode;
+}) {
+  const { t, isDark, reduceTransparency } = useDS();
+  void accent;
   return (
     <View
       style={[
         st.iconPill,
-        focused && (reduceTransparency
-          ? { backgroundColor: a.solid }
-          : {
-            backgroundColor: a.tint,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: g.rim,
-            ...(Platform.OS === 'ios'
-              ? { shadowColor: a.glow, shadowOpacity: isDark ? 0.6 : 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 2 } }
-              : null),
-          }),
+        focused && {
+          backgroundColor: t.action.primary,
+          ...(Platform.OS === 'ios' && !reduceTransparency
+            ? { shadowColor: '#000', shadowOpacity: isDark ? 0.35 : 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }
+            : null),
+        },
       ]}>
-      <IconSymbol size={22} name={name} color={focused ? (reduceTransparency ? a.onSolid : a.ink) : color} />
+      <IconSymbol size={20} name={name} color={focused ? t.text.onAction : color} />
+      {badge}
     </View>
   );
 }

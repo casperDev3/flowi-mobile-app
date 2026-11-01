@@ -8,18 +8,20 @@
  * з utils/financeOverview.ts) і під кожною — «Перенесено з минулого» за
  * період фільтра (calcPeriodTotalsByCurrency). Курсів немає, тож суми «≈
  * усього» між валютами немає свідомо.
+ *
+ * Omni (DS v2.2): суцільна BentoCard — шапка «icon-chip + Залишки», праворуч
+ * pill «Рахунки ›»; сума — великі тонкі цифри. Плашки під карткою — суцільні.
  */
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { fontFamily, radius, space, type as dsType } from '@/constants/theme';
+import { fontFamily, radius, type as dsType } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 import type { Translations } from '@/store/translations';
 import type { CurrencyTotals } from '@/utils/financeUtils';
 import type { FinColors } from './financeLabels';
-import { useGlassStyles } from '@/components/finance/finPalette';
-import { GlassSurface } from '@/components/ds';
+import { BentoCard } from '@/components/ds';
 
 export interface OperationsSummaryProps {
   /** Валюта → сума балансів активних рахунків (financeOverview.totalByCurrency). */
@@ -55,25 +57,27 @@ export function OperationsSummary({
   accountFilterName, onClearAccountFilter, style,
 }: OperationsSummaryProps) {
   const { t } = useDS();
-  const gs = useGlassStyles();
   const codes = orderCurrencies(Object.keys(totals), primaryCode);
   const shown = codes.length > 0 ? codes : [primaryCode];
 
   return (
     <View style={style}>
-      <GlassSurface radius={radius.cardCompact} tint="lime" style={st.card}>
-        <View style={st.head}>
-          <Text style={[st.label, { color: t.text.primary }]}>{tr.finBalances}</Text>
+      <BentoCard
+        compact
+        title={tr.finBalances}
+        icon="creditcard.fill"
+        accent="lime"
+        headerRight={
           <TouchableOpacity
             onPress={onOpenAccounts}
             accessibilityRole="button"
             accessibilityLabel={tr.finOpenAccounts}
-            hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-            style={st.link}>
-            <Text style={{ color: t.text.secondary, fontSize: 13, fontFamily: fontFamily.medium }}>{tr.finOpenAccounts}</Text>
-            <IconSymbol name="chevron.right" size={11} color={t.text.secondary} />
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            style={[st.link, { backgroundColor: t.surface.subtle }]}>
+            <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.medium }}>{tr.finOpenAccounts}</Text>
+            <IconSymbol name="chevron.right" size={10} color={t.text.secondary} />
           </TouchableOpacity>
-        </View>
+        }>
 
         {hasAccounts ? (
           <View style={st.amounts}>
@@ -87,7 +91,7 @@ export function OperationsSummary({
                     adjustsFontSizeToFit
                     minimumFontScale={0.7}
                     accessibilityLabel={`${tr.totalOnAccounts} ${fmt(value, code)}`}
-                    style={{ ...dsType.display, color: value < 0 ? t.status.danger : t.text.primary }}>
+                    style={{ ...dsType.display, fontFamily: fontFamily.light, color: value < 0 ? t.status.danger : t.text.primary }}>
                     {fmt(value, code)}
                   </Text>
                   {/* Перенесений залишок — ПІД сумою (як і раніше на головній картці). */}
@@ -114,7 +118,7 @@ export function OperationsSummary({
             </TouchableOpacity>
           </View>
         )}
-      </GlassSurface>
+      </BentoCard>
 
       {unassignedLabel ? (
         <TouchableOpacity
@@ -122,7 +126,7 @@ export function OperationsSummary({
           accessibilityRole="button"
           accessibilityState={{ selected: !!unassignedActive }}
           accessibilityLabel={unassignedLabel}
-          style={[st.warn, { backgroundColor: unassignedActive ? t.action.primary : (gs.card.backgroundColor as string) }]}>
+          style={[st.warn, { backgroundColor: unassignedActive ? t.action.primary : t.surface.card }]}>
           <IconSymbol name="exclamationmark.triangle.fill" size={14} color={t.status.warning} />
           <Text style={{ color: unassignedActive ? t.text.onAction : t.text.primary, fontSize: 13, fontFamily: fontFamily.medium, flex: 1 }}>{unassignedLabel}</Text>
           <IconSymbol name={unassignedActive ? 'xmark' : 'chevron.right'} size={12} color={unassignedActive ? t.text.onAction : t.text.secondary} />
@@ -147,10 +151,7 @@ export function OperationsSummary({
 }
 
 const st = StyleSheet.create({
-  card: { borderRadius: radius.cardCompact, paddingHorizontal: space.cardPaddingCompact, paddingTop: 10, paddingBottom: space.cardPaddingCompact },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 36, marginBottom: 6 },
-  label: { ...dsType.h2 },
-  link: { flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 32 },
+  link: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32, paddingHorizontal: 12, borderRadius: radius.pill },
   amounts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 28, rowGap: 12 },
   newBtn: { marginTop: 12, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, minHeight: 44, borderRadius: radius.pill },
   warn: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.pill, marginTop: 12 },

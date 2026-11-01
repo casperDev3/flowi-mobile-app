@@ -1,12 +1,10 @@
 import * as Clipboard from 'expo-clipboard';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo } from 'react';
 import {
   Alert,
   Linking,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,7 +21,7 @@ import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 import { fontFamily } from '@/constants/theme';
 import { glassStyles } from '@/components/finance/finPalette';
-import { MeshBackground } from '@/components/ds';
+import { BentoArrowButton, BentoCard, BentoGrid, MeshBackground } from '@/components/ds';
 
 const PAYPAL_EMAIL = 'ihor.lialuik@gmail.com';
 const DONATELLO_URL = 'https://donatello.to/igorichua';
@@ -93,65 +91,49 @@ export default function DonateScreen() {
           contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
           showsVerticalScrollIndicator={false}>
 
-          {/* Hero */}
-          {/* Promo-блок DS v2: переливчастий градієнт + frosted-підкладка іконки. */}
-          <View style={st.hero}>
-            <LinearGradient
-              colors={k.gradient.iridescent}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={[st.heroIconWrap, { backgroundColor: k.surface.glass }]}>
-              <IconSymbol name="heart.fill" size={28} color={k.status.danger} />
+          {/* Omni: hero — AI/promo-картка (лавандово-рожева змивка + сфера), далі
+              способи підтримки — bento-картки-кнопки з ↗ (2 колонки на планшеті). */}
+          <BentoCard variant="ai" style={{ marginBottom: 16 }}>
+            <View style={st.hero}>
+              <View style={[st.heroIconWrap, { backgroundColor: k.surface.card }]}>
+                <IconSymbol name="heart.fill" size={28} color={k.status.danger} />
+              </View>
+              <Text style={[st.heroTitle, { color: c.text }]}>Підтримайте розробника</Text>
+              <Text style={[st.heroSub, { color: c.sub }]}>
+                Якщо Flowi допомагає вам — будь-яка підтримка дуже мотивує продовжувати розвиток додатку
+              </Text>
             </View>
-            <Text style={[st.heroTitle, { color: c.text }]}>Підтримайте розробника</Text>
-            <Text style={[st.heroSub, { color: c.sub }]}>
-              Якщо Flowi допомагає вам — будь-яка підтримка дуже мотивує продовжувати розвиток додатку
-            </Text>
-          </View>
+          </BentoCard>
 
-          {/* Donatello — first */}
-          <Text style={[st.sectionLabel, { color: c.sub }]}>ШВИДКИЙ ДОНАТ</Text>
-          <Pressable
-            onPress={() => Linking.openURL(DONATELLO_URL)}
-            style={({ pressed }) => [st.card, { ...c.gl.card, opacity: pressed ? 0.82 : 1 }]}>
-            <View style={st.cardContent}>
-              <View style={[st.iconWrap, { backgroundColor: '#FFB70020' }]}>
-                <IconSymbol name="gift.fill" size={22} color="#FFB700" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[st.cardTitle, { color: c.text }]}>Donatello</Text>
-                <Text style={[st.cardSub, { color: c.sub }]}>
-                  donatello.to/igorichua
-                </Text>
-              </View>
-              <View style={[st.actionBtn, { backgroundColor: k.action.primary }]}>
-                <IconSymbol name="arrow.up.trend" size={15} color={k.text.onAction} />
-              </View>
-            </View>
-          </Pressable>
+          <BentoGrid columns={{ compact: 1, medium: 2, expanded: 2 }}>
+            {/* Donatello — first */}
+            <BentoCard
+              title="Donatello"
+              subtitle="Швидкий донат"
+              icon="gift.fill"
+              accent="amber"
+              onPress={() => Linking.openURL(DONATELLO_URL)}
+              accessibilityLabel="Donatello: donatello.to/igorichua"
+              headerRight={<BentoArrowButton />}>
+              <Text style={[st.cardSub, { color: c.sub }]}>donatello.to/igorichua</Text>
+            </BentoCard>
 
-          {/* PayPal */}
-          <Text style={[st.sectionLabel, { color: c.sub, marginTop: 20 }]}>ЧЕРЕЗ EMAIL</Text>
-          <Pressable
-            onPress={handlePayPal}
-            style={({ pressed }) => [st.card, { ...c.gl.card, opacity: pressed ? 0.82 : 1 }]}>
-            <View style={st.cardContent}>
-              <View style={[st.iconWrap, { backgroundColor: '#0070BA20' }]}>
-                <IconSymbol name="banknote" size={22} color="#0070BA" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[st.cardTitle, { color: c.text }]}>PayPal</Text>
-                <Text style={[st.cardSub, { color: c.sub }]}>
-                  Натисніть, щоб скопіювати email
-                </Text>
-              </View>
-              <View style={[st.actionBtn, { backgroundColor: k.action.primary }]}>
-                <IconSymbol name="doc.on.clipboard" size={15} color={k.text.onAction} />
-              </View>
-            </View>
-          </Pressable>
+            {/* PayPal */}
+            <BentoCard
+              title="PayPal"
+              subtitle="Через email"
+              icon="banknote"
+              accent="info"
+              onPress={handlePayPal}
+              accessibilityLabel="PayPal: натисніть, щоб скопіювати email"
+              headerRight={
+                <View style={[st.actionBtn, { backgroundColor: k.action.primary }]}>
+                  <IconSymbol name="doc.on.clipboard" size={15} color={k.text.onAction} />
+                </View>
+              }>
+              <Text style={[st.cardSub, { color: c.sub }]}>Натисніть, щоб скопіювати email</Text>
+            </BentoCard>
+          </BentoGrid>
 
           <Text style={[st.thankYou, { color: c.sub }]}>Дякуємо за вашу підтримку 🙏</Text>
         </ScrollView>
@@ -162,13 +144,9 @@ export default function DonateScreen() {
 
 const st = StyleSheet.create({
   pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
-  sectionLabel: { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginBottom: 8, marginTop: 4, marginLeft: 4 },
   hero: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    padding: 24,
     alignItems: 'center',
-    marginBottom: 24,
+    paddingVertical: 8,
   },
   heroIconWrap: {
     width: 60,
@@ -180,14 +158,7 @@ const st = StyleSheet.create({
   },
   heroTitle:    { fontSize: 20, fontFamily: fontFamily.semibold, letterSpacing: -0.4, marginBottom: 8, textAlign: 'center' },
   heroSub:      { fontSize: 14, lineHeight: 20, textAlign: 'center', fontFamily: fontFamily.regular },
-  card: {
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  cardContent:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 20, gap: 14 },
-  iconWrap:     { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  cardTitle:    { fontSize: 17, fontFamily: fontFamily.semibold, letterSpacing: -0.3 },
-  cardSub:      { fontSize: 12, marginTop: 3, fontFamily: fontFamily.regular },
-  actionBtn:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  cardSub:      { fontSize: 13, fontFamily: fontFamily.regular },
+  actionBtn:    { width: 36, height: 36, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   thankYou:     { textAlign: 'center', fontSize: 13, marginTop: 28, fontFamily: fontFamily.medium },
 });

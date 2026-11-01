@@ -50,7 +50,9 @@ import {
 } from 'react-native';
 
 import { PressableScale } from '@/components/shared/PressableScale';
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { HeaderButton } from '@/components/shared/ScreenHeader';
+// Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
+import { AppHeader } from '@/components/shared/AppHeader';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { AnomalyPanel, anomalyReasonText } from '@/components/time/AnomalyPanel';
 import { TimerProjectTag } from '@/components/time/ActiveTimerRow';
@@ -59,7 +61,7 @@ import { StartTimerCard } from '@/components/time/StartTimerCard';
 import { TimeEntryForm } from '@/components/time/TimeEntryForm';
 import { TimeEntrySheet } from '@/components/time/TimeEntrySheet';
 import { TimeFilterSheet } from '@/components/time/TimeFilterSheet';
-import { TimeKpi, TimeKpiTiles, TimeProjectBreakdown } from '@/components/time/TimeKpi';
+import { TimeProjectBreakdown } from '@/components/time/TimeKpi';
 import type { TimerCandidateTask } from '@/components/time/timerCandidates';
 import { useTimerProjects } from '@/components/time/useTimerProjects';
 import { timeColors } from '@/components/time/TimePalette';
@@ -111,9 +113,10 @@ import {
 } from '@/utils/timeEntries';
 import type { EditableTask } from '@/utils/timeEntryEdit';
 import { migrateTaskSessions, type MigratableTask } from '@/utils/timeMigration';
-import { MeshBackground } from '@/components/ds';
-import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
-import { AccentDot } from '@/components/shared/GlassBits';
+import {
+  BentoCard, BentoPeriodPill, HatchedBars, KpiCounter, MeshBackground, SectionTabs, type HatchedBar,
+} from '@/components/ds';
+import { dsGlass } from '@/components/shared/dsTheme';
 
 /** Рівно те, що рядок активного таймера показує про підзавдання. */
 interface RowSubtask { id: string; title: string; done: boolean }
@@ -155,6 +158,7 @@ export default function TimeScreen() {
   const projectRoles = useProjectRoles();
   // DS v2: canvas, білі картки без рамок, головна дія — action.primary.
   const { t, isDark } = useDSTheme();
+  const g = useMemo(() => dsGlass(isDark), [isDark]);
   useScreenView('time');
   const { activeTimers, stopTimer, startTaskTimer, tasksRevision, timeEntriesRevision } = useTimerContext();
   // Мітка проєкту в рядку таймера — та сама, що в панелі над табами й сайдбарі.
@@ -340,6 +344,32 @@ export default function TimeScreen() {
   const typical = useMemo(() => typicalSessionSeconds(filtered), [filtered]);
 
   /**
+   * Omni: штриховані стовпці «По днях» — останні 7 днів (сьогодні — праворуч).
+   * Не залежить від чипа періоду (інакше «Сьогодні» дало б один стовпець),
+   * але поважає фільтр проєкту/задачі — ті самі записи, що й у списку.
+   * День — за локальною датою запису (getFullYear/getMonth/getDate).
+   */
+  const weekBars = useMemo<HatchedBar[]>(() => {
+    const scoped = filterRecords(entries, { period: 'all', projectId: filterProjectId, taskKey: filterTaskKey }, now, taskProjects);
+    const keyOf = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const sums = new Map<string, number>();
+    for (const e of scoped) {
+      const d = new Date(e.date);
+      if (Number.isNaN(d.getTime())) continue;
+      sums.set(keyOf(d), (sums.get(keyOf(d)) ?? 0) + (e.duration || 0));
+    }
+    const out: HatchedBar[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const value = sums.get(keyOf(day)) ?? 0;
+      out.push({ label: day.toLocaleDateString(locale, { weekday: 'short' }).slice(0, 2), value, display: value > 0 ? fmtDur(value) : '—' });
+    }
+    return out;
+  }, [entries, filterProjectId, filterTaskKey, now, taskProjects, locale, fmtDur]);
+  /** Вибраний стовпець (лише підсвітка й підказка; за замовч. — сьогодні). */
+  const [barIndex, setBarIndex] = useState(6);
+
+  /**
    * Аномалії шукаємо у ВСІХ записах, а не лише у відфільтрованих: медіана за
    * тижнем на трьох сесіях — не медіана, а випадкове число, і фільтр «сьогодні»
    * щоразу давав би інший список «перевір».
@@ -514,7 +544,9 @@ export default function TimeScreen() {
             subtasks={timer.taskId ? timerSubtasks[timer.taskId] : undefined}
             accent={c.indigo}
             border={c.border}
-            card={c.card}
+            // Рядок усередині суцільної bento-картки — вкладена підкладка
+            // surface.subtle (скляна на білій картці не видна).
+            card={t.surface.subtle}
             text={c.text}
             sub={c.sub}
             stopLabel={tr.stopTimerAction}
@@ -553,13 +585,18 @@ export default function TimeScreen() {
     />
   ) : null;
 
+  // Omni: шапка розділу «Історія» — icon-chip + назва, праворуч — період
+  // (і «за проєктами») та кількість сесій вибірки.
   const historyTitle = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: twoPane ? 4 : 24, marginBottom: 4 }}>
-      <AccentDot isDark={isDark} accent="amber" style={{ marginRight: 8 }} />
+    <View style={[s.historyHead, { marginTop: twoPane ? 4 : 24 }]}>
+      <View style={[s.headChip, { backgroundColor: g.accent.amber.tint }]}>
+        <IconSymbol name="clock.fill" size={16} color={g.accent.amber.ink} />
+      </View>
       <Text style={[s.sectionTitle, { color: c.text, flex: 1 }]} accessibilityRole="header">{tr.history}</Text>
       <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium }}>
         {periodLabels[period]}
         {grouping === 'project' ? tr.timeByProjectSuffix : ''}
+        {` · ${filtered.length} ${tr.sessionsCount}`}
       </Text>
     </View>
   );
@@ -626,35 +663,62 @@ export default function TimeScreen() {
     </View>
   );
 
-  const periodChips = (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }} accessibilityRole="radiogroup">
-      {(Object.keys(periodLabels) as TimePeriod[]).map(key => {
-        const active = period === key;
-        return (
-          <TouchableOpacity
-            key={key}
-            onPress={() => { haptic.light(); setPeriod(key); }}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: active }}
-            // DS v2.1: вибраний чип — суцільний amber (акцент «Часу») + onSolid.
-            style={[s.periodChip, active
-              ? { backgroundColor: dsGlass(isDark).accent.amber.solid, borderColor: 'transparent' }
-              : { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
-            <Text style={{ color: active ? dsGlass(isDark).accent.amber.onSolid : c.text, fontSize: 13, fontFamily: active ? fontFamily.semibold : fontFamily.medium }}>
-              {periodLabels[key]}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-      <TouchableOpacity
-        onPress={() => setShowFilters(true)}
-        accessibilityRole="button"
-        accessibilityLabel={tr.filtersAndSort}
-        style={[s.periodChip, { borderColor: hasFilters ? c.indigo : 'transparent', backgroundColor: glassOf(t).surface, flexDirection: 'row', gap: 6 }]}>
-        <IconSymbol name="slider.horizontal.3" size={13} color={hasFilters ? c.indigo : c.sub} />
-        <Text style={{ color: hasFilters ? c.indigo : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.timeMoreFilters}</Text>
-      </TouchableOpacity>
+  // Omni: період — вкладки розділу (pill-таби, активна чорна). На широкому
+  // поруч — «Ще фільтри» (на телефоні та сама дія стоїть у шапці).
+  const periodTabs = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
+      <SectionTabs
+        tabs={(Object.keys(periodLabels) as TimePeriod[]).map(key => ({ key, label: periodLabels[key] }))}
+        value={period}
+        onChange={key => { haptic.light(); setPeriod(key); }}
+        accessibilityLabel={tr.history}
+        style={{ flex: 1, minWidth: 0 }}
+      />
+      {twoPane && (
+        <TouchableOpacity
+          onPress={() => setShowFilters(true)}
+          accessibilityRole="button"
+          accessibilityLabel={tr.filtersAndSort}
+          style={[s.periodChip, { borderColor: hasFilters ? c.indigo : 'transparent', backgroundColor: t.surface.card, flexDirection: 'row', gap: 6 }]}>
+          <IconSymbol name="slider.horizontal.3" size={13} color={hasFilters ? c.indigo : c.sub} />
+          <Text style={{ color: hasFilters ? c.indigo : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.timeMoreFilters}</Text>
+        </TouchableOpacity>
+      )}
     </View>
+  );
+
+  // Omni: «По днях» — штриховані стовпці, вибраний день — градієнтом.
+  const daysCard = (
+    <BentoCard
+      compact
+      title={tr.byDays}
+      icon="chart.bar.fill"
+      accent="amber"
+      headerRight={<BentoPeriodPill label={tr.days7} />}>
+      <HatchedBars
+        data={weekBars}
+        activeIndex={barIndex}
+        onSelect={setBarIndex}
+        height={110}
+        accessibilityLabel={`${tr.byDays}, ${tr.days7}`}
+      />
+    </BentoCard>
+  );
+
+  // Активні таймери — bento-картка з лічильником у шапці.
+  const activeTimersCard = (empty: React.ReactNode) => (
+    <BentoCard
+      compact
+      title={tr.activeTimers}
+      icon="timer"
+      accent="amber"
+      headerRight={activeTimers.length > 0 ? (
+        <View style={[s.countPill, { backgroundColor: t.surface.subtle }]}>
+          <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{activeTimers.length}</Text>
+        </View>
+      ) : undefined}>
+      {activeTimersBlock ?? empty}
+    </BentoCard>
   );
 
   const rightPanel = (
@@ -668,7 +732,7 @@ export default function TimeScreen() {
         contentContainerStyle={{ paddingBottom: tabBarInset + 24, gap: 14 }}>
         {panel.mode !== 'none' ? (
           <View
-            style={[s.panelCard, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}
+            style={[s.panelCard, { backgroundColor: t.surface.card }]}
             accessibilityLabel={panel.mode === 'edit' ? tr.timeEditEntry : tr.timeNewEntry}>
             <TimeEntryForm
               active
@@ -684,17 +748,12 @@ export default function TimeScreen() {
           </View>
         ) : (
           <>
-            <View>
-              <Text style={[s.sectionTitle, { color: c.text, marginBottom: 10 }]} accessibilityRole="header">
-                {tr.activeTimers}{activeTimers.length > 0 ? ` (${activeTimers.length})` : ''}
-              </Text>
-              {activeTimersBlock ?? (
-                <View style={[s.panelEmpty, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
-                  <IconSymbol name="stop.fill" size={12} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 13, marginLeft: 8, flex: 1 }}>{tr.timeNothingRunning}</Text>
-                </View>
-              )}
-            </View>
+            {activeTimersCard(
+              <View style={[s.panelEmpty, { backgroundColor: t.surface.subtle }]}>
+                <IconSymbol name="stop.fill" size={12} color={c.sub} />
+                <Text style={{ color: c.sub, fontSize: 13, marginLeft: 8, flex: 1 }}>{tr.timeNothingRunning}</Text>
+              </View>,
+            )}
             <StartTimerCard
               c={c}
               tr={tr}
@@ -703,6 +762,7 @@ export default function TimeScreen() {
               projectById={projectById}
               onStart={task => { void startFromPanel(task); }}
             />
+            {daysCard}
             {anomalyBlock}
             <TimeProjectBreakdown {...kpiProps} />
           </>
@@ -715,10 +775,19 @@ export default function TimeScreen() {
     <View style={{ flex: 1 }}>
       <MeshBackground />
       <View style={{ flex: 1 }}>
-        <ScreenHeader
+        {/* Omni: глобальна шапка (☰ · дзвіник · акаунт; рядок інструментів на
+            планшеті) + KPI обраного періоду. «Середнє на задачу» і «Звичайна
+            сесія» стоять поруч навмисно (див. components/time/TimeKpi.tsx). */}
+        <AppHeader
           title={tr.navTimeTracker}
-          color={c.text}
           paddingBottom={14}
+          kpis={initialized ? (
+            <>
+              <KpiCounter value={total > 0 ? fmtDur(total) : '—'} label={tr.totalLabel} />
+              <KpiCounter value={average > 0 ? fmtDur(average) : '—'} label={tr.timeAverageTask} />
+              <KpiCounter value={typical > 0 ? fmtDur(typical) : '—'} label={tr.timeTypicalSession} />
+            </>
+          ) : undefined}
           actions={
             <>
               {/* Режим зосередження показує те, що йде просто зараз, тож вхід у
@@ -726,20 +795,17 @@ export default function TimeScreen() {
               {activeTimers.length > 0 && (
                 <HeaderButton
                   onPress={() => { haptic.light(); setFsOpen(true); }}
-                  accessibilityLabel={`${tr.fullscreenTimers}, ${tr.activeTimers}: ${activeTimers.length}`}
-                  style={{ backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }}>
+                  accessibilityLabel={`${tr.fullscreenTimers}, ${tr.activeTimers}: ${activeTimers.length}`}>
                   <IconSymbol name="timer" size={17} color={c.indigo} />
                 </HeaderButton>
               )}
-              {/* На широкому фільтри стоять над самою історією (чипи періоду +
-                  «Ще фільтри»), тож кнопка в шапці дублювала б їх. */}
+              {/* На широкому фільтри стоять над самою історією (вкладки
+                  періоду + «Ще фільтри»), тож кнопка в шапці дублювала б їх. */}
               {!twoPane && (
                 <HeaderButton
                   onPress={() => setShowFilters(true)}
                   accessibilityLabel={tr.filtersAndSort}
-                  style={{
-                    backgroundColor: hasFilters ? c.indigo + '20' : glassOf(t).surface,
-                  }}>
+                  style={hasFilters ? { backgroundColor: c.indigo + '20' } : undefined}>
                   <IconSymbol name="slider.horizontal.3" size={17} color={hasFilters ? c.indigo : c.sub} />
                 </HeaderButton>
               )}
@@ -759,7 +825,7 @@ export default function TimeScreen() {
 
         {twoPane ? (
           <View style={[s.wideBody, { maxWidth: WIDE_CONTENT_MAX_WIDTH, paddingHorizontal: Layout.gutter.expanded }]}>
-            <TimeKpiTiles {...kpiProps} large />
+            {/* KPI періоду — у шапці (Omni), тож тут одразу дві колонки. */}
             <View style={s.wideColumns}>
               <SectionList
                 style={{ flex: 1, minWidth: 0 }}
@@ -773,7 +839,7 @@ export default function TimeScreen() {
                 renderSectionHeader={renderSectionHeader}
                 renderItem={renderItem}
                 ListEmptyComponent={emptyList}
-                ListHeaderComponent={<>{historyTitle}{periodChips}</>}
+                ListHeaderComponent={<>{historyTitle}{periodTabs}</>}
               />
               {rightPanel}
             </View>
@@ -791,27 +857,25 @@ export default function TimeScreen() {
             renderItem={renderItem}
             ListEmptyComponent={emptyList}
             ListHeaderComponent={
-              <>
-                {/* 1. Що йде ЗАРАЗ. Порожньої секції немає навмисно: заголовок
-                    «Активні (0)» щодня займав би екран ні за що. */}
-                {activeTimersBlock && (
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={[s.sectionTitle, { color: c.text, marginBottom: 10 }]}>
-                      {tr.activeTimers} ({activeTimers.length})
-                    </Text>
-                    {activeTimersBlock}
-                  </View>
-                )}
+              <View style={{ gap: 14 }}>
+                {/* Період — вкладки розділу одразу під шапкою (Omni). */}
+                {periodTabs}
 
-                {/* 2. KPI за обраним періодом. */}
-                <TimeKpi {...kpiProps} />
+                {/* 1. Що йде ЗАРАЗ. Порожньої картки немає навмисно: «Активні
+                    (0)» щодня займали б екран ні за що. */}
+                {activeTimersBlock && activeTimersCard(null)}
+
+                {/* 2. Підсумки: стовпці «По днях» і розподіл за проєктами
+                    (самі KPI періоду — у шапці). */}
+                {daysCard}
+                <TimeProjectBreakdown {...kpiProps} />
 
                 {/* 3. Що треба перевірити. */}
-                {anomalyBlock && <View style={{ marginTop: 14 }}>{anomalyBlock}</View>}
+                {anomalyBlock}
 
                 {/* 4. Самі записи. */}
                 {historyTitle}
-              </>
+              </View>
             }
           />
         )}
@@ -979,7 +1043,8 @@ const EntryRow = React.memo(function EntryRow({
   const flag = severity === 'red' ? danger : severity === 'amber' ? warn : null;
   const title = entry.task || tr.untitled;
   const { t } = useDSTheme();
-  const cardBg = glassOf(t).surface;
+  // Omni: рядок історії — суцільна біла картка (surface.card), без скла.
+  const cardBg = t.surface.card;
   return (
     <TouchableOpacity
       activeOpacity={0.75}
@@ -1021,7 +1086,7 @@ const EntryRow = React.memo(function EntryRow({
             accessibilityRole="button"
             accessibilityLabel={`${trimLabel}: ${title}`}
             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-            style={[s.trimBtn, { backgroundColor: glassOf(t).surfaceSubtle }]}>
+            style={[s.trimBtn, { backgroundColor: t.surface.subtle }]}>
             <IconSymbol name="scissors" size={11} color={accent} />
             <Text style={{ color: accent, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{trimLabel}</Text>
           </TouchableOpacity>
@@ -1049,6 +1114,9 @@ const s = StyleSheet.create({
   rowClock: { fontSize: 20, fontFamily: fontFamily.light, letterSpacing: -0.4, fontVariant: ['tabular-nums'], marginRight: 10 },
   stopBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(232,84,63,0.12)', alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { fontSize: 16, fontFamily: fontFamily.semibold },
+  historyHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4, minHeight: 36 },
+  headChip: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  countPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 },
   groupLabel: { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
   entryCard: { borderRadius: Atlas.radius.xlarge, borderWidth: 2, minHeight: 56, paddingVertical: 12, paddingRight: 16, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
   entryBar: { width: 3, alignSelf: 'stretch', borderRadius: 2, marginLeft: 11 },

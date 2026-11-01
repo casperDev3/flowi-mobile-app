@@ -28,9 +28,8 @@ import {
   getPendingRegistration,
   pollRegistrationStatus,
 } from '@/store/registration';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
 import { MeshBackground } from '@/components/ds';
-import { glassRimFor } from '@/components/shared/dsTheme';
 
 // Контракт §2.5: `/auth/register/status/` кине throttle 60/год на IP. 65 с
 // дає ~55 запитів/год — з запасом під той ліміт (8 с давало б ~450/год і
@@ -206,7 +205,7 @@ export default function RegisterPendingScreen() {
 
           {!rejected && (
             <View
-              style={[st.statusCard, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}
+              style={[st.statusCard, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}
             >
               {checking ? <ActivityIndicator color={c.sub} /> : <IconSymbol name="clock" size={16} color={c.sub} />}
               <Text style={[st.statusText, { color: c.sub }]}>{tr.registrationPendingChecking}</Text>

@@ -29,7 +29,8 @@ import { useActivityContext } from '@/hooks/use-activity-context';
 import { useProjectRouteId } from '@/hooks/use-project-route-id';
 import { fontFamily, radius, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { glassOf } from '@/components/shared/dsTheme';
+import { BentoCard } from '@/components/ds';
 
 export default function ProjectActivityScreen() {
   const projectId = useProjectRouteId();
@@ -102,7 +103,7 @@ export default function ProjectActivityScreen() {
         {loading ? (
           <ActivityIndicator color={c.sub} style={{ marginTop: 40 }} />
         ) : offline ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), borderRadius: radius.nested, padding: 14, marginTop: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: tk.surface.card, borderRadius: radius.cardCompact, padding: 14, marginTop: 8 }}>
             <IconSymbol name="exclamationmark.circle" size={14} color={c.sub} />
             <Text style={[type.caption, { color: c.sub, marginLeft: 6, flex: 1 }]}>{tr.projectMembersOfflineHint}</Text>
           </View>
@@ -112,13 +113,21 @@ export default function ProjectActivityScreen() {
           <Text style={[type.body, { color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 40 }]}>{tr.projectActivityEmpty}</Text>
         ) : (
           <>
-            {mergeConsecutiveActivity(entries).map(entry => (
-              <View key={entry.id} style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
-                <View style={{
-                  width: 28, height: 28, borderRadius: 14, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'),
-                  alignItems: 'center', justifyContent: 'center', marginTop: 2,
-                }}>
-                  <IconSymbol name={activityIcon(entry)} size={14} color={c.text} />
+            {/* Omni: стрічка — на одній суцільній картці, події — вертикальна
+                шкала з круглими icon-chip, з'єднаними тонкою лінією. */}
+            <BentoCard style={{ marginTop: 4, marginBottom: 14 }}>
+            {mergeConsecutiveActivity(entries).map((entry, index, list) => (
+              <View key={entry.id} style={{ flexDirection: 'row', gap: 12, paddingBottom: index < list.length - 1 ? 16 : 0 }}>
+                <View style={{ alignItems: 'center' }}>
+                  <View style={{
+                    width: 32, height: 32, borderRadius: 16, backgroundColor: tk.surface.subtle,
+                    alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <IconSymbol name={activityIcon(entry)} size={14} color={c.text} />
+                  </View>
+                  {index < list.length - 1 ? (
+                    <View style={{ flex: 1, width: 1.5, marginTop: 4, marginBottom: -12, backgroundColor: tk.border.hairline }} />
+                  ) : null}
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[type.body, { color: c.text, fontSize: 13, lineHeight: 18 }]}>{formatActivityMessage(entry, tr, activityCtx)}</Text>
@@ -130,11 +139,12 @@ export default function ProjectActivityScreen() {
                 </View>
               </View>
             ))}
+            </BentoCard>
             {nextBefore != null ? (
               <TouchableOpacity
                 onPress={loadMore}
                 disabled={loadingMore}
-                style={{ alignItems: 'center', justifyContent: 'center', alignSelf: 'center', minHeight: 44, paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, marginTop: 4 }}>
+                style={{ alignItems: 'center', justifyContent: 'center', alignSelf: 'center', minHeight: 44, paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: tk.surface.subtle, marginTop: 4 }}>
                 {loadingMore ? (
                   <ActivityIndicator color={c.sub} />
                 ) : (

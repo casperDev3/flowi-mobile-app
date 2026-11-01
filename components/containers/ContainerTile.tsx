@@ -1,4 +1,4 @@
-import { fontFamily, radius, type as dsType } from '@/constants/theme';
+import { fontFamily, radius, shadow, type as dsType } from '@/constants/theme';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -44,10 +44,12 @@ export const ContainerTile = React.memo(function ContainerTile({
   return (
     <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(con.id)} accessibilityRole="button"
       accessibilityLabel={`${con.name}${placeLabel ? `, ${placeLabel}` : ''}, ${itemsCount(tr, stats.count, lang)}`}
-      accessibilityState={{ selected }}>
-      {/* Товщина рамки НЕ змінюється від вибору (прозора 2px у спокої): інакше вміст плитки сіпався б. */}
-      <View style={{ width, borderRadius: radius.cardCompact, overflow: 'hidden', backgroundColor: (c.gl.card.backgroundColor as string),
-        borderWidth: 2, borderColor: selected ? color : c.g.rim }}>
+      accessibilityState={{ selected }}
+      style={{ borderRadius: radius.cardCompact, ...shadow[c.isDark ? 'dark' : 'light'].card }}>
+      {/* Omni (DS v2.2): суцільна bento-плитка (surface.card + м'яка тінь), не скло.
+          Товщина рамки НЕ змінюється від вибору (прозора 2px у спокої): інакше вміст плитки сіпався б. */}
+      <View style={{ width, borderRadius: radius.cardCompact, overflow: 'hidden', backgroundColor: c.t.surface.card,
+        borderWidth: 2, borderColor: selected ? color : 'transparent' }}>
         {hasCover ? (
           <View>
             <MediaImage asset={cover} style={{ width: '100%', height: 96 }} pendingLabel={tr.ctrPhotoPending} placeholderColor={color + '20'} />

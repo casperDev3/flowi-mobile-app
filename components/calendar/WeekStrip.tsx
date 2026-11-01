@@ -14,7 +14,6 @@ import type { Meeting } from '@/utils/meetings';
 import { keyToDate, sprintsOnDay, type CalendarTaskItem, type SprintBar } from './calendarModel';
 import type { CalendarColors } from './palette';
 import { fontFamily, radius } from '@/constants/theme';
-import { glassRimFor } from '@/components/shared/dsTheme';
 
 export function WeekStrip({ days, todayKey, selectedKey, tasksByDay, meetingsByDay, sprintBars, onSelect, c, tr }: {
   days: readonly string[];
@@ -45,7 +44,7 @@ export function WeekStrip({ days, todayKey, selectedKey, tasksByDay, meetingsByD
             accessibilityLabel={`${tr.weekdaysFull[(d.getDay() + 6) % 7]}, ${d.getDate()} ${tr.monthsGenitive[d.getMonth()]}, ${tr.calA11yTasks} ${tasks.length}, ${tr.calA11yMeetings} ${meetings}`}
             style={[st.day, {
               // DS v2: вибраний день — pill action.primary; «сьогодні» — тонка рамка акценту.
-              ...(isSel ? { backgroundColor: c.select } : { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }),
+              ...(isSel ? { backgroundColor: c.select } : { backgroundColor: c.card }),
               borderWidth: isToday && !isSel ? 1.5 : 0, borderColor: c.accent,
             }]}>
             <Text style={{ color: isSel ? c.onSelect : c.sub, opacity: isSel ? 0.75 : 1, fontSize: 10, fontFamily: fontFamily.semibold }}>
@@ -67,7 +66,8 @@ export function WeekStrip({ days, todayKey, selectedKey, tasksByDay, meetingsByD
 }
 
 const st = StyleSheet.create({
-  day: { flex: 1, alignItems: 'center', paddingTop: 8, paddingBottom: 4, borderRadius: radius.nestedCompact, minHeight: 64, overflow: 'hidden' },
+  // Omni: день — вертикальна капсула; вибраний — чорна pill (c.select).
+  day: { flex: 1, alignItems: 'center', paddingTop: 8, paddingBottom: 4, borderRadius: radius.pill, minHeight: 64, overflow: 'hidden' },
   marks: { flexDirection: 'row', gap: 3, height: 6, marginTop: 4 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   square: { width: 6, height: 6, borderRadius: 1.5 },

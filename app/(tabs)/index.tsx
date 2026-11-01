@@ -127,7 +127,9 @@ import { useProjectRole } from '@/hooks/use-project-role';
 import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { DetailPane } from '@/components/shared/DetailPane';
 import { detailColumnWidthFor } from '@/constants/tokens';
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { HeaderButton } from '@/components/shared/ScreenHeader';
+// Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
+import { AppHeader } from '@/components/shared/AppHeader';
 import type { PickerCreateOption } from '@/components/shared/PickerField';
 import { TaskHistoryTab, type HistoryEventType } from '@/components/tasks/TaskHistoryTab';
 import { TaskTimerButton } from '@/components/tasks/TaskTimerButton';
@@ -143,9 +145,8 @@ import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
 import { fontFamily, shadow } from '@/constants/theme';
-import { MeshBackground } from '@/components/ds';
-import { glassOf, glassRim, dsGlass, glassRimFor } from '@/components/shared/dsTheme';
-import { AccentWash } from '@/components/shared/GlassBits';
+import { BentoArrowButton, BentoCard, KpiCounter, MeshBackground, SectionTabs, SegmentedProgress } from '@/components/ds';
+import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
 
 
 /**
@@ -638,6 +639,12 @@ export default function TasksScreen() {
       doneSubtasks: due.reduce((acc, t) => acc + t.subtasks.filter(s => s.done).length, 0),
     };
   }, [tasks, todayStr, userId, projectRoles]);
+  // Omni: червона дельта біля KPI «Активні» — скільки МОЇХ завдань уже
+  // прострочено (те саме правило «моє» й isOverdue, що й у списку).
+  const overdueMineCount = useMemo(
+    () => tasks.filter(t => isOverdue(t) && (userId === undefined || isMyTask(t, userId, projectRoles))).length,
+    [tasks, userId, projectRoles],
+  );
   // Today's meetings — past meetings count as completed units in efficiency
   // Екземпляри повторів теж рахуються — так само, як у секції зустрічей нижче.
   const todayMeetings     = useMemo(() => meetingsOnDate(meetings, today), [meetings, today]);
@@ -1931,8 +1938,8 @@ export default function TasksScreen() {
   ), [renderTaskCard, cardColumns]);
 
   const renderSectionHeader = useCallback(({ section }: { section: SectionListData<Task[], TaskSection> }) => (
-    <Text style={[s.groupLabel, { color: c.sub }]}>{section.title}</Text>
-  ), [c.sub]);
+    <GroupHeader title={section.title} count={section.total} />
+  ), []);
 
   const renderSectionFooter = useCallback(({ section }: { section: SectionListData<Task[], TaskSection> }) => (
     section.total > TASK_GROUP_LIMIT ? (
@@ -1954,74 +1961,29 @@ export default function TasksScreen() {
   // у двоколонковій розкладці список довгий, а перемикач потрібен завжди.
   const filterBar = (
     <>
-            {/* Search bar */}
-            <View style={[s.searchBar, { backgroundColor: c.card, ...glassRim(t, 'card') }]}>
-              <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
-              <TextInput
-                placeholder={tr.searchPlaceholder}
-                placeholderTextColor={c.sub}
-                value={search}
-                onChangeText={setSearch}
-                style={[s.searchInput, { color: c.text }]}
-                returnKeyType="search"
-              />
-              {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch('')}
-                  accessibilityRole="button"
-                  accessibilityLabel={tr.clear}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
-                </TouchableOpacity>
-              )}
-            </View>
-
             {/* Скоуп: денна робота чи весь список. Окремо від чипів фільтрів
                 і завжди на очах — це головний перемикач вкладки, а не одна з
                 прихованих у шторці опцій.
 
-                flexWrap + flexShrink нижче: при найбільшому Dynamic Type (AX5)
-                чип «Сьогодні N» виїжджав за правий край екрана, а «Всі N»
-                обрізало рамкою — ряд не мав ні куди перенестись, ні як
-                стиснутись (NAT-06). */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <View style={{ flexDirection: 'row', gap: 4, flexShrink: 1, backgroundColor: c.card, ...glassRim(t, 'card'), borderRadius: 999, padding: 4 }}>
-                  {([
-                    { key: 'today' as const, label: tr.today, count: scopeCounts.today },
-                    { key: 'week' as const, label: tr.tasksScopeWeek, count: scopeCounts.week },
-                    { key: 'all' as const, label: tr.allTasks, count: scopeCounts.all },
-                  ]).map(option => {
-                    const active = scope === option.key;
-                    return (
-                      <TouchableOpacity
-                        key={option.key}
-                        onPress={() => { haptic.light(); selectScope(option.key); }}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: active }}
-                        accessibilityLabel={`${option.label}, ${option.count}`}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 6, minHeight: 36, borderRadius: 999, backgroundColor: active ? c.primary : 'transparent' }}>
-                        <Text numberOfLines={1} style={{ color: active ? c.onPrimary : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 }}>{option.label}</Text>
-                        <Text style={{ color: active ? c.onPrimary : c.sub, opacity: active ? 0.75 : 1, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{option.count}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* «Без дедлайну» — лише в режимі «Всі»: особиста дошка
-                    типово показує завдання З дедлайном, а беклог без дати
-                    відкривається свідомо, цією кнопкою. */}
-                {scope === 'all' && (
-                  <TouchableOpacity
-                    onPress={() => { haptic.light(); setNoDeadline(v => !v); }}
-                    accessibilityRole="switch"
-                    accessibilityState={{ checked: noDeadline }}
-                    accessibilityLabel={`${tr.withoutDeadline}, ${scopeCounts.noDeadline}`}
-                    accessibilityHint={tr.tasksNoDeadlineA11y}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minHeight: 36, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: noDeadline ? c.primary : c.card }}>
-                    <IconSymbol name="calendar" size={13} color={noDeadline ? c.onPrimary : c.sub} />
-                    <Text numberOfLines={1} style={{ color: noDeadline ? c.onPrimary : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 }}>{tr.withoutDeadline}</Text>
-                    <Text style={{ color: noDeadline ? c.onPrimary : c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{scopeCounts.noDeadline}</Text>
-                  </TouchableOpacity>
-                )}
+                При найбільшому Dynamic Type (AX5) чип «Сьогодні N» колись
+                виїжджав за правий край екрана (NAT-06) — тепер вкладки
+                займають решту рядка (flex:1) і прокручуються вбік, а кнопка
+                фільтрів лишається на місці. «Без дедлайну» — окремим рядком. */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {/* Omni: вкладки розділу — pill-таби з іконками й лічильниками
+                    (активна — чорна pill). Прокручуються вбік, коли при
+                    великому Dynamic Type не вміщаються (NAT-06). */}
+                <SectionTabs
+                  tabs={[
+                    { key: 'today' as const, label: tr.today, icon: 'sun.max', count: scopeCounts.today },
+                    { key: 'week' as const, label: tr.tasksScopeWeek, icon: 'calendar', count: scopeCounts.week },
+                    { key: 'all' as const, label: tr.allTasks, icon: 'list.bullet', count: scopeCounts.all },
+                  ]}
+                  value={scope}
+                  onChange={key => { haptic.light(); selectScope(key); }}
+                  accessibilityLabel={tr.tasks}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
 
                 {/* Фільтри й скидання — поруч із перемикачем, а не в хедері:
                     обидва органи керування звужують ОДИН набір завдань, і
@@ -2047,6 +2009,46 @@ export default function TasksScreen() {
                   />
                 </HeaderButton>
               </View>
+
+            {/* Search bar (Omni: під вкладками розділу) */}
+            <View style={[s.searchBar, { marginTop: 10 }, { backgroundColor: c.card, ...glassRim(t, 'card') }]}>
+              <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
+              <TextInput
+                placeholder={tr.searchPlaceholder}
+                placeholderTextColor={c.sub}
+                value={search}
+                onChangeText={setSearch}
+                style={[s.searchInput, { color: c.text }]}
+                returnKeyType="search"
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => setSearch('')}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.clear}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* «Без дедлайну» — лише в режимі «Всі»: особиста дошка
+                типово показує завдання З дедлайном, а беклог без дати
+                відкривається свідомо, цією кнопкою. */}
+            {scope === 'all' && (
+              <View style={{ flexDirection: 'row', marginTop: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => { haptic.light(); setNoDeadline(v => !v); }}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: noDeadline }}
+                    accessibilityLabel={`${tr.withoutDeadline}, ${scopeCounts.noDeadline}`}
+                    accessibilityHint={tr.tasksNoDeadlineA11y}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minHeight: 36, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: noDeadline ? c.primary : c.card }}>
+                    <IconSymbol name="calendar" size={13} color={noDeadline ? c.onPrimary : c.sub} />
+                    <Text numberOfLines={1} style={{ color: noDeadline ? c.onPrimary : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 }}>{tr.withoutDeadline}</Text>
+                    <Text style={{ color: noDeadline ? c.onPrimary : c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{scopeCounts.noDeadline}</Text>
+                  </TouchableOpacity>
+                  </View>
+                )}
 
             {/* Active filter chips.
                 keyboardShouldPersistTaps: ряд стоїть просто під полем пошуку,
@@ -2140,33 +2142,30 @@ export default function TasksScreen() {
               </>
             )}
 
-            {/* Stats — today (deadline = today) */}
+            {/* Прогрес дня. Самі числа (активні / виконано / ефективність)
+                переїхали в KPI шапки (Omni); тут лишається те, чого там немає:
+                підзавдання сьогоднішніх завдань — сегментним прогресом. */}
             <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
-              <View style={[s.statsRow, { backgroundColor: c.card, ...glassRim(t, 'card') }]}>
-                {/* DS v2.1: KPI-картка — скло зі змивкою акценту модуля (lavender);
-                    цифри text.primary, колір несуть крапки-тіки (fill акцентів). */}
-                <AccentWash isDark={isDark} accent="lavender" strength={0.6} />
-                <StatCell value={activeCount}          label={tr.active} color={c.text} dot={dsGlass(isDark).accent.amber.fill} sub={c.sub} />
-                <StatCell value={doneCount}            label={tr.done}           color={c.text} dot={dsGlass(isDark).accent.success.fill} sub={c.sub} />
-                <StatCell value={todayMeetings.length} label={tr.meetings} color={c.text} dot={dsGlass(isDark).accent.info.fill} sub={c.sub} />
-                <StatCell value={efficiency} unit="%"  label={tr.efficiency}                                                         color={c.text} dot={c.accent} sub={c.sub} />
-              </View>
               {totalSubtasks > 0 && (
-                <View style={[s.subtaskStatRow, { backgroundColor: c.card, ...glassRim(t, 'card') }]}>
-                  <IconSymbol name="list.bullet.circle.fill" size={14} color={c.accent} />
-                  <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginLeft: 7 }}>{tr.subtasksToday}</Text>
-                  <View style={{ flex: 1, marginHorizontal: 12 }}>
-                    <View style={[s.progressBg, { flex: 1 }]}>
-                      <View style={[s.progressFill, { width: `${Math.round((doneSubtasks / totalSubtasks) * 100)}%`, backgroundColor: dsGlass(isDark).accent.lavender.fill }]} />
-                    </View>
-                  </View>
-                  <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
-                    {doneSubtasks}/{totalSubtasks}
-                  </Text>
-                </View>
+                <BentoCard
+                  compact
+                  title={tr.subtasksToday}
+                  icon="list.bullet.circle.fill"
+                  accent="lavender"
+                  headerRight={
+                    <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
+                      {doneSubtasks}/{totalSubtasks}
+                    </Text>
+                  }>
+                  <SegmentedProgress
+                    value={doneSubtasks / totalSubtasks}
+                    showValue
+                    accessibilityLabel={`${tr.subtasksToday}: ${doneSubtasks}/${totalSubtasks}`}
+                  />
+                </BentoCard>
               )}
               {dueTodayTasks.length === 0 && (
-                <View style={[s.subtaskStatRow, { backgroundColor: c.card, ...glassRim(t, 'card'), justifyContent: 'center' }]}>
+                <View style={[s.subtaskStatRow, { backgroundColor: t.surface.card, justifyContent: 'center' }]}>
                   <IconSymbol name="checkmark.seal" size={13} color={c.sub} />
                   <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginLeft: 6 }}>{tr.noTasksToday}</Text>
                 </View>
@@ -2180,28 +2179,26 @@ export default function TasksScreen() {
                 «Зустрічі» немає власного «+» і інлайн-поля «Додати зустріч» —
                 зустріч додається з Календаря. Порожня група не показується. */}
             {!showDetailColumn && todayMeetings2.length > 0 && (
-              <View style={{ marginBottom: 20 }}>
-                {/* Header */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                  <TouchableOpacity
-                    onPress={() => router.push('/calendar' as never)}
-                    activeOpacity={0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel={tr.meetings}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                    <IconSymbol name="calendar.circle.fill" size={16} color={c.accent} />
-                    <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginLeft: 6 }}>{tr.meetings}</Text>
-                    {/* Шеврон — інакше немає жодної підказки, що заголовок клікабельний */}
-                    <IconSymbol name="chevron.right" size={12} color={c.sub} style={{ marginLeft: 2 }} />
-                  </TouchableOpacity>
-                  {todayMeetings2.length > 0 && (
-                    <View style={{ backgroundColor: c.card, ...glassRimFor(c.card, 'card'), borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
+              // Omni: картка з шапкою «icon-chip + назва», лічильник і ↗ у
+              // календар праворуч. Рядки зустрічей — вкладені (surface.subtle):
+              // скляна підкладка на білій картці не видна.
+              <BentoCard
+                compact
+                title={tr.meetings}
+                icon="calendar"
+                accent="info"
+                style={{ marginBottom: 20 }}
+                headerRight={
+                  <>
+                    <View style={{ backgroundColor: t.surface.subtle, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
                       <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{todayMeetings2.length}</Text>
                     </View>
-                  )}
-                </View>
-
+                    <BentoArrowButton
+                      onPress={() => router.push('/calendar' as never)}
+                      accessibilityLabel={tr.meetings}
+                    />
+                  </>
+                }>
                 <View style={{ gap: 4 }}>
                     {visibleTodayMeetings.map(({ meeting: mtg, phase }) => {
                       // Фазу рахує orderTodayMeetings — той самий розрахунок,
@@ -2214,7 +2211,7 @@ export default function TasksScreen() {
                         : `${mtg.durationMinutes} хв`;
                       return (
                         <TouchableOpacity key={mtg.id} onPress={() => openMeetingView(mtg)} activeOpacity={0.75}>
-                          <View style={{ borderRadius: Atlas.radius.large, paddingVertical: 8, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 8, overflow: 'hidden', opacity: isPast ? 0.5 : 1, backgroundColor: c.card, ...glassRim(t, 'card') }}>
+                          <View style={{ borderRadius: Atlas.radius.large, paddingVertical: 8, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 8, overflow: 'hidden', opacity: isPast ? 0.5 : 1, backgroundColor: t.surface.subtle }}>
                             {/* Accent bar */}
                             <View style={{ width: 2.5, alignSelf: 'stretch', backgroundColor: mtg.color, borderRadius: 2, marginLeft: 0, minHeight: 36 }} />
                             {/* Time + day */}
@@ -2280,7 +2277,7 @@ export default function TasksScreen() {
                       </TouchableOpacity>
                     )}
                   </View>
-              </View>
+              </BentoCard>
             )}
 
             {/* Порожній день — окрема гілка, і вона НЕ про фільтри. Стандартний
@@ -2346,12 +2343,7 @@ export default function TasksScreen() {
             {/* Overdue section (list view, active/all filter) */}
             {overdueItems.length > 0 && (
               <View style={{ marginBottom: 16 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-                  <Text style={[s.groupLabel, { color: c.danger, marginBottom: 0, marginTop: 0 }]}>{tr.overdueSection}</Text>
-                  <View style={{ backgroundColor: t.accent.coral + '20', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
-                    <Text style={{ color: c.danger, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{overdueItems.length}</Text>
-                  </View>
-                </View>
+                <GroupHeader title={tr.overdueSection} count={overdueItems.length} tone="danger" />
                 <View style={{ gap: 6 }}>
                   {chunkRows(overdueLimited.visible, cardColumns).map((row, r) => (
                     <TaskCardRow key={row.map(t => t.id).join('|')} columns={cardColumns}>
@@ -2404,6 +2396,24 @@ export default function TasksScreen() {
     </>
   );
 
+  // ─── KPI дня (Omni: великі тонкі числа в шапці) ─────────────────────────────
+  // Ті самі три числа, що раніше стояли рядком-статистикою над списком
+  // (дедлайн сьогодні, лише МОЄ). Зустрічі дня тут не дублюються — їх показує
+  // картка «Зустрічі» нижче (телефон/портрет) або колонка «Сьогодні» (expanded).
+  // До першого читання — нічого: нуль до завантаження збрехав би.
+  const headerKpis = initialized ? (
+    <>
+      <KpiCounter
+        value={activeCount}
+        label={tr.active}
+        delta={overdueMineCount > 0 ? `${overdueMineCount} ${tr.todayOverdue}` : undefined}
+        deltaTone="down"
+      />
+      <KpiCounter value={doneCount} label={tr.done} />
+      <KpiCounter value={`${efficiency}%`} label={tr.efficiency} />
+    </>
+  ) : undefined;
+
   return (
     <View style={{ flex: 1 }}>
       <MeshBackground />
@@ -2411,10 +2421,12 @@ export default function TasksScreen() {
       <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
 
-        {/* Fixed Header */}
-        <ScreenHeader
+        {/* Fixed Header — Omni (DS v2.2): AppHeader поверх <ScreenHeader (верхній
+            інсет, стеля Dynamic Type): ☰ · дзвіник · акаунт на телефоні, рядок
+            інструментів на планшеті, KPI дня праворуч від H1 / стрічкою. */}
+        <AppHeader
           title={tr.tasks}
-          color={c.text}
+          kpis={headerKpis}
           actions={
             <>
               {/* Планшет: єдина кнопка створення стоїть у шапці (на телефоні — FAB). */}
@@ -2447,7 +2459,8 @@ export default function TasksScreen() {
             dimColor={c.dim}
             borderColor={c.border}
           />
-        </ScreenHeader>
+        </AppHeader>
+        {/* кінець шапки (AppHeader → </ScreenHeader>) */}
 
         {/* Планшет: пошук і перемикач скоупу — нерухомо над списком. */}
         {isWide && (
@@ -2509,7 +2522,8 @@ export default function TasksScreen() {
               activitySources={todayPaneActivity}
               onOpenMeeting={openMeetingView}
               onOpenCalendar={() => router.push('/calendar' as never)}
-              colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent }}
+              // dim — суцільний surface.subtle: графік стоїть на білій картці.
+              colors={{ text: c.text, sub: c.sub, border: c.border, dim: t.surface.subtle, accent: c.accent }}
               tr={tr}
             />
           }>
@@ -2947,6 +2961,30 @@ interface TaskSection {
 }
 
 /** Відступ між картками. Модульний компонент — не нова функція щорендера. */
+/**
+ * Заголовок групи списку в стилі колонки Omni-канбану: кільце статусу +
+ * назва + лічильник у pill. «Прострочені» — тоном danger (червоне кільце й
+ * лічильник), решта — нейтральні. Сам текст — text.primary/secondary, тож
+ * контраст ≥ 4.5:1 в обох темах; колір несе лише кільце.
+ */
+const GroupHeader = React.memo(function GroupHeader({ title, count, tone = 'neutral' }: {
+  title: string; count?: number; tone?: 'neutral' | 'danger';
+}) {
+  const { t } = useDSTheme();
+  const ring = tone === 'danger' ? t.status.danger : t.text.secondary;
+  return (
+    <View style={s.groupHead} accessibilityRole="header" accessible accessibilityLabel={count != null ? `${title}, ${count}` : title}>
+      <View style={[s.groupRing, { borderColor: ring }]} />
+      <Text numberOfLines={1} style={[s.groupHeadText, { color: tone === 'danger' ? t.status.danger : t.text.primary }]}>{title}</Text>
+      {count != null ? (
+        <View style={[s.groupCount, { backgroundColor: tone === 'danger' ? t.status.danger + '1F' : t.surface.subtle }]}>
+          <Text style={[s.groupCountText, { color: tone === 'danger' ? t.status.danger : t.text.secondary }]}>{count}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+});
+
 function TaskItemSeparator() {
   return <View style={s.itemSeparator} />;
 }
@@ -2979,57 +3017,20 @@ const GroupShowAllButton = React.memo(function GroupShowAllButton({
   );
 });
 
-// ─── Stat Cell ───────────────────────────────────────────────────────────────
-/**
- * Стеля масштабування чисел і підписів картки статистики.
- *
- * Чотири комірки ділять ширину екрана порівну, тож при AX5 (×3) підпис
- * «ефективність» ламався на три рядки («ефек/ти/сть») і вилазив за нижню
- * межу картки, яка має `overflow: 'hidden'` (NAT-06). 1.6 — той самий
- * прийом, що вже вжито для заголовка (`TITLE_MAX_FONT_SCALE`) і підписів
- * табів, але трохи вільніший: тут є куди рости у два рядки.
- */
-const STAT_MAX_FONT_SCALE = 1.6;
-
-/**
- * DS v2: KPI-комірка — тонке велике число (Light 300, tabular-nums, −2%),
- * одиниця (%) дрібніша й text.secondary; колір категорії — лише крапка-тік.
- */
-function StatCell({ value, unit, label, color, dot, sub }: any) {
-  return (
-    <View style={{ flex: 1, alignItems: 'flex-start', paddingVertical: 16, paddingHorizontal: 14, minWidth: 0 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-        <Text
-          numberOfLines={1}
-          maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
-          style={{ color, fontSize: 30, lineHeight: 34, fontFamily: fontFamily.light, letterSpacing: -0.6, fontVariant: ['tabular-nums'] }}>{value}</Text>
-        {unit ? (
-          <Text
-            maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
-            style={{ color: sub, fontSize: 14, fontFamily: fontFamily.regular, marginLeft: 2 }}>{unit}</Text>
-        ) : null}
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
-        {dot ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: dot }} /> : null}
-        <Text
-          numberOfLines={2}
-          maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
-          style={{ color: sub, fontSize: 12, fontFamily: fontFamily.regular, flexShrink: 1 }}>{label}</Text>
-      </View>
-    </View>
-  );
-}
-
+// ─── Styles ──────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   searchBar:      { flexDirection: 'row', alignItems: 'center', borderRadius: 999, minHeight: 44, paddingHorizontal: 16, paddingVertical: 10, marginBottom: 0 },
   searchInput:    { flex: 1, fontSize: 14, fontFamily: fontFamily.regular, marginLeft: 8, paddingVertical: 0 },
   activeChip:     { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, minHeight: 32 },
   activeChipText: { fontSize: 11, fontFamily: fontFamily.semibold },
-  statsRow:       { flexDirection: 'row', borderRadius: Atlas.radius.xlarge, paddingHorizontal: 6, overflow: 'hidden' },
   subtaskStatRow: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.large, paddingHorizontal: 16, paddingVertical: 12, minHeight: 44, overflow: 'hidden' },
   sortChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
   sortLabel:      { fontSize: 12, fontFamily: fontFamily.semibold },
-  groupLabel:     { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.2, marginBottom: 10, marginTop: 6 },
+  groupHead:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 10, minHeight: 24 },
+  groupRing:      { width: 12, height: 12, borderRadius: 6, borderWidth: 2 },
+  groupHeadText:  { fontSize: 14, fontFamily: fontFamily.semibold, flexShrink: 1 },
+  groupCount:     { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  groupCountText: { fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   taskCard:       { borderRadius: Atlas.radius.xlarge, padding: 16, overflow: 'hidden' },
   boardCard:      { borderRadius: Atlas.radius.large, padding: 12, overflow: 'hidden' },
   taskTitle:      { fontSize: 14, fontFamily: fontFamily.semibold },
@@ -3037,8 +3038,6 @@ const s = StyleSheet.create({
   dot:            { width: 8, height: 8, borderRadius: 4 },
   colorDot:       { width: 12, height: 12, borderRadius: 4 },
   badge:          { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-  progressBg:     { height: 6, backgroundColor: 'rgba(128,128,128,0.18)', borderRadius: 999, overflow: 'hidden' },
-  progressFill:   { height: '100%', borderRadius: 999 },
   // tabular-nums: без них ширина «7%» і «71%» різна, і прогрес-рядок сіпається
   // при кожній зміні.
   pct:            { fontSize: 11, fontFamily: fontFamily.semibold, minWidth: 30, fontVariant: ['tabular-nums'] },

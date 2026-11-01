@@ -33,7 +33,7 @@ import { formatClock, formatDuration } from '@/utils/durationFormat';
 import { localDateKey } from '@/utils/dateUtils';
 import { meetingTrackedSeconds, type Meeting } from '@/utils/meetings';
 import { elapsedSince } from '@/utils/taskTimer';
-import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
+import { dsGlass } from '@/components/shared/dsTheme';
 
 // DS v2: глибока лаванда (акцент tasks) і статусні токени замість легасі #6366F1/#10B981/#EF4444.
 // Тема — за кольором тексту палітри (без хуків: компонент рендериться в тестах).
@@ -95,7 +95,10 @@ export function MeetingDetailHeader({ meeting, original, onEdit, onClose, isExpa
     <View style={st.headerWrap}>
       {!isExpanded ? <View style={[st.handle, { backgroundColor: c.border }]} /> : null}
       <View style={st.headerRow}>
-        <View style={[st.colorBar, { backgroundColor: meeting.color }]} />
+        {/* Omni (DS v2.2): колір наради — кругла icon-chip, а не бічна смуга. */}
+        <View style={[st.colorChip, { backgroundColor: meeting.color + '26' }]}>
+          <IconSymbol name="person.2.fill" size={16} color={meeting.color} />
+        </View>
         <View style={{ flex: 1 }}>
           <Text numberOfLines={2} accessibilityRole="header" style={[st.title, { color: c.text }]}>
             {meeting.title}
@@ -197,8 +200,9 @@ export function MeetingDetailBody({
         </View>
       ) : null}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 6 }}>
-        {tabs.map(item => <TouchableOpacity key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} onPress={() => selectTab(item.id)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: tab === item.id ? t.action.primary : glassOf(t).surfaceSubtle }}><Text style={{ color: tab === item.id ? t.text.onAction : c.text, fontFamily: fontFamily.medium }}>{item.label}</Text></TouchableOpacity>)}
+      {/* Omni: вкладки деталі — pill-таби; активна — чорна pill. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist" style={{ marginBottom: 10 }} contentContainerStyle={{ gap: 6 }}>
+        {tabs.map(item => <TouchableOpacity key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} onPress={() => selectTab(item.id)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: tab === item.id ? t.action.primary : t.surface.subtle }}><Text style={{ color: tab === item.id ? t.text.onAction : t.text.secondary, fontFamily: fontFamily.semibold, fontSize: 13 }}>{item.label}</Text></TouchableOpacity>)}
       </ScrollView>
       <View style={{ display: tab === 'info' ? 'flex' : 'none' }}>
       {/* Date */}
@@ -255,7 +259,7 @@ export function MeetingDetailBody({
               <TouchableOpacity
                 onPress={() => onPlayRecording?.(uri)}
                 accessibilityRole="button"
-                style={[st.smallBtn, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+                style={[st.smallBtn, { backgroundColor: t.surface.card }]}>
                 <IconSymbol name={playingUri === uri ? 'pause.fill' : 'play.fill'} size={12} color={ACCENT} />
               </TouchableOpacity>
               {onDeleteRecording ? (
@@ -263,7 +267,7 @@ export function MeetingDetailBody({
                   onPress={() => onDeleteRecording(uri)}
                   accessibilityRole="button"
                   accessibilityLabel={tr.delete}
-                  style={[st.smallBtn, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card'), marginLeft: 4 }]}>
+                  style={[st.smallBtn, { backgroundColor: t.surface.card, marginLeft: 4 }]}>
                   <IconSymbol name="trash" size={12} color={RED} />
                 </TouchableOpacity>
               ) : null}
@@ -312,7 +316,7 @@ export function MeetingDetailBody({
           accessibilityLabel={timer ? tr.meetingTimerStopA11y : tr.meetingTimerStartA11y}
           style={[st.btn, {
             paddingHorizontal: 14, gap: 6,
-            backgroundColor: timer ? glassOf(t).surfaceSubtle : t.action.primary,
+            backgroundColor: timer ? t.surface.card : t.action.primary,
           }]}>
           <IconSymbol name={timer ? 'stop.fill' : 'play.fill'} size={13} color={timer ? RED : t.text.onAction} />
           <Text style={{ color: timer ? t.action.secondaryText : t.text.onAction, fontSize: 13, fontFamily: fontFamily.semibold }}>
@@ -335,7 +339,7 @@ export function MeetingDetailBody({
         <TouchableOpacity
           onPress={onEdit}
           accessibilityRole="button"
-          style={[st.btn, { flex: 1, gap: 6, backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
+          style={[st.btn, { flex: 1, gap: 6, backgroundColor: t.surface.subtle }]}>
           <IconSymbol name="pencil" size={16} color={t.action.secondaryText} />
           <Text style={{ color: t.action.secondaryText, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.edit}</Text>
         </TouchableOpacity>
@@ -349,7 +353,7 @@ const st = StyleSheet.create({
   headerWrap:   { paddingBottom: 14 },
   handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
   headerRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  colorBar:     { width: 4, alignSelf: 'stretch', minHeight: 44, borderRadius: 2 },
+  colorChip:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   title:        { fontSize: 20, fontFamily: fontFamily.semibold, letterSpacing: -0.4 },
   timeRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   headerBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },

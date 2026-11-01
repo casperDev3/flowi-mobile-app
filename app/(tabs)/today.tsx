@@ -19,7 +19,8 @@ import { useInPlaceProjectTask } from '@/components/projects/ProjectTaskSheet';
 import { RingCell } from '@/components/health/RingCell';
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
 import { PressableScale } from '@/components/shared/PressableScale';
-import { ScreenHeader } from '@/components/shared/ScreenHeader';
+// Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
+import { AppHeader } from '@/components/shared/AppHeader';
 import { SkeletonCard } from '@/components/shared/Skeleton';
 import { SyncBadge } from '@/components/today/SyncBadge';
 import { QuickActions } from '@/components/today/QuickActions';
@@ -60,10 +61,11 @@ import { Layout } from '@/constants/tokens';
 import { TODAY_SECTION_GAP, TodaySectionGrid, type TodaySectionEntry } from '@/components/today/TodaySectionGrid';
 import { orderTodaySections } from '@/components/today/sectionOrder';
 import { masonryColumnCount } from '@/utils/masonry';
-import { fontFamily, type, type GlassAccent } from '@/constants/theme';
-import { MeshBackground } from '@/components/ds';
-import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
-import { AccentDot, AccentIcon, AccentWash } from '@/components/shared/GlassBits';
+import { fontFamily, radius, type, type GlassAccent } from '@/constants/theme';
+import {
+  BentoArrowButton, BentoCard, HatchedBars, KpiCounter, MeshBackground, SegmentedProgress, useBentoColors,
+} from '@/components/ds';
+import { useDS } from '@/hooks/use-ds';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -137,6 +139,7 @@ export default function TodayScreen() {
   const columnCount = masonryColumnCount(Math.min(useScreenWidth(), Layout.wideMaxWidth));
   // DS v2: canvas + білі картки без рамок і блюру; KPI — тонкі великі цифри.
   const { t, isDark } = useDSTheme();
+  const { g } = useDS();
   // Задача ПРОЄКТУ — карткою проєкту тут же, а не в особистому редакторі.
   const { openProjectTask, projectTaskSheet } = useInPlaceProjectTask(isDark);
   const router = useRouter();
@@ -372,6 +375,23 @@ export default function TodayScreen() {
     .filter(e => isSameDay(new Date(e.date), today))
     .reduce((s, e) => s + (e.duration || 0), 0);
 
+  /**
+   * Omni: штриховані стовпці «Час» — відстежене за останні 7 днів (сьогодні
+   * — активний стовпець із градієнтом). Ті самі записи, що й trackedSec.
+   */
+  const trackedWeek = useMemo(() => {
+    const days: { label: string; value: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+      const sec = time
+        .filter(e => isSameDay(new Date(e.date), day))
+        .reduce((acc, e) => acc + (e.duration || 0), 0);
+      days.push({ label: day.toLocaleDateString(locale, { weekday: 'short' }).slice(0, 2), value: sec });
+    }
+    return days;
+  }, [time, today, locale]);
+  const habitsDone = habits.filter(h => habitDoneToday(h)).length;
+
   // Today's meetings — разом із екземплярами повторюваних (як секція на
   // екрані Завдань і веб-дашборд): поточні/майбутні за часом, минулі в кінці.
   const todayMeetings = useMemo(
@@ -472,6 +492,10 @@ export default function TodayScreen() {
 
   let sections: TodaySectionEntry[] = [];
 
+  // Omni (DS v2.2): секції — суцільні bento-картки (BentoCard) з шапкою
+  // «icon-chip + назва» і ↗ праворуч; акцент модуля — на icon-chip.
+  // Порядок, ключі й сітка (TodaySectionGrid) — без змін.
+
   // 1. Здоровʼя (hero-стрічка кілець) + швидкі дії — одна секція: за
   // правилом власника вони йдуть парою одразу після пошуку речей, і на
   // планшеті не мають розходитись по різних клітинках сітки.
@@ -489,28 +513,21 @@ export default function TodayScreen() {
       <Section index={0} animate={animateIntro} motion={motion}>
         <View style={{ gap: TODAY_SECTION_GAP }}>
         {showHealthCard && (
-          <PressableScale
+          <BentoCard
+            compact
+            title={tr.tabHealth}
+            icon="heart.fill"
+            accent="coral"
+            headerRight={<BentoArrowButton />}
             onPress={() => router.push('/health')}
-            accessibilityRole="button"
             accessibilityLabel={tr.tabHealth}>
-            <View
-              style={[s.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
-              <AccentWash isDark={isDark} accent="coral" strength={0.6} />
-              <View style={s.cardHead}>
-                <View style={s.titleRow}>
-                  <AccentIcon isDark={isDark} icon="heart.fill" accent="coral" />
-                  <Text style={[s.cardTitle, { color: t.text.primary }]}>{tr.tabHealth}</Text>
-                </View>
-                <IconSymbol name="chevron.right" size={12} color={c.sub} />
-              </View>
-              <View style={{ flexDirection: 'row', gap: 4, marginTop: 8 }}>
-                <RingCell pct={calDay.pct} color={ACCENT_CAL} label={tr.calories} value={`${calDay.consumed}кк`} />
-                <RingCell pct={steps / goals.steps} color={ACCENT_STEPS} label={tr.steps} value={steps >= 1000 ? `${(steps / 1000).toFixed(1)}т` : `${steps}`} />
-                <RingCell pct={water / goals.water} color={ACCENT} label={tr.water} value={water >= 1000 ? `${(water / 1000).toFixed(1)}л` : `${water}мл`} />
-                <RingCell pct={sleep ? sleep / goals.sleep : 0} color={ACCENT_SLEEP} label={tr.sleep} value={sleep ? fmtSleep(sleep) : '—'} />
-              </View>
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              <RingCell pct={calDay.pct} color={ACCENT_CAL} label={tr.calories} value={`${calDay.consumed}кк`} />
+              <RingCell pct={steps / goals.steps} color={ACCENT_STEPS} label={tr.steps} value={steps >= 1000 ? `${(steps / 1000).toFixed(1)}т` : `${steps}`} />
+              <RingCell pct={water / goals.water} color={ACCENT} label={tr.water} value={water >= 1000 ? `${(water / 1000).toFixed(1)}л` : `${water}мл`} />
+              <RingCell pct={sleep ? sleep / goals.sleep : 0} color={ACCENT_SLEEP} label={tr.sleep} value={sleep ? fmtSleep(sleep) : '—'} />
             </View>
-          </PressableScale>
+          </BentoCard>
         )}
         {showQuickActions && (
           <QuickActions
@@ -539,14 +556,13 @@ export default function TodayScreen() {
     key: 'finance',
     node: (
       <Section index={1} animate={animateIntro} motion={motion}>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ flexDirection: 'row', gap: TODAY_SECTION_GAP }}>
           {showFinanceTile && (
           <StatTile
-            c={c} isDark={isDark}
             icon="banknote" accent="lime"
             title={tr.tabFinance}
             onPress={() => router.push('/explore')}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text numberOfLines={1} style={{ color: t.text.secondary, fontSize: 12, fontFamily: fontFamily.regular, flexShrink: 1 }}>
                 {hasPrimaryAccounts ? tr.totalOnAccounts : tr.monthNet}
               </Text>
@@ -561,7 +577,7 @@ export default function TodayScreen() {
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
-              style={{ ...type.displaySm, fontSize: 30, lineHeight: 34, letterSpacing: -0.6, color: headlineValue >= 0 ? t.text.primary : t.status.danger, marginTop: 6 }}>
+              style={{ ...type.displaySm, fontSize: 32, lineHeight: 36, letterSpacing: -0.8, color: headlineValue >= 0 ? t.text.primary : t.status.danger, marginTop: 6 }}>
               {fmtMoney(headlineValue)}
             </Text>
             {hasPrimaryAccounts && (
@@ -569,22 +585,31 @@ export default function TodayScreen() {
                 {tr.monthNet}: {overview.month.net > 0 ? '+' : ''}{fmtMoney(overview.month.net)}
               </Text>
             )}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-              <Text style={{ color: t.status.success, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>↑ {fmtMoney(overview.month.income)}</Text>
-              <Text style={{ color: t.status.danger, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>↓ {fmtMoney(overview.month.expense)}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 10, marginTop: 8 }}>
+              <Text style={{ color: g.accent.success.ink, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>↑ {fmtMoney(overview.month.income)}</Text>
+              <Text style={{ color: t.status.danger, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>↓ {fmtMoney(overview.month.expense)}</Text>
             </View>
           </StatTile>
           )}
           {showTimeTile && (
           <StatTile
-            c={c} isDark={isDark}
             icon="timer" accent="amber"
             title={tr.quickTimer}
             onPress={() => router.push('/time')}>
-            <Text numberOfLines={1} adjustsFontSizeToFit style={{ ...type.displaySm, fontSize: 30, lineHeight: 34, letterSpacing: -0.6, color: t.text.primary, marginTop: 6 }}>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={{ ...type.displaySm, fontSize: 32, lineHeight: 36, letterSpacing: -0.8, color: t.text.primary }}>
               {fmtTime(trackedSec)}
             </Text>
-            <Text style={{ color: t.text.secondary, fontSize: 12, marginTop: 4 }}>{tr.todayTracked}</Text>
+            <Text style={{ color: t.text.secondary, fontSize: 12, marginTop: 2 }}>{tr.todayTracked}</Text>
+            {/* Omni: тиждень штрихованими стовпцями, сьогодні — градієнтом.
+                Вузька плитка — без pill-підказки; число вже стоїть вище. */}
+            <HatchedBars
+              data={trackedWeek}
+              activeIndex={trackedWeek.length - 1}
+              showTooltip={false}
+              height={44}
+              accessibilityLabel={`${tr.todayTracked}: ${fmtTime(trackedSec)}`}
+              style={{ marginTop: 10 }}
+            />
           </StatTile>
           )}
         </View>
@@ -599,11 +624,16 @@ export default function TodayScreen() {
       key: 'habits',
       node: (
         <Section index={2} animate={animateIntro} motion={motion}>
-          <View style={[s.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card'), gap: 8 }]}>
-            <View style={[s.titleRow, { marginBottom: 4 }]}>
-              <AccentDot isDark={isDark} accent="coral" />
-              <Text style={[s.cardTitle, { color: t.text.primary }]}>{tr.todayHabits}</Text>
-            </View>
+          <BentoCard compact title={tr.todayHabits} icon="flame.fill" accent="coral">
+            {/* Omni: сегментний прогрес дня — скільки звичок уже відмічено. */}
+            <SegmentedProgress
+              value={habitsDone / habits.length}
+              label={`${habitsDone}/${habits.length}`}
+              showValue
+              accessibilityLabel={`${tr.todayHabits}: ${habitsDone}/${habits.length}`}
+              style={{ marginBottom: 14 }}
+            />
+            <View style={{ gap: 8 }}>
             {habits.map(h => {
               const done   = habitDoneToday(h);
               const streak = habitStreak(h);
@@ -615,17 +645,16 @@ export default function TodayScreen() {
                   accessibilityState={{ checked: done }}
                   accessibilityLabel={h.title}>
                   <View
-                    style={[s.habitRow, { backgroundColor: glassOf(t).surfaceSubtle }]}>
-                    <View style={[s.habitBar, { backgroundColor: h.color || ACCENT }]} />
+                    style={[s.habitRow, { backgroundColor: t.surface.subtle }]}>
                     <AnimatedCheck
                       checked={done}
                       size={20}
                       color={h.color || ACCENT}
                       borderColor={c.sub}
                     />
-                    <Text style={[s.habitTitle, { color: c.text }]} numberOfLines={1}>{h.title}</Text>
+                    <Text style={[s.habitTitle, { color: c.text }, done && { textDecorationLine: 'line-through', color: t.text.secondary }]} numberOfLines={1}>{h.title}</Text>
                     {streak > 0 && (
-                      <Text style={[s.streakBadge, { color: h.color || ACCENT }]}>
+                      <Text style={[s.streakBadge, { color: g.accent.coral.ink }]}>
                         🔥{streak}
                       </Text>
                     )}
@@ -633,7 +662,8 @@ export default function TodayScreen() {
                 </PressableScale>
               );
             })}
-          </View>
+            </View>
+          </BentoCard>
         </Section>
       ),
     });
@@ -644,27 +674,37 @@ export default function TodayScreen() {
     key: 'tasks',
     node: (
       <Section index={3} animate={animateIntro} motion={motion}>
-        <View style={[s.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
-          <View style={s.sectionRow}>
-            <View style={s.titleRow}>
-              <AccentDot isDark={isDark} accent="lavender" />
-              <Text style={[s.cardTitle, { color: t.text.primary }]}>{tr.todayTasks}</Text>
-            </View>
+        <BentoCard
+          compact
+          title={tr.todayTasks}
+          icon="checklist"
+          accent="lavender"
+          headerRight={
             <View style={{ flexDirection: 'row', gap: 6 }}>
+              {/* Дві pill зі словами з'їдали заголовок картки до «Завдан…»
+                  (телефон і пів-колонка планшета) — лишаємо числа, слова
+                  йдуть у VoiceOver; повні підписи вже є в KPI шапки. */}
               {overdueCount > 0 && (
-                <View style={[s.badge, { backgroundColor: dsGlass(isDark).accent.coral.tint }]}>
-                  <Text style={{ color: t.status.danger, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
-                    {overdueCount} {tr.todayOverdue}
+                <View
+                  accessible
+                  accessibilityLabel={`${overdueCount} ${tr.todayOverdue}`}
+                  style={[s.badge, { backgroundColor: g.accent.coral.tint, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                  <IconSymbol name="exclamationmark.triangle.fill" size={11} color={g.accent.coral.ink} />
+                  <Text style={{ color: g.accent.coral.ink, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
+                    {overdueCount}
                   </Text>
                 </View>
               )}
-              <View style={[s.badge, { backgroundColor: dsGlass(isDark).accent.lavender.tint }]}>
-                <Text style={{ color: dsGlass(isDark).accent.lavender.ink, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
-                  {activeCount} {tr.todayActive}
+              <View
+                accessible
+                accessibilityLabel={`${activeCount} ${tr.todayActive}`}
+                style={[s.badge, { backgroundColor: g.accent.lavender.tint }]}>
+                <Text style={{ color: g.accent.lavender.ink, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
+                  {activeCount}
                 </Text>
               </View>
             </View>
-          </View>
+          }>
           {/* Групи за статусом. «У процесі» йде першою і не обрізається:
               на екрані дня спершу те, що робиться просто зараз. Заголовок
               групи показуємо лише коли груп справді кілька — над єдиним
@@ -701,47 +741,32 @@ export default function TodayScreen() {
           {todayGroups.total === 0 && (
             <Text style={{ color: t.text.secondary, fontSize: 13, marginTop: 2 }}>{tr.noTasksToday}</Text>
           )}
-        </View>
+        </BentoCard>
       </Section>
     ),
   });
 
-  // 5. Зустрічі сьогодні
+  // 5. Зустрічі сьогодні — Omni: ЄДИНА «темна» виділена картка екрана.
+  // Найближча (поточна/майбутня) зустріч — крупно, решта — рядками; біла
+  // pill унизу веде в календар (як і колишнє «Показати всі»).
   if (moduleOn('meetings') && todayMeetings.length > 0) {
     sections.push({
       key: 'meetings',
       node: (
         <Section index={4} animate={animateIntro} motion={motion}>
-          <View style={[s.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card'), gap: 8 }]}>
-            <View style={[s.titleRow, { marginBottom: 4 }]}>
-              <AccentDot isDark={isDark} accent="info" />
-              <Text style={[s.cardTitle, { color: t.text.primary }]}>{tr.todayMeetings}</Text>
-            </View>
-            {todayMeetings.slice(0, TODAY_PREVIEW_LIMIT).map(({ meeting: m, phase }) => (
-              <PressableScale
-                key={m.id}
-                onPress={() => openMeeting(m)}
-                accessibilityRole="button"
-                accessibilityLabel={`${m.time} ${m.title}`}
-                style={{ opacity: phase === 'past' ? 0.5 : 1 }}>
-                <View
-                  style={[s.meetingRow, { backgroundColor: glassOf(t).surfaceSubtle }]}>
-                  <View style={[s.meetingBar, { backgroundColor: m.color || dsGlass(isDark).accent.info.fill }]} />
-                  <Text style={[s.meetingTime, { color: c.sub }]}>{m.time}</Text>
-                  <Text style={[s.meetingTitle, { color: c.text }]} numberOfLines={1}>{m.title}</Text>
-                  <MeetingProjectChip project={meetingProject(m, projects)} textColor={c.sub} maxWidth={110} />
-                </View>
-              </PressableScale>
-            ))}
-            {todayMeetings.length > TODAY_PREVIEW_LIMIT && (
-              <ShowAllRow
-                label={tr.showAllCount.replace('{count}', String(todayMeetings.length))}
-                color={t.text.primary}
-                c={c}
-                onPress={() => router.push('/calendar' as never)}
-              />
-            )}
-          </View>
+          <BentoCard compact variant="dark" title={tr.todayMeetings} icon="calendar" accent="info">
+            <TodayMeetingsList
+              items={todayMeetings.slice(0, TODAY_PREVIEW_LIMIT)}
+              projects={projects}
+              onOpen={openMeeting}
+            />
+            <MeetingsCta
+              label={todayMeetings.length > TODAY_PREVIEW_LIMIT
+                ? tr.showAllCount.replace('{count}', String(todayMeetings.length))
+                : tr.todayPaneOpenCalendar}
+              onPress={() => router.push('/calendar' as never)}
+            />
+          </BentoCard>
         </Section>
       ),
     });
@@ -787,7 +812,7 @@ export default function TodayScreen() {
             accessibilityRole="button"
             accessibilityLabel={tr.modulesOpenSettings}>
             <View
-              style={[s.card, { gap: 6, backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+              style={[s.card, { gap: 6, backgroundColor: t.surface.card }]}>
               <Text style={{ color: t.text.primary, fontSize: 16, fontFamily: fontFamily.semibold }}>
                 {tr.modulesDashboardEmptyTitle}
               </Text>
@@ -806,6 +831,39 @@ export default function TodayScreen() {
 
   sections = orderTodaySections(sections);
 
+  // ─── KPI дня (Omni: великі тонкі числа в шапці) ─────────────────────────────
+  // Лише реальні дані й лише ввімкнених модулів; до першого читання — нічого
+  // (нуль до завантаження збрехав би). Тап веде в розділ.
+  const kpis = loaded && (moduleOn('tasks') || moduleOn('meetings') || moduleOn('time')) ? (
+    <>
+      {moduleOn('tasks') && (
+        <KpiCounter
+          value={activeCount}
+          label={tr.tabTasks}
+          delta={overdueCount > 0 ? `${overdueCount} ${tr.todayOverdue}` : undefined}
+          deltaTone="down"
+          onPress={() => router.push('/')}
+        />
+      )}
+      {moduleOn('meetings') && (
+        <KpiCounter
+          value={todayMeetings.length}
+          // «Наради», а не «Зустрічі сьогодні»: той самий заголовок має
+          // секція нижче, і скрінрідер чув би його двічі поспіль.
+          label={tr.navMeetings}
+          onPress={() => router.push('/calendar' as never)}
+        />
+      )}
+      {moduleOn('time') && (
+        <KpiCounter
+          value={fmtTime(trackedSec)}
+          label={tr.todayTracked}
+          onPress={() => router.push('/time')}
+        />
+      )}
+    </>
+  ) : undefined;
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -814,12 +872,15 @@ export default function TodayScreen() {
       <MeshBackground />
       <View style={{ flex: 1 }}>
         {/* Header */}
-        <ScreenHeader
+        {/* Omni: глобальна шапка (☰ шухляда · дзвіник · акаунт на телефоні;
+            рядок інструментів на планшеті) + KPI-лічильники дня. */}
+        <AppHeader
           title={dateStr.charAt(0).toUpperCase() + dateStr.slice(1)}
-          color={c.text}
           titleStyle={s.title}
           eyebrow={<Text style={{ color: t.text.secondary, fontSize: 13, fontFamily: fontFamily.medium }}>{greet}</Text>}
           actions={<SyncBadge />}
+          kpis={kpis}
+          paddingBottom={14}
         />
 
         <ScrollView
@@ -873,36 +934,82 @@ export default function TodayScreen() {
 
 // ─── StatTile — компактна плитка сітки ────────────────────────────────────────
 
-function StatTile({ c, isDark, icon, accent, title, onPress, children }: {
-  c: any;
-  isDark: boolean;
+/** Omni: компактна bento-плитка (icon-chip акценту + назва), уся — кнопка. */
+function StatTile({ icon, accent, title, onPress, children }: {
   icon: IconSymbolName;
-  /** DS v2.1: акцент модуля плитки — icon-chip + легка змивка KPI. */
+  /** Акцент модуля плитки — icon-chip. */
   accent: GlassAccent;
   title: string;
   onPress: () => void;
   children?: React.ReactNode;
 }) {
-  const { t } = useDSTheme();
-  void isDark; void c;
   return (
-    <PressableScale
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      style={{ flex: 1 }}>
-      <View
-        style={[s.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
-        <AccentWash isDark={isDark} accent={accent} strength={0.7} />
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <AccentIcon isDark={isDark} icon={icon} accent={accent} />
-          <Text style={{ color: t.text.primary, fontSize: 14, fontFamily: fontFamily.semibold, marginLeft: 8, flex: 1 }} numberOfLines={1}>
-            {title}
-          </Text>
-        </View>
+    <View style={{ flex: 1 }}>
+      <BentoCard compact title={title} icon={icon} accent={accent} onPress={onPress} accessibilityLabel={title} style={{ flexGrow: 1 }}>
         {children}
-      </View>
-    </PressableScale>
+      </BentoCard>
+    </View>
+  );
+}
+
+// ─── Зустрічі на темній картці ────────────────────────────────────────────────
+
+function TodayMeetingsList({ items, projects, onOpen }: {
+  items: ReturnType<typeof orderTodayMeetings>;
+  projects: TodayProject[];
+  onOpen: (m: Meeting) => void;
+}) {
+  const bc = useBentoColors();
+  const { g } = useDS();
+  const featuredIdx = Math.max(0, items.findIndex(x => x.phase !== 'past'));
+  return (
+    <View style={{ gap: 8 }}>
+      {items.map(({ meeting: m, phase }, i) => {
+        const featured = i === featuredIdx && phase !== 'past';
+        return (
+          <PressableScale
+            key={m.id}
+            onPress={() => onOpen(m)}
+            accessibilityRole="button"
+            accessibilityLabel={`${m.time} ${m.title}`}
+            style={{ opacity: phase === 'past' ? 0.6 : 1 }}>
+            {featured ? (
+              <View style={{ paddingVertical: 4, gap: 4 }}>
+                <Text numberOfLines={2} style={[s.meetingFeatured, { color: bc.text }]}>{m.title}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={[s.meetingDot, { backgroundColor: m.color || g.accent.info.fill }]} />
+                  <Text style={[s.meetingTime, { color: bc.textSecondary }]}>{m.time}</Text>
+                  <MeetingProjectChip project={meetingProject(m, projects)} textColor={bc.textSecondary} maxWidth={140} />
+                </View>
+              </View>
+            ) : (
+              <View style={[s.meetingRow, { backgroundColor: bc.nestedBg }]}>
+                <View style={[s.meetingDot, { backgroundColor: m.color || g.accent.info.fill }]} />
+                <Text style={[s.meetingTime, { color: bc.textSecondary }]}>{m.time}</Text>
+                <Text style={[s.meetingTitle, { color: bc.text }]} numberOfLines={1}>{m.title}</Text>
+                <MeetingProjectChip project={meetingProject(m, projects)} textColor={bc.textSecondary} maxWidth={110} />
+              </View>
+            )}
+          </PressableScale>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Omni: біла pill-дія на темній картці («Start Meeting»). */
+function MeetingsCta({ label, onPress }: { label: string; onPress: () => void }) {
+  const bc = useBentoColors();
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={[s.cta, { backgroundColor: bc.actionBg }]}>
+      <IconSymbol name="calendar" size={15} color={bc.actionText} />
+      <Text style={{ color: bc.actionText, fontSize: 14, fontFamily: fontFamily.semibold }}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -914,83 +1021,28 @@ const s = StyleSheet.create({
   title: { fontSize: 28, fontFamily: fontFamily.medium, letterSpacing: -0.28, lineHeight: 34, marginTop: 2 },
   // DS v2: картка 20 радіус, 20 відступ, без рамки.
   card:  { borderRadius: Atlas.radius.xlarge, padding: 20, overflow: 'hidden' },
-  cardTitle: { fontSize: 16, lineHeight: 22, fontFamily: fontFamily.semibold },
-  cardHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
-  cardIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   groupRow:   { flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 4 },
   groupDot:   { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
   groupName:  { flex: 1, fontSize: 12, fontFamily: fontFamily.semibold },
   groupCount: { fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
-  sectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontFamily: fontFamily.bold,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  focusCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: Atlas.radius.large,
-    borderWidth: 1,
-    paddingVertical: 14,
-    paddingLeft: 18,
-    paddingRight: 12,
-    overflow: 'hidden',
-  },
-  focusBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-  },
-  focusTitle: { fontSize: 15, fontFamily: fontFamily.bold },
-  playBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: Atlas.radius.medium,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
   meetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: Atlas.radius.large,
     minHeight: 44,
     paddingVertical: 10,
-    paddingLeft: 16,
-    paddingRight: 12,
+    paddingHorizontal: 12,
     gap: 10,
     overflow: 'hidden',
   },
-  meetingBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-    borderRadius: 2,
-  },
   meetingTime: { fontSize: 13, fontFamily: fontFamily.medium, minWidth: 40, fontVariant: ['tabular-nums'] },
+  meetingFeatured: { fontSize: 20, lineHeight: 26, fontFamily: fontFamily.medium, letterSpacing: -0.2 },
+  meetingDot: { width: 8, height: 8, borderRadius: 4 },
+  cta: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    minHeight: 44, borderRadius: radius.pill, marginTop: 14,
+  },
   meetingTitle: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium },
   habitRow: {
     flexDirection: 'row',
@@ -998,18 +1050,9 @@ const s = StyleSheet.create({
     borderRadius: Atlas.radius.large,
     minHeight: 44,
     paddingVertical: 10,
-    paddingLeft: 16,
-    paddingRight: 12,
+    paddingHorizontal: 12,
     gap: 10,
     overflow: 'hidden',
-  },
-  habitBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-    borderRadius: 2,
   },
   habitTitle: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium },
   streakBadge: { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },

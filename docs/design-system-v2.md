@@ -328,3 +328,127 @@ time/notes/containers → amber, finance → lime, health → coral.
 9. «Зменшити прозорість» обробляють примітиви самі; власні скляні стилі — через
    `ds.glass(isDark, v, reduceTransparency)` з `useDS().reduceTransparency`.
 10. Як і раніше НЕ чіпати логіку, i18n-ключі, `accessibilityLabel`/`testID`/`hitSlop`.
+
+
+---
+
+## Omni layout (v2.2)
+
+> Структура з референсу «Omni — Task & Project Management Dashboard» (Behance
+> 251900741) поверх DS v2.1. Токени, Manrope, Liquid Glass, акценти модулів,
+> червоні витрати / зелені доходи — без змін. Шрифт Omni (Outfit) не має
+> кирилиці — лишається Manrope. Ті самі назви компонентів, що й на вебі.
+>
+> **Перекриває «Навігація v2.1»:** активна вкладка таб-бару й активний пункт
+> сайдбара (особистого й проєктного) — більше НЕ тонована pill акценту модуля, а
+> суцільна чорна pill `action.primary` + `text.onAction` (у темній — біла).
+> Акцент модуля лишився на icon-chip пунктів сайдбара.
+
+### Принципи
+
+- **Скло — лише функціональний шар** (Apple HIG): шапка, таб-бар, сайдбар,
+  модалки. **Вміст — на суцільних bento-картках** (`BentoCard`: surface.card +
+  м'яка тінь, без рамок).
+- **«Ви тут» = чорна pill** (`action.primary`, у темній — біла) + `text.onAction`:
+  активна вкладка таб-бару, активний пункт сайдбара, активна `SectionTabs`.
+  Акцент модуля — на icon-chip (тонований кружок + ink-іконка), не на pill.
+- **Фірмовий градієнт** `t.gradient.signature` (світла `#7F0BE8 → #F4AA2D`,
+  темна `#9B3BFF → #F7B84A`) — ЛИШЕ підсвітка даних: активний стовпець,
+  сегментний прогрес, повзунок таймлайну, AI-сфера. Не фон і не текст.
+- **Одна «темна» картка на сторінку** (`BentoCard variant="dark"`, токени
+  `t.featured.*`: світла `#11141B`, темна `#2C2C2E`; текст ≥ 15:1 / ≥ 7:1;
+  CTA — біла pill). На «Сьогодні» — зустрічі.
+- KPI — великі тонкі числа (Manrope Light 300, tabular).
+
+### Каркас за розміром вікна
+
+| Вікно | Шапка (`AppHeader`) | Навігація | Вміст |
+|---|---|---|---|
+| Телефон (compact) | `[☰] Заголовок … [дії] [🔔] [аватар]`; KPI — горизонтальна стрічка під заголовком | нижній таб-бар (5 головних, чорна pill) + **шухляда сайдбара** (☰ → `SidebarDrawer`, усі модулі) | bento 1 колонка |
+| Планшет medium | рядок інструментів `[пошук] … [таймер] [дії] [🔔] [аватар+ім'я ⌄]`, під ним H1; KPI рядком під H1 | сайдбар-рейка 76pt (розгортається) | bento 2 колонки |
+| Планшет expanded | як medium, KPI праворуч від H1 (як в Omni) | повний сайдбар 232pt | bento 2–3 колонки |
+
+Аватар відкриває `AccountSheet` (Керування акаунтом · Сповіщення · Налаштування ·
+тема Системна/Світла/Темна — той самий `store/theme-context`). Дзвіник →
+`/notifications` (крапка непрочитаних). Таймер-pill (лише планшет, лише коли
+йдуть таймери) → «Час».
+
+### Компоненти — API
+
+```tsx
+import { AppHeader } from '@/components/shared/AppHeader';
+import { SidebarDrawer, drawerWidthFor } from '@/components/shared/SidebarDrawer';
+import { AccountSheet } from '@/components/shared/AccountSheet';
+import { NavSidebar } from '@/components/shared/NavSidebar';
+import {
+  PageHeader, KpiCounter, SectionTabs, BentoGrid, BentoCard, BentoCardHeader,
+  BentoArrowButton, BentoPeriodPill, useBentoColors, SegmentedProgress, HatchedBars,
+  Tag, PriorityFlag, Avatar, AvatarStack, initialsOf, SignatureGradient, signatureAt,
+} from '@/components/ds';
+
+<AppHeader title eyebrow? subtitle? kpis?={<>{<KpiCounter/>…}</>} actions? showMenu?=true
+           onSearch? searchLabel? back? titleStyle? paddingBottom?>{/* SectionTabs… */}</AppHeader>
+// Побудований на ScreenHeader (useTopInset, стеля Dynamic Type) — нові слоти ScreenHeader:
+<ScreenHeader … leading?={<HeaderButton/>} toolbar?={<View/>} />
+
+<NavSidebar pathname isDark variant?="docked|drawer" width? onNavigate? onClose? />
+<SidebarDrawer visible onClose />          // Modal, ковзання зліва (Reduce Motion — без анімації)
+<AccountSheet visible onClose />
+
+<PageHeader title? subtitle? kpis? action? bleed? />   // телефон: KPI-стрічка; планшет: ряд
+<KpiCounter value label delta? deltaTone?="up|down|neutral" valueColor? onPress? accessibilityLabel? />
+<SectionTabs tabs={[{key,label,icon?,count?,testID?}]} value onChange accessibilityLabel? bleed? />
+
+<BentoGrid columns?={{compact:1,medium:2,expanded:3}} gap?>
+  <BentoCard variant?="default|dark|ai" title? icon? accent? subtitle? headerRight?
+             onPress? accessibilityLabel? span?={2|'full'} compact? padded? testID?>…</BentoCard>
+</BentoGrid>
+<BentoArrowButton onPress? accessibilityLabel? />   // без onPress — декоративний ↗ (картка сама кнопка)
+<BentoPeriodPill label onPress? />                  // «Цей місяць ⌄»
+const bc = useBentoColors();                        // text / textSecondary / nestedBg / actionBg… поточної картки
+
+<SegmentedProgress value={0..1} segments?=15 height?=10 label? showValue? accessibilityLabel? />
+<HatchedBars data={[{label,value,display?}]} activeIndex? onSelect? showTooltip?=true height?=120 accessibilityLabel />
+<Tag label accent? size?="sm|md" />    <PriorityFlag priority="high|medium|low" label? />
+<AvatarStack people={[{id,name,accent?}]} max?=3 size?=28 ringColor? moreLabel? />
+<SignatureGradient direction?="horizontal|vertical" style />   signatureAt(t, 0..1) → '#RRGGBB'
+```
+
+Нові токени (`constants/theme.ts`): `t.gradient.signature`, `t.gradient.aiCard`,
+`t.featured.{bg,text,textSecondary,action,actionText,hairline}`.
+
+### Доступність
+
+- Цілі дотику ≥ 44: кнопки шапки 36 + `HEADER_BUTTON_HIT_SLOP`, pill-таби 36 + hitSlop 4,
+  ↗ 36 + 4, пункти сайдбара/шухляди 44, рядки AccountSheet 48.
+- Ролі: `SectionTabs` — tablist/tab+selected; сайдбар — menu/menuitem+selected;
+  `SegmentedProgress` — progressbar зі значенням; `HatchedBars` — один елемент
+  з підписом (або кнопки-колонки з onSelect); `AvatarStack` — один елемент «імена, +N».
+- Dynamic Type: KPI ×1.3, заголовки карток ×1.6, підписи стовпців ×1.3 (стелі — щоб
+  не ламати ряд), решта тексту масштабується.
+- «Зменшити прозорість»: шапка/кнопки/таб-бар — суцільні; Tag — solid + onSolid.
+  «Зменшити рух»: шухляда й поява секцій — без анімації.
+
+### Сторінка-зразок: «Сьогодні»
+
+`AppHeader` (дата + привітання, SyncBadge) з KPI: активні завдання (дельта
+«N прострочено», червона), наради сьогодні, відстежений час — усе з реальних
+даних, лише ввімкнених модулів, лише після першого читання. Секції — `BentoCard`
+у тому самому порядку правила власника й тій самій `TodaySectionGrid`:
+здоров'я (↗) + швидкі дії (суцільні плитки) → фінанси | час (тиждень
+`HatchedBars`, сьогодні — градієнт) → звички (`SegmentedProgress` дня) →
+завдання (бейджі прострочено/активних) → зустрічі (**темна** картка: найближча
+крупно, біла pill → календар) → оплати.
+
+### Рецепт для решти екранів
+
+1. Шапка: `ScreenHeader` → `AppHeader` (ті самі `title`/`eyebrow`/`back`/`actions`);
+   KPI — `kpis={<>…<KpiCounter/></>}`.
+2. Перемикачі розділу (Операції/Рахунки/Звіти, Список/Дошка/Календар) → `SectionTabs`
+   у `children` AppHeader або першим рядком вмісту.
+3. Вміст → `BentoGrid` + `BentoCard` (шапка `title`+`icon`+`accent`, праворуч
+   `BentoPeriodPill`/`BentoArrowButton`). Рядки всередині — `useBentoColors().nestedBg`
+   або `t.surface.subtle` (НЕ скляний subtle — на білій картці він зникає).
+4. Прогрес → `SegmentedProgress`; тижневі/місячні ряди → `HatchedBars`; мітки → `Tag`;
+   пріоритет → `PriorityFlag`; учасники → `AvatarStack`.
+5. Одна найважливіша «подія» сторінки → `BentoCard variant="dark"`; AI-блок → `variant="ai"`.

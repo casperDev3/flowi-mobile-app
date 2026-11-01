@@ -8,12 +8,13 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
+import { BentoArrowButton, BentoCard, KpiCounter } from '@/components/ds';
 import { GroupScreenShell } from '@/components/training/GroupScreenShell';
 import { useGroupStream, useGroupSummary, usePersonalSessions, useTrainingScope } from '@/components/training/hooks';
 import { LeaderboardList } from '@/components/training/LeaderboardList';
 import { QuestCard } from '@/components/training/QuestCard';
 import { StreakXpCard, TodaySessionCard, WeekStrip } from '@/components/training/SessionCards';
-import { TG_ACCENT, useTrainingColors } from '@/components/training/theme';
+import { useTrainingColors } from '@/components/training/theme';
 import { Card, EmptyState, Notice, SectionTitle } from '@/components/training/TrainingBits';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useResponsive } from '@/hooks/use-responsive';
@@ -31,7 +32,7 @@ import {
   weekDays,
 } from '@/utils/trainingSessions';
 import type { LeaderboardRow, Quest, QuestProgress, TrainingSession } from '@/utils/trainingTypes';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
 
 export default function TrainingGroupHome() {
   const { groupId = '' } = useLocalSearchParams<{ groupId: string }>();
@@ -122,10 +123,15 @@ export default function TrainingGroupHome() {
           accessibilityLabel={t.label}
           style={{
             flexGrow: 1, flexBasis: '45%', minHeight: 56, borderRadius: 16,
-            ...c.gl.card, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16,
+            backgroundColor: c.t.surface.card, ...shadow[c.isDark ? 'dark' : 'light'].card,
+            flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12,
           }}>
-          <IconSymbol name={t.icon} size={18} color={TG_ACCENT} />
-          <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{t.label}</Text>
+          {/* Omni icon-chip: тонований кружок + ink-іконка. */}
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.accentTint, alignItems: 'center', justifyContent: 'center' }}>
+            <IconSymbol name={t.icon} size={16} color={c.accent} />
+          </View>
+          <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 }}>{t.label}</Text>
+          <IconSymbol name="chevron.right" size={12} color={c.sub} />
         </TouchableOpacity>
       ))}
     </View>
@@ -165,12 +171,18 @@ export default function TrainingGroupHome() {
 
   const sideColumn = (
     <View>
-      <SectionTitle c={c} action={{ label: tr.tgSeeAll, onPress: () => go('leaderboard') }}>{tr.tgLeaderboard}</SectionTitle>
-      <Card c={c}>
+      {/* Omni card header: icon-chip + назва, праворуч ↗ «Усі». */}
+      <BentoCard
+        title={tr.tgLeaderboard}
+        icon="star.fill"
+        accent="amber"
+        compact
+        style={{ marginTop: isWide ? 0 : 20 }}
+        headerRight={<BentoArrowButton onPress={() => go('leaderboard')} accessibilityLabel={`${tr.tgLeaderboard}: ${tr.tgSeeAll}`} />}>
         {top.length ? <LeaderboardList c={c} rows={top} limit={3} /> : (
           <Text style={{ color: c.sub, fontSize: 14 }}>{tr.tgNoLeaderboard}</Text>
         )}
-      </Card>
+      </BentoCard>
       <SectionTitle c={c} action={{ label: tr.tgSeeAll, onPress: () => go('quests') }}>{tr.tgActiveQuests}</SectionTitle>
       {quests.length ? quests.slice(0, 3).map(q => (
         <QuestCard
@@ -187,6 +199,18 @@ export default function TrainingGroupHome() {
     </View>
   );
 
+  // Omni KPI шапки — лише з даних, що вже є на сторінці.
+  const weekDone = sessions.filter(s => days.includes(s.date) && s.status === 'completed').length;
+  const weekPlanned = sessions.filter(s => days.includes(s.date)).length;
+  const kpis = group ? (
+    <>
+      {/* Учаснику XP і стрік показує StreakXpCard — тут не дублюємо. */}
+      {isCoach ? <KpiCounter value={group.member_count} label={tr.tgMembers} onPress={() => go('members')} /> : null}
+      {weekPlanned > 0 ? <KpiCounter value={`${weekDone}/${weekPlanned}`} label={tr.tgThisWeek} /> : null}
+      <KpiCounter value={quests.length} label={tr.tgActiveQuests} onPress={() => go('quests')} />
+    </>
+  ) : undefined;
+
   const lastRejected = stream.state.rejected[stream.state.rejected.length - 1];
   const recentRejection = lastRejected && Date.now() - new Date(lastRejected.at).getTime() < 60_000 ? lastRejected.reason : null;
 
@@ -201,6 +225,7 @@ export default function TrainingGroupHome() {
       rejectedReason={recentRejection}
       onRefresh={onRefresh}
       refreshing={refreshing}
+      kpis={kpis}
       wide={isWide}>
       {sessionsApi.failed ? (
         <Notice c={c} text={tr.loadErrorBody} tone="error" onRetry={() => { void sessionsApi.reload(); }} retryLabel={tr.loadErrorRetry} />

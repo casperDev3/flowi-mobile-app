@@ -1,5 +1,7 @@
 import { Atlas } from '@/constants/atlas';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
+import { KpiCounter, PageHeader } from '@/components/ds/PageHeader';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AdSlot } from '@/components/advertising/Advertising';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -37,7 +39,7 @@ import {
   type NoteScope,
 } from '@/utils/notes';
 import { uuidV4 } from '@/utils/uuid';
-import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 
 export type { Note } from '@/utils/notes';
 
@@ -125,16 +127,18 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   const canEditProject = (id: string) => canEditProjectItem(id, roles);
   const canEdit = canEditNote(current ?? (projectId ? { projectId } : null), canEditProject);
   const canCreate = canEditNote(projectId ? { projectId } : null, canEditProject);
-  // DS v2.1 (Liquid Glass): тло прозоре — під ним mesh екрана; картки — скло,
-  // редактор/читач — щільне скло (довгий текст ≥ 4.5:1), акцент «Нотаток» —
-  // amber (ink на склі). `dim` — тонована amber-змивка вибраних кнопок.
+  // Omni (DS v2.2): тло прозоре — під ним mesh екрана; картки нотаток і
+  // редактор/читач — СУЦІЛЬНІ (surface.card + м'яка тінь, без обідка: скло
+  // лишилось функціональному шару), акцент «Нотаток» — amber (ink). Вибрані
+  // кнопки-фільтри — чорна pill action.primary, як вкладки Omni.
   const tk = dsTheme(isDark);
   const gl = glassOf(tk);
   const amber = gl.accent.amber;
+  const cardShadow = shadow[isDark ? 'dark' : 'light'].card;
   const c = {
     bg: 'transparent',
-    panel: gl.surface,
-    panelStrong: gl.surfaceStrong,
+    panel: tk.surface.card,
+    panelStrong: tk.surface.card,
     text: tk.text.primary,
     sub: tk.text.secondary,
     border: gl.rim,
@@ -361,10 +365,11 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   const button = (label: string, onPress: () => void, id: string, disabled = false, active = false) => (
     <TouchableOpacity testID={id} accessibilityRole="button" accessibilityLabel={label}
       accessibilityState={{ disabled, selected: active }} disabled={disabled} onPress={onPress}
-      style={[s.button, active
-        ? { borderColor: c.accent, backgroundColor: c.dim }
-        : { ...glassRim(tk, 'subtle'), backgroundColor: gl.surfaceSubtle }, { opacity: disabled ? 0.45 : 1 }]}>
-      <Text style={{ color: c.accent, fontFamily: fontFamily.semibold }}>{label}</Text>
+      style={[s.button, active || id === 'notes-add'
+        ? { backgroundColor: tk.action.primary }
+        : { backgroundColor: tk.surface.card }, { opacity: disabled ? 0.45 : 1 }]}>
+      {id === 'notes-add' ? <IconSymbol name="plus" size={14} color={tk.text.onAction} /> : null}
+      <Text style={{ color: active || id === 'notes-add' ? tk.text.onAction : tk.text.primary, fontFamily: fontFamily.semibold, fontSize: 13 }}>{label}</Text>
     </TouchableOpacity>
   );
   const missingLink = (value: string | null, options: PickerOption[]) =>
@@ -378,7 +383,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   const readMeeting = current ? linkLabel(current.linkedMeetingId, meetings) : null;
 
   const reader = reading && current ? (
-    <View testID="notes-reader" style={[s.editor, { backgroundColor: c.panelStrong, ...glassRim(tk, 'strong') }]}>
+    <View testID="notes-reader" style={[s.editor, { backgroundColor: c.panelStrong }, cardShadow]}>
       <View style={s.toolbar}>
         {button(tr.close, () => confirmLeave(closeEditor), 'notes-close', saving)}
         {canEdit && button(tr.edit, startEdit, 'notes-edit', saving || readError)}
@@ -407,7 +412,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   ) : null;
 
   const editor = selected && !reading ? (
-    <View testID="notes-editor" style={[s.editor, { backgroundColor: c.panelStrong, ...glassRim(tk, 'strong') }]}>
+    <View testID="notes-editor" style={[s.editor, { backgroundColor: c.panelStrong }, cardShadow]}>
       <View style={s.toolbar}>
         {button(tr.close, () => confirmLeave(closeEditor), 'notes-close', saving)}
         {!isNew && button(tr.cancel, cancelEdit, 'notes-cancel-edit', saving)}
@@ -463,19 +468,32 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
       </View>}
       <View style={[s.panes, { flexDirection: split ? 'row' : 'column', paddingBottom: Math.max(insets.bottom, projectId ? tabBarInset : 0, 12) }]}>
         {(split || !selected) && <View testID="notes-list" style={split ? { width: listWidth } : s.list}>
+          {/* Omni KPI — з уже прочитаних нотаток цього зрізу. */}
+          {ready && !readError && scoped.length > 0 ? (
+            <PageHeader
+              style={{ paddingTop: 4, paddingBottom: 4 }}
+              kpis={
+                <>
+                  <KpiCounter value={scoped.length} label={tr.notes} />
+                  <KpiCounter value={scoped.filter(n => n.pinned).length} label={tr.notesPinned} />
+                  {tagChips.length > 0 ? <KpiCounter value={tagChips.length} label={tr.notesTagsLabel} /> : null}
+                </>
+              }
+            />
+          ) : null}
           <View style={s.toolbar}>
             {canCreate && button(tr.addNote, add, 'notes-add', !ready || readError || saving)}
             {button(sort === 'title' ? tr.notesSortTitle : sort === 'oldest' ? tr.sortOldest : tr.sortNewest, () => setSort(v => v === 'newest' ? 'oldest' : v === 'oldest' ? 'title' : 'newest'), 'notes-sort')}
           </View>
           <TextInput testID="notes-search" accessibilityLabel={tr.notesSearch} placeholder={tr.notesSearch}
             placeholderTextColor={c.sub} value={query} onChangeText={setQuery}
-            style={[s.search, { color: c.text, backgroundColor: gl.surfaceSubtle, ...glassRim(tk, 'subtle') }]} />
+            style={[s.search, { color: c.text, backgroundColor: tk.surface.card }]} />
           {!projectId && <View style={s.toolbar}>{(['all', 'personal', 'projects'] as const).map(value => (
             <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: scope === value }}
               testID={`notes-scope-${value}`} onPress={() => setScope(value)} style={[s.button, scope === value
-                ? { borderColor: c.accent, backgroundColor: c.dim }
-                : { ...glassRim(tk, 'subtle'), backgroundColor: gl.surfaceSubtle }]}>
-              <Text style={{ color: c.text }}>{value === 'all' ? tr.all : value === 'personal' ? tr.notesPersonal : tr.projects}</Text>
+                ? { backgroundColor: tk.action.primary }
+                : { backgroundColor: tk.surface.card }]}>
+              <Text style={{ color: scope === value ? tk.text.onAction : tk.text.secondary, fontFamily: fontFamily.semibold, fontSize: 13 }}>{value === 'all' ? tr.all : value === 'personal' ? tr.notesPersonal : tr.projects}</Text>
             </TouchableOpacity>
           ))}</View>}
           {tagChips.length > 0 && (
@@ -501,7 +519,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
               return <TouchableOpacity accessibilityRole="button" testID={`note-${item.id}`}
                 accessibilityLabel={`${item.pinned ? `${tr.notesPinned}, ` : ''}${item.title || tr.untitled}`}
                 accessibilityState={{ selected: selected?.id === item.id }} onPress={() => open(item)}
-                style={[s.card, { backgroundColor: c.panel }, selected?.id === item.id ? { borderColor: c.accent } : glassRim(tk, 'card')]}>
+                style={[s.card, { backgroundColor: c.panel, borderColor: selected?.id === item.id ? tk.action.primary : 'transparent' }, cardShadow]}>
                 <View style={s.cardHead}>
                   {item.pinned && <Text testID={`note-pin-${item.id}`} style={{ color: c.accent, fontSize: 15 }}>★</Text>}
                   <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontFamily: fontFamily.semibold, fontSize: 16 }}>{item.title || tr.untitled}</Text>
@@ -526,12 +544,13 @@ const s = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: 16 }, panes: { flex: 1, gap: 16 }, list: { flex: 1 },
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 },
   tagRow: { flexDirection: 'row', gap: 8, paddingVertical: 4, paddingRight: 8 },
-  button: { minHeight: 44, minWidth: 44, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1 },
-  search: { minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderRadius: Atlas.radius.medium, fontSize: 16 },
-  section: { fontFamily: fontFamily.semibold, paddingVertical: 12 }, card: { borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 14, marginBottom: 10 },
+  // Omni: кнопки-фільтри — pill; вибрана — чорна (action.primary).
+  button: { minHeight: 44, minWidth: 44, paddingHorizontal: 14, flexDirection: 'row', gap: 6, justifyContent: 'center', alignItems: 'center', borderRadius: 999 },
+  search: { minHeight: 48, paddingHorizontal: 16, borderRadius: 999, fontSize: 16 },
+  section: { fontFamily: fontFamily.semibold, paddingVertical: 12 }, card: { borderWidth: 1.5, borderRadius: Atlas.radius.large, padding: 16, marginBottom: 10 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cardFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 8 },
-  editor: { flex: 1, minWidth: 0, padding: 16, borderWidth: 1, borderRadius: Atlas.radius.large },
+  editor: { flex: 1, minWidth: 0, padding: 20, borderRadius: Atlas.radius.large },
   context: { fontSize: 13, paddingVertical: 8 },
   readTitle: { fontSize: 24, fontFamily: fontFamily.semibold }, title: { fontSize: 24, fontFamily: fontFamily.semibold, minHeight: 52, borderBottomWidth: 1 },
   tagsInput: { minHeight: 44, fontSize: 15, borderBottomWidth: 1, paddingVertical: 8 },

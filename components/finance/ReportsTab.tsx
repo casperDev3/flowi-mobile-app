@@ -15,12 +15,16 @@
  * направо збігається зі стрічкою телефона.
  *
  * Уся арифметика — у utils/finance/* (pnl, cashflow, forecast); тут лише показ.
+ *
+ * Omni (DS v2.2): кожна секція — суцільна BentoCard із шапкою «icon-chip +
+ * назва», праворуч — period-pill (період · валюта) або перемикач горизонту.
+ * Вкладені підкладки — surface.subtle (скляний subtle на білій картці зникав).
  */
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { fontFamily, radius, shadow, space, type as dsType } from '@/constants/theme';
+import { fontFamily, radius, space, type as dsType } from '@/constants/theme';
 import { WIDE_CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
 import type { Translations } from '@/store/translations';
 import type { Account } from '@/utils/accounts';
@@ -39,7 +43,7 @@ import { formatDateKey, type Subscription } from '@/utils/subscriptions';
 import { CashflowFactChart, ForecastChart } from './CashflowCharts';
 import { categoryGroupLabel, costKindLabel, type FinColors } from './financeLabels';
 import { useFinPalette } from './finPalette';
-import { GlassSurface } from '@/components/ds';
+import { BentoCard, BentoPeriodPill } from '@/components/ds';
 
 export interface ReportsTabProps {
   transactions: readonly Transaction[];
@@ -70,8 +74,9 @@ export function ReportsTab(props: ReportsTabProps) {
     money, tr, locale, isWide, bottomInset, onScrollY,
   } = props;
   // DS v2: палітра розділу з теми (props.c лишився в API заради сумісності).
-  const c = useFinPalette();
-  const cardShadow = shadow[c.isDark ? 'dark' : 'light'].card;
+  const base = useFinPalette();
+  // Вміст лежить на суцільній картці — підкладки теж суцільні.
+  const c = useMemo(() => ({ ...base, dim: base.t.surface.subtle }), [base]);
   const [costFilter, setCostFilter] = useState<CostFilter>('all');
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [horizon, setHorizon] = useState<30 | 90>(30);
@@ -172,11 +177,9 @@ export function ReportsTab(props: ReportsTabProps) {
     </View>
   );
 
+  const periodPill = <BentoPeriodPill label={`${labelPeriodLocalized(filter.period, tr.months, tr.monthsShort)} · ${currency}`} />;
   const pnlCard = (
-    <GlassSurface radius={radius.cardCompact} style={st.card}>
-      <Text style={[st.cardTitle, { color: c.text }]}>
-        {tr.finPnlTitle} · {labelPeriodLocalized(filter.period, tr.months, tr.monthsShort)} · {currency}
-      </Text>
+    <BentoCard compact style={st.card} title={tr.finPnlTitle} icon="chart.bar.fill" accent="lime" headerRight={periodPill}>
       {row(tr.finIncome, money(t.income, currency), 'income')}
       {row(tr.finFixed, money(t.fixedExpense, currency), 'fixedExpense')}
       {row(tr.finVariable, money(t.variableExpense, currency), 'variableExpense')}
@@ -192,13 +195,12 @@ export function ReportsTab(props: ReportsTabProps) {
       {uncounted.length > 0 ? (
         <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>{tr.finOtherCurrencies.replace('{list}', uncounted.join(', '))}</Text>
       ) : null}
-    </GlassSurface>
+    </BentoCard>
   );
 
   const groups = pnl.groups.filter(g => costFilter === 'all' || g.cost === costFilter);
   const structureCard = (
-    <GlassSurface radius={radius.cardCompact} style={st.card}>
-      <Text style={[st.cardTitle, { color: c.text }]}>{tr.finStructure}</Text>
+    <BentoCard compact style={st.card} title={tr.finStructure} icon="chart.pie.fill" accent="coral">
       <View accessibilityRole="radiogroup" style={[st.segment, { backgroundColor: c.dim, alignSelf: 'flex-start', marginBottom: 12 }]}>
         {(['all', 'fixed', 'variable'] as const).map(k => {
           const on = costFilter === k;
@@ -266,15 +268,16 @@ export function ReportsTab(props: ReportsTabProps) {
           </TouchableOpacity>
         </View>
       ) : null}
-    </GlassSurface>
+    </BentoCard>
   );
 
   const warningCard = warning ? (
-    <View
-      accessibilityLiveRegion="polite"
-      style={[st.card, { ...c.gl.card }, cardShadow]}>
-      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-        <IconSymbol name="exclamationmark.triangle.fill" size={16} color={c.t.accent.coral} />
+    <View accessibilityLiveRegion="polite">
+    <BentoCard compact style={st.card}>
+      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+        <View style={[st.warnChip, { backgroundColor: c.g.accent.coral.tint }]}>
+          <IconSymbol name="exclamationmark.triangle.fill" size={15} color={c.g.accent.coral.ink} />
+        </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
             {tr.finShortfallTitle
@@ -306,12 +309,12 @@ export function ReportsTab(props: ReportsTabProps) {
           </View>
         </View>
       </View>
+    </BentoCard>
     </View>
   ) : null;
 
   const factCard = (
-    <GlassSurface radius={radius.cardCompact} style={st.card}>
-      <Text style={[st.cardTitle, { color: c.text }]}>{tr.finFactTitle} · {currency}</Text>
+    <BentoCard compact style={st.card} title={tr.finFactTitle} icon="arrow.left.arrow.right" accent="lime" headerRight={<BentoPeriodPill label={currency} />}>
       {fact.points.length > 0 ? (
         <CashflowFactChart
           points={fact.points}
@@ -337,13 +340,11 @@ export function ReportsTab(props: ReportsTabProps) {
       {filter.scope !== 'all' ? (
         <Text style={{ color: c.sub, fontSize: 11, marginTop: 8 }}>{tr.finBalanceAllScopes}</Text>
       ) : null}
-    </GlassSurface>
+    </BentoCard>
   );
 
   const forecastCard = (
-    <GlassSurface radius={radius.cardCompact} style={st.card}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-        <Text style={[st.cardTitle, { color: c.text, flex: 1, marginBottom: 0 }]}>{tr.finForecastTitle}</Text>
+    <BentoCard compact style={st.card} title={tr.finForecastTitle} icon="chart.line.uptrend.xyaxis" accent="lime" headerRight={
         <View accessibilityRole="radiogroup" style={[st.segment, { backgroundColor: c.dim }]}>
           {([30, 90] as const).map(h => {
             const on = horizon === h;
@@ -361,7 +362,7 @@ export function ReportsTab(props: ReportsTabProps) {
             );
           })}
         </View>
-      </View>
+      }>
       <ForecastChart
         points={forecast.points}
         c={c}
@@ -408,7 +409,7 @@ export function ReportsTab(props: ReportsTabProps) {
           ))}
         </View>
       )) : null}
-    </GlassSurface>
+    </BentoCard>
   );
 
   const cards: Record<Exclude<ReportsSection, 'shortfall'>, React.ReactNode> = {
@@ -476,8 +477,8 @@ const WIDE_COLUMN = { width: '100%', maxWidth: WIDE_CONTENT_MAX_WIDTH, alignSelf
 const st = StyleSheet.create({
   reportsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   reportsCell: { flex: 1, minWidth: 0 },
-  card: { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: space.cardGapCompact },
-  cardTitle: { ...dsType.h2, marginBottom: 8 },
+  card: { marginBottom: space.cardGapCompact },
+  warnChip: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 3 },
   segmentBtn: { minHeight: 34, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   bar: { height: 6, borderRadius: radius.pill, marginTop: 6, overflow: 'hidden' },

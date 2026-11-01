@@ -27,7 +27,9 @@ import { TransactionGroup } from '@/components/finance/TransactionGroup';
 import { FAB_LIST_CLEARANCE } from '@/components/tasks/AddTaskButton';
 import { PickerField, type PickerOption } from '@/components/shared/PickerField';
 import { PressableScale } from '@/components/shared/PressableScale';
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+// Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
+import { HeaderButton } from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { SkeletonCard } from '@/components/shared/Skeleton';
 import { useUndoToast } from '@/components/shared/UndoToast';
@@ -89,7 +91,7 @@ import { calcPeriodTotalsByCurrency } from '@/utils/financePeriod';
 import { parseFinanceTab, reportsFabHidden, visibleFinanceTabs, type FinanceTab } from '@/utils/financeTabs';
 import { formatSubscriptionMoney, parseDateKey } from '@/utils/subscriptions';
 import { fontFamily } from '@/constants/theme';
-import { MeshBackground } from '@/components/ds';
+import { KpiCounter, MeshBackground } from '@/components/ds';
 import { glassOf, glassRim, glassRimFor, dsGlass } from '@/components/shared/dsTheme';
 import { AccentIcon } from '@/components/shared/GlassBits';
 
@@ -1564,6 +1566,36 @@ export default function FinanceScreen() {
     );
   })() : null;
 
+  // ─── KPI розділу (Omni: великі тонкі числа в шапці) ─────────────────────────
+  // Оборот ПЕРІОДУ спільного фільтра у валюті фільтра — ті самі цифри, що й
+  // «Оборот за період»/стрічка (totalsByCurrency). Без копійок: KPI — про
+  // масштаб, точна сума — у картках нижче. До першого читання — нічого (нуль
+  // до завантаження збрехав би). Тап по доходах/витратах — стрічка з
+  // відповідним фільтром типу.
+  const kpiCode = finFilter.filter.currency || primaryCurrency;
+  const kpiTotals = totalsByCurrency[kpiCode];
+  const kpiMoney = (n: number) => fmtCur(Math.round(n), { ...curOf(kpiCode), decimals: 0 });
+  const kpiNet = (kpiTotals?.income ?? 0) - (kpiTotals?.expense ?? 0);
+  const headerKpis = initialized && !loadFailed ? (
+    <>
+      <KpiCounter
+        value={kpiMoney(kpiTotals?.income ?? 0)}
+        label={tr.incomes}
+        onPress={() => { changeTab('transactions'); setFilter('income'); }}
+      />
+      <KpiCounter
+        value={kpiMoney(kpiTotals?.expense ?? 0)}
+        label={tr.expenses}
+        onPress={() => { changeTab('transactions'); setFilter('expense'); }}
+      />
+      <KpiCounter
+        value={`${kpiNet < 0 ? '−' : ''}${kpiMoney(Math.abs(kpiNet))}`}
+        label={tr.finNet}
+        valueColor={kpiNet < 0 ? t.status.danger : undefined}
+      />
+    </>
+  ) : undefined;
+
   return (
     <View style={{ flex: 1 }}>
       <MeshBackground />
@@ -1571,10 +1603,11 @@ export default function FinanceScreen() {
       <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
 
-        {/* Fixed Header */}
-        <ScreenHeader
+        {/* Omni: глобальна шапка (☰ · дзвіник · акаунт; на планшеті — рядок
+            інструментів) + KPI обороту періоду; під нею — вкладки й фільтр. */}
+        <AppHeader
           title={tr.finance}
-          color={c.text}
+          kpis={headerKpis}
           actions={tab !== 'transactions' ? undefined :
             <>
               <HeaderButton
@@ -1610,7 +1643,7 @@ export default function FinanceScreen() {
             isDark={isDark}
           />
           </View>
-        </ScreenHeader>
+        </AppHeader>
 
         {tab === 'reports' ? (
           <ReportsTab

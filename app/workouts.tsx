@@ -17,7 +17,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+// Omni (DS v2.2): AppHeader — це ScreenHeader + 🔔 і аватар (інсет і «Назад» дає ScreenHeader).
+import { AppHeader } from '@/components/shared/AppHeader';
+import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { requestNotificationPermissions } from '@/store/notifications';
 import { loadDataResult, retryStorageRead } from '@/store/storage';
@@ -29,10 +31,10 @@ import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { LoadErrorNotice } from '@/components/health/HealthNotices';
 import { getHealthDSColors } from '@/components/health/palette';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
 import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
 import { glassStyles } from '@/components/finance/finPalette';
-import { GlassSurface, MeshBackground } from '@/components/ds';
+import { BentoCard, GlassSurface, HatchedBars, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
 
 const ACCENT2 = '#6366F1';
 
@@ -94,9 +96,9 @@ const PROGRAM_COLORS = ['#EF4444', '#F97316', '#EAB308', '#10B981', '#0EA5E9', '
 const DAY_LABELS = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
 const TABS = [
-  { key: 'workouts' as const, label: 'Тренування' },
-  { key: 'exercises' as const, label: 'Вправи' },
-  { key: 'programs' as const, label: 'Програми' },
+  { key: 'workouts' as const, label: 'Тренування', icon: 'figure.run' as const },
+  { key: 'exercises' as const, label: 'Вправи', icon: 'dumbbell.fill' as const },
+  { key: 'programs' as const, label: 'Програми', icon: 'list.bullet.clipboard' as const },
 ];
 
 // Одиниці вшиті українською, як і решта рядків цього екрана (див. звіт);
@@ -581,6 +583,12 @@ function makeColors(isDark: boolean, reduceTransparency = false) {
     /** Лише placeholder / декор. */
     muted:  t.text.muted,
     card:   reduceTransparency ? g.solid.card : g.surface,
+    /**
+     * Omni (DS v2.2): вміст лежить на суцільних bento-картках (surface.card +
+     * м'яка тінь), скло лишається функціональному шару (шапка, модалки).
+     */
+    solid:  { backgroundColor: t.surface.card, ...shadow[isDark ? 'dark' : 'light'].card },
+    nested: t.surface.subtle,
     subtle: g.surfaceSubtle,
     action: t.action.primary,
     onAction: t.text.onAction,
@@ -615,7 +623,7 @@ const WorkoutRow = React.memo(function WorkoutRow({ w, c, isDark, lastInGroup, o
   const cfg = WORKOUT_TYPES.find(t => t.key === w.type) ?? WORKOUT_TYPES[6];
   return (
     <View
-      style={{ ...c.gl.card, borderRadius: 20, padding: 20, marginBottom: lastInGroup ? 24 : 8, flexDirection: 'row', alignItems: 'center' }}>
+      style={{ ...c.solid, borderRadius: 20, padding: 20, marginBottom: lastInGroup ? 24 : 8, flexDirection: 'row', alignItems: 'center' }}>
       <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: cfg.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
         <IconSymbol name={cfg.icon as any} size={20} color={cfg.color} />
       </View>
@@ -641,7 +649,7 @@ const ExerciseRow = React.memo(function ExerciseRow({ ex, c, isDark, onEdit, onD
   const { tr } = useI18n();
   return (
     <View
-      style={{ ...c.gl.card, borderRadius: 20, padding: 20, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
+      style={{ ...c.solid, borderRadius: 20, padding: 20, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
       <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: ACCENT2 + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
         <IconSymbol name="dumbbell.fill" size={18} color={ACCENT2} />
       </View>
@@ -680,8 +688,8 @@ const ProgramShortcut = React.memo(function ProgramShortcut({ prog, exercises, c
       activeOpacity={0.75}
       style={{
         flexDirection: 'row', alignItems: 'center',
-        padding: 20, borderRadius: 20, marginBottom: 12,
-        ...c.gl.card,
+        padding: 14, borderRadius: 16, marginBottom: 8,
+        backgroundColor: c.nested,
       }}>
       <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: prog.color + '28', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
         <IconSymbol name="dumbbell.fill" size={20} color={prog.color} />
@@ -709,7 +717,7 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
   const progExs = exercises.filter(e => prog.exerciseIds.includes(e.id));
   return (
     <View
-      style={{ ...c.gl.card, borderRadius: 20, marginBottom: 12 }}>
+      style={{ ...c.solid, borderRadius: 20, marginBottom: 12 }}>
       <View style={{ padding: 20 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: prog.color + '25', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
@@ -905,6 +913,22 @@ export default function WorkoutsScreen() {
     };
   }, [workouts]);
 
+  /** Omni: хвилини за останні 7 днів (сьогодні — останній, активний стовпець). */
+  const week = useMemo(() => {
+    const now = new Date();
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (6 - i));
+      return { d, minutes: 0 };
+    });
+    for (const w of workouts) {
+      const wd = new Date(w.date);
+      const slot = days.find(x => isSameDay(x.d, wd));
+      if (slot) slot.minutes += w.durationMin;
+    }
+    return days.map(x => ({ label: DAY_LABELS[x.d.getDay()], value: x.minutes, display: fmtDuration(x.minutes) }));
+  }, [workouts]);
+  const weekTotal = useMemo(() => week.reduce((sum, d) => sum + d.value, 0), [week]);
+
   // Групування історії по днях (новіші згори) за один прохід. Попередня
   // версія на кожен запис шукала свою групу через grouped.find, тобто
   // квадратично від довжини історії — на кількох сотнях тренувань це
@@ -1060,45 +1084,29 @@ export default function WorkoutsScreen() {
     }
     return (
       <>
-        {todayStats.count > 0 && (
-          <View
-            style={{ ...c.gl.card, borderRadius: 20, padding: 20, marginBottom: 16 }}>
-            <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Сьогодні</Text>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                <Text style={{ color: c.text, fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}>{todayStats.count}</Text>
-                <Text style={{ color: c.sub, fontSize: 11 }}>тренувань</Text>
-              </View>
-              <View style={{ width: 1, backgroundColor: c.border }} />
-              <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                <Text style={{ color: c.text, fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}>{fmtDuration(todayStats.minutes)}</Text>
-                <Text style={{ color: c.sub, fontSize: 11 }}>загалом</Text>
-              </View>
-              {todayStats.calories > 0 && <>
-                <View style={{ width: 1, backgroundColor: c.border }} />
-                <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                  <Text style={{ color: c.text, fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}>{todayStats.calories}</Text>
-                  <Text style={{ color: c.sub, fontSize: 11 }}>ккал</Text>
-                </View>
-              </>}
-            </View>
-          </View>
+        {/* Сьогоднішні лічильники переїхали в KPI шапки (Omni); тут — тиждень. */}
+        {weekTotal > 0 && (
+          <BentoCard title="Цей тиждень" icon="chart.bar.fill" accent="coral" style={{ marginBottom: 16 }}
+            headerRight={<Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{fmtDuration(weekTotal)}</Text>}>
+            <HatchedBars data={week} activeIndex={6} height={110}
+              accessibilityLabel={`Тренування за тиждень: ${fmtDuration(weekTotal)}`} />
+          </BentoCard>
         )}
 
-        {programs.length > 0 && <>
-          <Text style={[sectionLabel(c), { marginBottom: 10, marginTop: 4 }]}>Мої програми</Text>
-          {programs.map(prog => (
-            <ProgramShortcut key={prog.id} prog={prog} exercises={exercises} c={c} onStart={startFromProgram} />
-          ))}
-          <View style={{ height: 8 }} />
-        </>}
+        {programs.length > 0 && (
+          <BentoCard title="Мої програми" icon="list.bullet.clipboard" accent="coral" style={{ marginBottom: 20 }}>
+            {programs.map(prog => (
+              <ProgramShortcut key={prog.id} prog={prog} exercises={exercises} c={c} onStart={startFromProgram} />
+            ))}
+          </BentoCard>
+        )}
 
         {grouped.length > 0 && (
           <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Історія</Text>
         )}
       </>
     );
-  }, [tab, c, todayStats, programs, exercises, grouped.length, startFromProgram, openNewExercise, openNewProgram]);
+  }, [tab, c, week, weekTotal, programs, exercises, grouped.length, startFromProgram, openNewExercise, openNewProgram]);
 
   const listEmpty = useMemo(() => {
     if (tab === 'exercises') {
@@ -1169,52 +1177,45 @@ export default function WorkoutsScreen() {
               й без імені («Back» англійською). Спільний ScreenHeader дає й
               44×44, і переклад, і — головне — ховає стрілку на планшеті, де
               «Тренування» відкриваються прямо з сайдбара. */}
-          <ScreenHeader
+          <AppHeader
             title={tr.workoutsLabel}
-            color={c.text}
             back={{ onPress: () => router.back(), label: tr.back, color: c.text }}
+            kpis={initialized ? (
+              <>
+                <KpiCounter value={todayStats.count} label="тренувань сьогодні" />
+                <KpiCounter value={fmtDuration(todayStats.minutes)} label="загалом сьогодні" />
+                {todayStats.calories > 0 ? <KpiCounter value={todayStats.calories} label="ккал сьогодні" /> : null}
+              </>
+            ) : undefined}
             actions={
               <>
                 {/* Групи тренувань (training-module.md §10.1): вхід у модуль груп. */}
                 <HeaderButton
                   onPress={() => router.push('/training' as Href)}
-                  accessibilityLabel={tr.tgGroupsButton}
-                  style={{
-                    borderColor: 'transparent',
-                    ...c.gl.card,
-                  }}>
+                  accessibilityLabel={tr.tgGroupsButton}>
                   <IconSymbol name="person.2.fill" size={17} color={c.text} />
                 </HeaderButton>
                 <HeaderButton
                   onPress={() => setShowStats(true)}
-                  accessibilityLabel={tr.statistics}
-                  style={{
-                    borderColor: 'transparent',
-                    ...c.gl.card,
-                  }}>
+                  accessibilityLabel={tr.statistics}>
                   <IconSymbol name="chart.bar.fill" size={17} color={c.text} />
                 </HeaderButton>
               </>
-            }
-          />
-
-          {/* Tab bar */}
-          <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12, gap: 6 }}>
-            {TABS.map(t => (
-              <TouchableOpacity
-                key={t.key}
-                onPress={() => setTab(t.key)}
-                style={{
-                  flex: 1, minHeight: 40, justifyContent: 'center', borderRadius: 999, alignItems: 'center',
-                  backgroundColor: tab === t.key ? c.action : c.card,
-                }}>
-                <Text style={{ color: tab === t.key ? c.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }} numberOfLines={1}>
-                  {/* «Мої програми» — щоб не плутались із груповими (§10.1). */}
-                  {t.key === 'programs' ? tr.tgPersonalProgramsTab : t.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+            }>
+            {/* Вкладки розділу — Omni SectionTabs (чорна pill = «ви тут»).
+                «Мої програми» — щоб не плутались із груповими (§10.1). */}
+            <SectionTabs
+              tabs={TABS.map(t => ({
+                key: t.key,
+                icon: t.icon,
+                label: t.key === 'programs' ? tr.tgPersonalProgramsTab : t.label,
+                count: !initialized ? undefined : t.key === 'exercises' ? exercises.length : t.key === 'programs' ? programs.length : undefined,
+              }))}
+              value={tab}
+              onChange={setTab}
+              accessibilityLabel={tr.workoutsLabel}
+            />
+          </AppHeader>
         </View>
 
         <FlatList

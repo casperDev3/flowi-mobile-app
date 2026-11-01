@@ -28,8 +28,7 @@ import { throttleMessage } from '@/store/auth-throttle';
 import { useSync } from '@/store/sync-engine';
 import { haptic } from '@/utils/haptics';
 import { fontFamily } from '@/constants/theme';
-import { MeshBackground } from '@/components/ds';
-import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
+import { Avatar, BentoCard, BentoGrid, MeshBackground } from '@/components/ds';
 
 export default function AccountScreen() {
   const cs = useColorScheme();
@@ -45,8 +44,6 @@ export default function AccountScreen() {
   const k = dsTokens(isDark);
   const c = {
     ...getScreenColors('auth', isDark),
-    // Картка форми — суцільна поверхня DS v2.
-    card: glassOf(k).surface,
     red: k.status.danger,
   };
 
@@ -257,17 +254,23 @@ export default function AccountScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Email (readonly) */}
-            <SectionLabel label={tr.authEmail} color={c.sub} />
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
-              <View style={st.fieldWrap}>
-                <Text style={[st.input, { color: c.sub }]} numberOfLines={1}>{user?.email}</Text>
+            {/* Omni: профіль — картка з аватаром; далі bento-картки розділів
+                (1 колонка на телефоні, 2 — коли колонка вміщує). */}
+            <BentoCard style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                {user ? <Avatar person={{ id: user.id, name: user.name || user.email }} size={56} ringColor="transparent" /> : null}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[st.profileName, { color: c.text }]} numberOfLines={1}>{user?.name || user?.email}</Text>
+                  {/* Email (readonly) */}
+                  <Text accessibilityLabel={`${tr.authEmail}: ${user?.email ?? ''}`} style={[st.profileEmail, { color: c.sub }]} numberOfLines={1}>{user?.email}</Text>
+                </View>
               </View>
-            </View>
+            </BentoCard>
 
+            <BentoGrid columns={{ compact: 1, medium: 2, expanded: 2 }}>
             {/* Name */}
-            <SectionLabel label={tr.accountDisplayName} color={c.sub} />
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+            <BentoCard title={tr.accountDisplayName} icon="person.fill" accent="info">
+            <View style={[st.card, { backgroundColor: k.surface.subtle }]}>
               <View style={st.fieldWrap}>
                 <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.accountDisplayName.toUpperCase()}</Text>
                 <TextInput
@@ -299,10 +302,11 @@ export default function AccountScreen() {
                 <Text style={[st.btnText, { color: k.text.onAction }]}>{tr.accountSaveName}</Text>
               )}
             </TouchableOpacity>
+            </BentoCard>
 
             {/* Change password */}
-            <SectionLabel label={tr.accountChangePassword} color={c.sub} />
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+            <BentoCard title={tr.accountChangePassword} icon="key.fill" accent="lavender">
+            <View style={[st.card, { backgroundColor: k.surface.subtle }]}>
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
                 <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.accountOldPassword.toUpperCase()}</Text>
                 <View style={st.row}>
@@ -390,10 +394,11 @@ export default function AccountScreen() {
                 <Text style={[st.btnText, { color: k.text.onAction }]}>{tr.accountChangePassword}</Text>
               )}
             </TouchableOpacity>
+            </BentoCard>
 
             {/* Workspace */}
-            <SectionLabel label={tr.workspaceScreenTitle} color={c.sub} />
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+            <BentoCard title={tr.workspaceScreenTitle} icon="building.2.fill" accent="amber">
+            <View style={[st.card, { backgroundColor: k.surface.subtle }]}>
               {user?.isAdmin && (
                 <TouchableOpacity
                   style={[st.fieldWrap, { flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderBottomColor: c.border }]}
@@ -416,10 +421,11 @@ export default function AccountScreen() {
                 <IconSymbol name="chevron.right" size={16} color={c.sub} />
               </TouchableOpacity>
             </View>
+            </BentoCard>
 
             {/* Danger zone */}
-            <SectionLabel label={tr.accountDangerZone} color={c.red} />
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+            <BentoCard title={tr.accountDangerZone} icon="exclamationmark.triangle.fill" accent="coral">
+            <View style={[st.card, { backgroundColor: k.surface.subtle }]}>
               <TouchableOpacity
                 style={[st.fieldWrap, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}
                 onPress={handleDeleteRequest}
@@ -474,22 +480,14 @@ export default function AccountScreen() {
                 </View>
               )}
             </View>
+            </BentoCard>
+            </BentoGrid>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
 }
-
-// Мемоізовано: екран перемальовується на кожну літеру в будь-якому полі,
-// а підписи секцій залежать лише від двох рядків.
-const SectionLabel = React.memo(function SectionLabel(
-  { label, color }: { label: string; color: string },
-) {
-  return (
-    <Text style={[st.sectionLabel, { color }]}>{label.toUpperCase()}</Text>
-  );
-});
 
 const st = StyleSheet.create({
   scroll: {
@@ -503,17 +501,20 @@ const st = StyleSheet.create({
     fontFamily: fontFamily.medium,
     letterSpacing: -0.32,
   },
-  sectionLabel: {
-    fontSize: 12,
-    fontFamily: fontFamily.medium,
-    letterSpacing: 0.3,
-    marginBottom: 8,
-    marginTop: 20,
-    marginLeft: 4,
-  },
+  // Вкладена група полів усередині bento-картки (surface.subtle).
   card: {
-    borderRadius: 24,
+    borderRadius: 16,
     overflow: 'hidden',
+  },
+  profileName: {
+    fontSize: 20,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: -0.2,
+  },
+  profileEmail: {
+    fontSize: 14,
+    fontFamily: fontFamily.regular,
+    marginTop: 2,
   },
   fieldWrap: {
     paddingHorizontal: 20,

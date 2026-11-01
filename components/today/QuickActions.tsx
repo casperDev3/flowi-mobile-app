@@ -5,8 +5,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PressableScale } from '@/components/shared/PressableScale';
 import { AccentIcon } from '@/components/shared/GlassBits';
 import type { Translations } from '@/store/translations';
-import { fontFamily, type GlassAccent } from '@/constants/theme';
-import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
+import { fontFamily, shadow, type GlassAccent } from '@/constants/theme';
+import { dsTheme } from '@/components/shared/dsTheme';
 
 interface Props {
   isDark: boolean;
@@ -22,10 +22,12 @@ interface Props {
 const QUICK_LABEL_MAX_FONT_SCALE = 1.6;
 
 export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWater, onTimer }: Props) {
-  // DS v2.1: плитки — скло з обідком; іконка — тонований скляний кружок
-  // акценту модуля (завдання — lavender, фінанси — lime, вода/здоров'я — coral,
-  // час — amber).
+  // Omni (DS v2.2): плитки — суцільні bento-картки (surface.card + м'яка
+  // тінь), іконка — тонований кружок акценту модуля (завдання — lavender,
+  // фінанси — lime, вода/здоров'я — coral, час — amber). Скло лишається
+  // функціональному шару (шапка, таб-бар, сайдбар).
   const t = dsTheme(isDark);
+  const cardShadow = shadow[isDark ? 'dark' : 'light'].card;
   const actions: { label: string; icon: 'plus.circle.fill' | 'banknote' | 'drop.fill' | 'timer'; accent: GlassAccent; onPress: () => void }[] = [
     { label: tr.quickAddTask,    icon: 'plus.circle.fill', accent: 'lavender', onPress: onAddTask },
     { label: tr.quickAddExpense, icon: 'banknote',         accent: 'lime',     onPress: onAddExpense },
@@ -43,7 +45,7 @@ export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWate
           accessibilityRole="button"
           accessibilityLabel={a.label}>
           <View
-            style={[s.btn, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+            style={[s.btn, { backgroundColor: t.surface.card, ...cardShadow }]}>
             <AccentIcon isDark={isDark} icon={a.icon} accent={a.accent} size="md" style={s.iconWrap} />
             {/* NAT-06: чотири плитки ділять ширину порівну, і при найбільшому
                 Dynamic Type (AX5) підписи зрізались до «+ З…», «Та…», «Фін…».
@@ -51,7 +53,7 @@ export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWate
                 озвучення не страждає — повний підпис є в accessibilityLabel
                 самої плитки. */}
             <Text
-              style={[s.label, { color: c.sub }]}
+              style={[s.label, { color: t.text.primary }]}
               numberOfLines={2}
               maxFontSizeMultiplier={QUICK_LABEL_MAX_FONT_SCALE}>{a.label}</Text>
           </View>
@@ -68,7 +70,6 @@ const s = StyleSheet.create({
     borderRadius: Atlas.radius.xlarge,
     paddingVertical: 14,
     alignItems: 'center',
-    overflow: 'hidden',
   },
   iconWrap: { marginBottom: 6 },
   label: { fontSize: 11, fontFamily: fontFamily.medium, textAlign: 'center', paddingHorizontal: 4 },

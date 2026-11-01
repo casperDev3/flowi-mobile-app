@@ -65,9 +65,11 @@ export function makeTrainingColors(isDark: boolean, reduceTransparency = false):
     sub: t.text.secondary,
     faint: t.text.muted,
     border: t.border.hairline,
-    card: reduceTransparency ? g.solid.card : g.surface,
-    input: g.surfaceSubtle,
-    chip: g.surfaceSubtle,
+    // Omni (DS v2.2): вміст — на суцільних bento-картках; поля й чипи всередині
+    // них — суцільний subtle (скляний subtle на білій картці не видно).
+    card: t.surface.card,
+    input: t.surface.subtle,
+    chip: t.surface.subtle,
     blurTint: isDark ? 'dark' : 'light',
   };
 }

@@ -17,7 +17,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 
 import { fillTemplate } from './labels';
-import { glassRimFor } from '@/components/shared/dsTheme';
 
 const STEP_MINUTES = 30;
 
@@ -53,7 +52,7 @@ export function QuietHoursCard({ enabled, start, end, timezone, tr, colors: c, o
     { edge: 'end', label: tr.ncQuietTo, value: end ?? '08:00', fallback: '08:00' },
   ];
   return (
-    <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+    <View style={[st.card, { backgroundColor: c.card }]}>
       <View style={st.toggleRow}>
         <View style={[st.iconBox, { backgroundColor: c.dim }]}>
           <IconSymbol name="moon.fill" size={16} color={c.text} />

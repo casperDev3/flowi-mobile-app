@@ -43,9 +43,9 @@ import type { CategoryRowLike } from '@/utils/financeCategories';
 import { haptic } from '@/utils/haptics';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
 import { fontFamily, radius, type } from '@/constants/theme';
-import { ProgressBar } from '@/components/ds';
+import { BentoCard, BentoGrid, KpiCounter, SegmentedProgress } from '@/components/ds';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { glassOf } from '@/components/shared/dsTheme';
 
 interface ProjectBudgetRecord {
   id: string;
@@ -217,7 +217,30 @@ export default function ProjectBudgetScreen() {
   }
 
   return (
-    <ProjectScreenShell project={project} isDark={isDark} title={tr.navBudget}>
+    <ProjectScreenShell
+      project={project}
+      isDark={isDark}
+      title={tr.navBudget}
+      // Omni KPI: витрачено (частка ліміту) · ліміт · сальдо, якщо є доходи.
+      kpis={budget ? (
+        <>
+          <KpiCounter
+            value={formatSubscriptionMoney(spent, currency, allCurrencies, locale)}
+            label={tr.overviewBudgetSpent}
+            delta={budget.amount > 0 ? `${Math.round((spent / budget.amount) * 100)}%` : undefined}
+            deltaTone={spent > budget.amount ? 'down' : 'neutral'}
+            valueColor={spent > budget.amount ? tk.status.danger : undefined}
+          />
+          <KpiCounter value={formatSubscriptionMoney(budget.amount, currency, allCurrencies, locale)} label={tr.projectBudgetLimit} />
+          {totals && (totals.income > 0 || projectIncome.length > 0) ? (
+            <KpiCounter
+              value={`${totals.net < 0 ? '−' : ''}${formatSubscriptionMoney(Math.abs(totals.net), currency, allCurrencies, locale)}`}
+              label={tr.finProjectNet}
+              valueColor={totals.net < 0 ? tk.status.danger : undefined}
+            />
+          ) : null}
+        </>
+      ) : undefined}>
       <ScrollView
         contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
         showsVerticalScrollIndicator={false}
@@ -226,8 +249,8 @@ export default function ProjectBudgetScreen() {
         // виглядає мертвою.
         keyboardShouldPersistTaps="handled">
 
-        <View style={{ borderRadius: radius.card, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 24, marginBottom: 16 }}>
-          <Text style={[type.h2, { color: c.text, marginBottom: 8 }]}>{tr.projectBudgetLimit}</Text>
+        {/* Omni bento: ліміт — головна картка з сегментним прогресом. */}
+        <BentoCard title={tr.projectBudgetLimit} icon="creditcard.fill" accent="success" style={{ marginBottom: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <TextInput
               placeholder={budget ? String(budget.amount) : '0'}
@@ -248,7 +271,7 @@ export default function ProjectBudgetScreen() {
               <TouchableOpacity
                 key={cur.code}
                 onPress={() => saveAmount(cur.code)}
-                style={{ borderRadius: radius.pill, minHeight: 32, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: cur.code === currency ? tk.action.primary : glassOf(tk).surfaceSubtle }}>
+                style={{ borderRadius: radius.pill, minHeight: 32, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: cur.code === currency ? tk.action.primary : tk.surface.subtle }}>
                 <Text style={{ color: cur.code === currency ? tk.text.onAction : c.text, fontFamily: fontFamily.semibold, fontSize: 12 }}>{cur.code}</Text>
               </TouchableOpacity>
             ))}
@@ -261,10 +284,10 @@ export default function ProjectBudgetScreen() {
                 {formatSubscriptionMoney(spent, currency, allCurrencies, locale)}
                 <Text style={[type.displayUnit, { color: c.sub }]}> / {formatSubscriptionMoney(budget.amount, currency, allCurrencies, locale)}</Text>
               </Text>
-              <ProgressBar
+              <SegmentedProgress
                 value={budget.amount > 0 ? spent / budget.amount : 0}
-                tone={spent > budget.amount ? 'coral' : 'amber'}
-                height={8}
+                showValue
+                accessibilityLabel={`${tr.overviewBudgetSpent}: ${formatSubscriptionMoney(spent, currency, allCurrencies, locale)} / ${formatSubscriptionMoney(budget.amount, currency, allCurrencies, locale)}`}
                 style={{ marginTop: 12 }}
               />
             </>
@@ -282,7 +305,7 @@ export default function ProjectBudgetScreen() {
           {uncountedLine ? (
             <Text style={[type.caption, { color: c.sub, marginTop: 6 }]}>{tr.finProjectUncounted.replace('{list}', uncountedLine)}</Text>
           ) : null}
-        </View>
+        </BentoCard>
 
         {/* П3: операція проєкту з телефона — з рахунком (П2). */}
         <TouchableOpacity
@@ -297,20 +320,27 @@ export default function ProjectBudgetScreen() {
         {/* Підписки проєкту: та сама секція, що раніше жила в деталі
             (app/projects.tsx) — тепер тут, поруч із рештою бюджету, бо й
             підписки з projectId бачить лише власник (contract §4.1). */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <Text style={[type.h2, { flex: 1, color: c.text }]}>{tr.navSubscriptions}</Text>
-          <TouchableOpacity
-            onPress={() => router.push({ pathname: '/subscriptions', params: { create: '1', projectId } } as never)}
-            accessibilityRole="button"
-            accessibilityLabel={tr.subNew}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="plus" size={17} color={c.text} />
-          </TouchableOpacity>
-        </View>
+        <BentoGrid columns={{ compact: 1, medium: 2, expanded: 2 }} style={{ marginBottom: 16 }}>
+        <BentoCard
+          key="subs"
+          span="full"
+          title={tr.navSubscriptions}
+          icon="arrow.triangle.2.circlepath"
+          accent="lavender"
+          headerRight={
+            <TouchableOpacity
+              onPress={() => router.push({ pathname: '/subscriptions', params: { create: '1', projectId } } as never)}
+              accessibilityRole="button"
+              accessibilityLabel={tr.subNew}
+              hitSlop={4}
+              style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: tk.surface.subtle }}>
+              <IconSymbol name="plus" size={16} color={c.text} />
+            </TouchableOpacity>
+          }>
         {projectSubscriptions.live.length === 0 ? (
-          <Text style={[type.body, { color: c.sub, fontSize: 13, marginBottom: 20 }]}>{tr.subProjectEmpty}</Text>
+          <Text style={[type.body, { color: c.sub, fontSize: 13 }]}>{tr.subProjectEmpty}</Text>
         ) : (
-          <View style={{ marginBottom: 20 }}>
+          <View>
             <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginBottom: 8 }}>{projectSubscriptions.monthlyLine}</Text>
             {projectSubscriptions.live.map(sub => {
               const overdue = subscriptionStatus(sub, projectSubscriptions.today ?? '') === 'overdue';
@@ -319,7 +349,7 @@ export default function ProjectBudgetScreen() {
                   key={sub.id}
                   onPress={() => router.push({ pathname: '/subscriptions', params: { open: sub.id } } as never)}
                   activeOpacity={0.75}
-                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 14, marginBottom: 8 }}>
+                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: tk.surface.subtle, padding: 14, marginBottom: 8, minHeight: 44 }}>
                   <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: sub.color || (project?.color ?? c.accent), marginRight: 10 }} />
                   <View style={{ flex: 1 }}>
                     <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{sub.name}</Text>
@@ -336,27 +366,32 @@ export default function ProjectBudgetScreen() {
           </View>
         )}
 
-        <Text style={[type.h2, { color: c.text, marginBottom: 8 }]}>{tr.projectBudgetTransactions}</Text>
+        </BentoCard>
+
+        <BentoCard key="tx" title={tr.projectBudgetTransactions} icon="arrow.up.right" accent="coral">
         {projectTx.length === 0 ? (
           <Text style={[type.body, { color: c.sub, fontSize: 13 }]}>{tr.projectBudgetNoTransactions}</Text>
         ) : projectTx.map(tx => (
-          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 14, marginBottom: 8 }}>
+          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: tk.surface.subtle, padding: 14, marginBottom: 8 }}>
             <View style={{ flex: 1 }}>
               <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tx.category || tx.note || '—'}</Text>
               <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
                 {new Date(tx.date).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
               </Text>
             </View>
-            <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>-{tx.amount.toLocaleString(locale)}</Text>
+            {/* DS v2: витрати — червоні, доходи — зелені. */}
+            <Text style={{ color: tk.status.danger, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>-{tx.amount.toLocaleString(locale)}</Text>
           </View>
         ))}
 
+        </BentoCard>
+
         {/* П4: доходи проєкту окремим списком — як на вебі. */}
-        <Text style={[type.h2, { color: c.text, marginBottom: 8, marginTop: 20 }]}>{tr.finProjectIncomeTitle}</Text>
+        <BentoCard key="income" title={tr.finProjectIncomeTitle} icon="arrow.down.left" accent="success">
         {projectIncome.length === 0 ? (
           <Text style={[type.body, { color: c.sub, fontSize: 13 }]}>{tr.finProjectNoIncome}</Text>
         ) : projectIncome.map(tx => (
-          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 14, marginBottom: 8 }}>
+          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: tk.surface.subtle, padding: 14, marginBottom: 8 }}>
             <View style={{ flex: 1 }}>
               <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tx.category || tx.note || '—'}</Text>
               <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
@@ -366,11 +401,13 @@ export default function ProjectBudgetScreen() {
             <Text style={{ color: tk.status.success, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>+{Number(tx.amount).toLocaleString(locale)}</Text>
           </View>
         ))}
+        </BentoCard>
+        </BentoGrid>
 
         {/* Регулярні доходи проєкту — та сама секція, що у вкладці «Підписки». */}
         {projectId ? (
           <RecurringIncomesSection
-            c={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, card: glassOf(tk).surface, accent: c.accent, green: tk.status.success, red: tk.status.danger, sheet: glassOf(tk).sheet }}
+            c={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, card: tk.surface.card, accent: c.accent, green: tk.status.success, red: tk.status.danger, sheet: glassOf(tk).sheet }}
             tr={tr}
             lang={lang === 'en' ? 'en' : 'uk'}
             isDark={isDark}

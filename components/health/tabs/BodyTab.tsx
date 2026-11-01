@@ -31,7 +31,7 @@ import type { Translations } from '@/store/translations';
 import {
   ACCENT, ACCENT_MOOD, ACCENT_PROT, ACCENT_PULSE, ACCENT_STEPS, ACCENT_WEIGHT, ModalKey,
 } from '@/utils/healthTheme';
-import { getHealthDSColors } from '@/components/health/palette';
+import { getHealthCardColors } from '@/components/health/palette';
 import { dsTokens } from '@/hooks/use-ds';
 import {
   DEFAULT_PROFILE, EntryType, MEASUREMENT_TYPES, MeasurementType,
@@ -49,7 +49,7 @@ export function BodyTab({ h }: HealthTabProps) {
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
-  const c = getHealthDSColors(isDark);
+  const c = getHealthCardColors(isDark);
   const k = dsTokens(isDark);
 
   const { latestWeight, bmi, prevWeight, today } = h;
@@ -102,7 +102,7 @@ export function BodyTab({ h }: HealthTabProps) {
     {
       key: 'weight',
       node: (
-        <HealthCard c={c} title={tr.weight} right={<HealthAddButton onPress={() => setSheet(true)} label={tr.addBodyEntry} />}>
+        <HealthCard c={c} title={tr.weight} icon="scalemass.fill" right={<HealthAddButton onPress={() => setSheet(true)} label={tr.addBodyEntry} />}>
           {latestWeight ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -157,7 +157,7 @@ export function BodyTab({ h }: HealthTabProps) {
     {
       key: 'pulse',
       node: (
-        <HealthCard c={c} title={tr.pulse}>
+        <HealthCard c={c} title={tr.pulse} icon="waveform.path.ecg">
           {pulse ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
@@ -201,7 +201,7 @@ export function BodyTab({ h }: HealthTabProps) {
       // Склад тіла
       key: 'composition',
       node: (
-        <HealthCard c={c} title={tr.summary}>
+        <HealthCard c={c} title={tr.summary} icon="chart.bar.fill">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             <Stat label={bodyfatManual ? tr.mBodyfat : tr.bodyfatEst} value={bodyfat != null ? `${bodyfat.toFixed(1)}%` : '—'} color={ACCENT_MOOD} sub={c.sub} />
             <Stat label={tr.leanMass} value={lean ? `${lean.toFixed(1)} кг` : '—'} color={ACCENT} sub={c.sub} />
@@ -217,7 +217,7 @@ export function BodyTab({ h }: HealthTabProps) {
       // Виміри — одна картка з рядками: у masonry стос дрібних карток розлетівся б по колонках.
       key: 'measurements',
       node: (
-        <HealthCard c={c} title={tr.bodyMeasurements}>
+        <HealthCard c={c} title={tr.bodyMeasurements} icon="ruler.fill">
           {/* Порожньо — підказка «додати», а не порожня картка з самим заголовком. */}
           {measured.length === 0 ? (
             <TouchableOpacity onPress={() => setSheet(true)} accessibilityRole="button" accessibilityLabel={tr.addBodyEntry}
@@ -252,7 +252,7 @@ export function BodyTab({ h }: HealthTabProps) {
     {
       key: 'reminders',
       node: (
-        <HealthCard c={c} title={tr.reminders} style={{ paddingBottom: 8 }}>
+        <HealthCard c={c} title={tr.reminders} icon="bell.fill" style={{ paddingBottom: 8 }}>
           <View style={s.remRow}>
             <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 }}>{tr.weightReminder}</Text>
             <Switch

@@ -57,9 +57,9 @@ import {
 } from '@/utils/taskListView';
 import { mergeTaskStatusColumns, taskStatusColumn, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { assigneeDisplayName, normalizePriority, priorityLabel as priorityLevelLabel, type Task } from '@/utils/taskUtils';
-import { fontFamily, radius } from '@/constants/theme';
+import { fontFamily } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { MeshBackground } from '@/components/ds';
+import { KpiCounter, MeshBackground, PageHeader } from '@/components/ds';
 import { glassOf, dsGlass } from '@/components/shared/dsTheme';
 
 interface ProjectLite {
@@ -255,15 +255,25 @@ export default function TaskGroupScreen() {
           { label: tr.tabTasks, onPress: () => router.push('/(tabs)') },
           { label: title },
         ]}
-        crumbColor={c.sub}
-        actions={loaded ? (
-          <View style={[st.countBadge, { backgroundColor: tk.accent.lime }]}>
-            <Text style={{ color: tk.text.onAccent, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{data.length}</Text>
-          </View>
-        ) : undefined}>
+        crumbColor={c.sub}>
+        <View style={{ gap: 12 }}>
         {group?.subtitle ? (
-          <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular }}>{group.subtitle}</Text>
+          <Text numberOfLines={1} style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.regular }}>{group.subtitle}</Text>
         ) : null}
+        {/* Omni: KPI добірки (колишній лаймовий бейдж у шапці): скільки
+            завдань і скільки з них уже виконано. */}
+        {loaded ? (
+          <PageHeader
+            bleed={20}
+            kpis={
+              <>
+                <KpiCounter value={data.length} label={tr.tabTasks} />
+                <KpiCounter value={data.filter(task => task.status === 'done').length} label={tr.done} />
+              </>
+            }
+          />
+        ) : null}
+        </View>
       </ScreenHeader>
 
       <FlatList
@@ -291,6 +301,5 @@ export default function TaskGroupScreen() {
 
 const st = StyleSheet.create({
   title:      { fontSize: 28, fontFamily: fontFamily.medium, letterSpacing: -0.4 },
-  countBadge: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
   separator:  { height: 8 },
 });

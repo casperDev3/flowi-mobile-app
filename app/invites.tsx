@@ -13,7 +13,9 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { InviteActions } from '@/components/notifications/InviteActions';
-import { ScreenHeader } from '@/components/shared/ScreenHeader';
+// Omni (DS v2.2): AppHeader = ScreenHeader (інсет, «Назад») + 🔔 і аватар + KPI.
+import { AppHeader } from '@/components/shared/AppHeader';
+import { BentoCard, BentoGrid, KpiCounter } from '@/components/ds';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { dsTokens } from '@/hooks/use-ds';
@@ -83,10 +85,10 @@ export default function InvitesScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: c.bg1 }]} />
       <View style={contentWidth}>
-        <ScreenHeader
+        <AppHeader
           title={tr.invitesTitle}
-          color={c.text}
           titleStyle={st.pageTitle}
+          kpis={ordered.length > 0 ? <KpiCounter value={ordered.length} label={tr.invitesTitle} /> : undefined}
           back={{
             onPress: () => (router.canGoBack() ? router.back() : router.replace('/notifications' as never)),
             label: tr.back,
@@ -119,12 +121,17 @@ export default function InvitesScreen() {
             <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginTop: 16, textAlign: 'center' }}>{tr.invitesEmptyTitle}</Text>
             <Text style={{ color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center', lineHeight: 18 }}>{tr.invitesEmptySub}</Text>
           </View>
-        ) : ordered.map(invite => (
-          <View
+        ) : (
+          <BentoGrid>
+          {ordered.map(invite => (
+          <BentoCard
             key={invite.id}
-            style={[st.card, { backgroundColor: c.card }, invite.id === focusId ? { borderWidth: 2, borderColor: k.focus.ring } : null]}>
+            style={invite.id === focusId ? { borderWidth: 2, borderColor: k.focus.ring } : null}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <View style={[st.dot, { backgroundColor: invite.project.color || c.accent }]} />
+              {/* Omni icon-chip кольору проєкту. */}
+              <View style={[st.chip, { backgroundColor: (invite.project.color || c.accent) + '26' }]}>
+                <IconSymbol name="folder.fill" size={15} color={invite.project.color || c.accent} />
+              </View>
               <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontSize: 16, fontFamily: fontFamily.semibold }}>
                 {invite.project.name}
               </Text>
@@ -143,8 +150,10 @@ export default function InvitesScreen() {
               sub={c.sub}
               border={c.border}
             />
-          </View>
-        ))}
+          </BentoCard>
+          ))}
+          </BentoGrid>
+        )}
       </ScrollView>
     </View>
   );
@@ -152,8 +161,7 @@ export default function InvitesScreen() {
 
 const st = StyleSheet.create({
   pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
-  card: { borderRadius: 20, overflow: 'hidden', padding: 20, marginBottom: 12 },
-  dot: { width: 12, height: 12, borderRadius: 6 },
+  chip: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   banner: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginTop: 8 },
   retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
   emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },

@@ -18,7 +18,7 @@ import type { CalendarColors } from './palette';
 import type { GoogleCalendarState } from './useGoogleCalendar';
 import { fontFamily, radius } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassOf, glassRim, glassRimFor } from '@/components/shared/dsTheme';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 /** Фірмовий синій Google — лише на логотипі інтеграції. */
 const GOOGLE_BLUE = '#4285F4';
@@ -69,7 +69,7 @@ export function GoogleCalendarSheet({ visible, onClose, gcal, isDark, c }: {
                       ['4', tr.gcalStep4],
                     ].map(([n, text]) => (
                       <View key={n} style={{ flexDirection: 'row', gap: 10 }}>
-                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c.card, ...glassRimFor(c.card, 'card'),
+                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c.card,
                           alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
                           <Text style={{ fontSize: 11, fontFamily: fontFamily.semibold, color: c.text, fontVariant: ['tabular-nums'] }}>{n}</Text>
                         </View>

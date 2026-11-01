@@ -54,7 +54,7 @@ import {
 import { FeedbackCard } from '@/components/feedback/FeedbackCard';
 import { FeedbackDetailBody, FeedbackDetailHeader } from '@/components/feedback/FeedbackDetail';
 import { FeedbackForm } from '@/components/feedback/FeedbackForm';
-import { KIND_COLOR, requiredFieldLabel } from '@/components/feedback/labels';
+import { requiredFieldLabel } from '@/components/feedback/labels';
 import {
   COLLECTION_FOR_KIND,
   MAX_ATTACHMENTS,
@@ -83,7 +83,8 @@ import {
 } from '@/components/feedback/model';
 import { DetailPane } from '@/components/shared/DetailPane';
 import { detailColumnWidthFor } from '@/constants/tokens';
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
+import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -97,7 +98,7 @@ import { hasStorageReadFailure, subscribeToStorage } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
 import { fontFamily } from '@/constants/theme';
 import { glassStyles } from '@/components/finance/finPalette';
-import { MeshBackground } from '@/components/ds';
+import { KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
 
 /** Між закриттям одного аркуша й відкриттям наступного (NEW-02 у CLAUDE.md). */
 const SHEET_HANDOFF_MS = 260;
@@ -165,7 +166,6 @@ export default function FeedbackScreen() {
     gl:     glassStyles(isDark, reduceTransparency),
   }), [k, g, isDark, reduceTransparency]);
   const cardColors = useMemo(() => ({ border: c.border, text: c.text, sub: c.sub }), [c]);
-  const accent = KIND_COLOR[kind];
 
   const loadAll = useCallback(async () => {
     await Promise.all([reloadIdeas(), reloadBugs()]);
@@ -502,12 +502,20 @@ export default function FeedbackScreen() {
       <MeshBackground />
       <View style={{ flex: 1, flexDirection: 'row' }}>
         <View style={{ flex: 1 }}>
-          <ScreenHeader
+          {/* Omni: AppHeader (ScreenHeader + 🔔 + аватар), KPI стану праворуч/
+              стрічкою, під ними — SectionTabs «Ідеї | Баги» (§10.1). */}
+          <AppHeader
             title={tr.fbTitle}
-            color={c.text}
             titleStyle={st.pageTitle}
             paddingBottom={6}
             back={{ onPress: back, label: tr.back, color: c.text }}
+            kpis={loaded && !loadFailed ? (
+              <>
+                <KpiCounter value={counts.open} label={tr.fbStatOpen} onPress={() => setFilter('open')} />
+                <KpiCounter value={counts.done} label={tr.fbStatDone} onPress={() => setFilter('done')} />
+                <KpiCounter value={counts.sent} label={tr.fbStatSent} onPress={() => setFilter('sent')} />
+              </>
+            ) : undefined}
             actions={
               <HeaderButton
                 onPress={() => openForm(null)}
@@ -515,46 +523,21 @@ export default function FeedbackScreen() {
                 style={{ backgroundColor: c.action, borderColor: c.action }}>
                 <IconSymbol name="plus" size={18} color={c.onAction} />
               </HeaderButton>
-            }
-          />
+            }>
+            <SectionTabs
+              tabs={[
+                { key: 'idea' as const, label: tr.fbTabIdeas, icon: 'lightbulb.fill' as const },
+                { key: 'bug' as const, label: tr.fbTabBugs, icon: 'ladybug.fill' as const },
+              ]}
+              value={kind}
+              onChange={setKind}
+              accessibilityLabel={tr.fbTitle}
+            />
+          </AppHeader>
 
           <View style={[contentWidth, { paddingHorizontal: 20 }]}>
-            {/* Тип: Ідеї | Баги (§10.1) */}
-            <View style={[st.segment, { ...c.gl.card }]} accessibilityRole="tablist">
-              {(['idea', 'bug'] as const).map(k => {
-                const active = kind === k;
-                return (
-                  <TouchableOpacity
-                    key={k}
-                    onPress={() => setKind(k)}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: active }}
-                    style={[st.segmentBtn, active && { backgroundColor: c.action }]}>
-                    <IconSymbol name={k === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={13} color={active ? c.onAction : KIND_COLOR[k]} />
-                    <Text style={{ color: active ? c.onAction : c.text, fontFamily: fontFamily.semibold, fontSize: 13 }}>
-                      {k === 'bug' ? tr.fbTabBugs : tr.fbTabIdeas}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View style={st.stats}>
-              {([
-                { label: tr.fbStatOpen, value: counts.open, color: accent },
-                { label: tr.fbStatDone, value: counts.done, color: k.status.success },
-                { label: tr.fbStatSent, value: counts.sent, color: k.accent.amber },
-              ]).map(stat => (
-                <View key={stat.label} style={[st.statCard, { ...c.gl.card }]}>
-                  {/* KPI — тонкі великі табличні цифри; колір стану — позначкою. */}
-                  <Text style={{ color: c.text, fontSize: 32, lineHeight: 36, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.64 }}>{stat.value}</Text>
-                  <View style={{ width: 14, height: 3, borderRadius: 2, backgroundColor: stat.color, marginTop: 6 }} />
-                  <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 6 }}>{stat.label}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={[st.filterRow, { ...c.gl.card }]}>
+            {/* Фільтр стану — тиха pill-група (вторинна до вкладок типу). */}
+            <View style={[st.filterRow, { backgroundColor: k.surface.card, borderWidth: 1, borderColor: c.border }]}>
               {(['all', 'open', 'done', 'sent'] as const).map(f => (
                 <TouchableOpacity
                   key={f}
@@ -577,7 +560,7 @@ export default function FeedbackScreen() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: sort === opt.key }}
                   style={[st.sortChip, {
-                    backgroundColor: sort === opt.key ? c.action : c.card,
+                    backgroundColor: sort === opt.key ? c.action : k.surface.card,
                   }]}>
                   <IconSymbol name={opt.icon as never} size={11} color={sort === opt.key ? c.onAction : c.sub} />
                   <Text style={{ color: sort === opt.key ? c.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 4 }}>{opt.label}</Text>
@@ -586,7 +569,7 @@ export default function FeedbackScreen() {
             </View>
 
             {forwardingOff ? (
-              <View style={[st.banner, { ...c.gl.card }]}>
+              <View style={[st.banner, { backgroundColor: k.surface.card }]}>
                 <IconSymbol name="info.circle" size={14} color={c.sub} />
                 <Text style={{ color: c.sub, fontSize: 12, flex: 1 }}>{tr.fbForwardingOff}</Text>
               </View>
@@ -694,11 +677,7 @@ function Separator() {
 
 const st = StyleSheet.create({
   pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
-  segment:    { flexDirection: 'row', borderRadius: 999, padding: 4, marginTop: 6 },
-  segmentBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 999, minHeight: 40 },
-  stats:      { flexDirection: 'row', gap: 12, marginTop: 12, marginBottom: 12 },
-  statCard:   { flex: 1, borderRadius: 20, paddingVertical: 16, paddingHorizontal: 12, alignItems: 'flex-start' },
-  filterRow:  { flexDirection: 'row', borderRadius: 999, padding: 4, overflow: 'hidden' },
+  filterRow:  { flexDirection: 'row', borderRadius: 999, padding: 4, overflow: 'hidden', marginTop: 4 },
   filterBtn:  { flex: 1, minHeight: 36, justifyContent: 'center', paddingVertical: 8, borderRadius: 999, alignItems: 'center' },
   sortRow:    { flexDirection: 'row', gap: 6, marginTop: 8, marginBottom: 12 },
   sortChip:   { flexDirection: 'row', alignItems: 'center', borderRadius: 999, minHeight: 36, paddingHorizontal: 14, paddingVertical: 7 },

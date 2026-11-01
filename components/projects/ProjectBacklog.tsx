@@ -39,10 +39,10 @@ import { ProjectScreenShell, projectShellColors } from './ProjectScreenShell';
 import { ProjectTaskSheet } from './ProjectTaskSheet';
 import { TeamInput } from './TeamTaskPanel';
 import { saveProjectRecord, useProjectRecords } from './useProjectRecords';
-import { fontFamily, radius, type } from '@/constants/theme';
+import { fontFamily, radius, shadow, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassOf, glassRim } from '@/components/shared/dsTheme';
-import { MeshBackground } from '@/components/ds';
+import { BentoCard, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
+import { useResponsive } from '@/hooks/use-responsive';
 
 type Tab = 'backlog' | 'idea' | 'bug';
 interface Choice { id: string; name: string }
@@ -55,6 +55,7 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
   const { user } = useAuth();
   const { tr } = useI18n();
   const dark = useColorScheme() === 'dark';
+  const { isWide } = useResponsive();
   const c = projectShellColors(dark, project?.color ?? '#7C3AED', project?.appearance);
   const tk = dsTokens(dark);
 
@@ -145,6 +146,7 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
     ].filter(Boolean).join('\n\n'),
   });
 
+  const sectionLabel = tab === 'idea' ? tr.pbIdeas : tab === 'bug' ? tr.pbBugs : tr.projectBacklogNav;
   const newLabel = tab === 'idea' ? tr.pbNewIdea : tab === 'bug' ? tr.pbNewBug : tr.newTask;
   const onNew = () => (tab === 'backlog'
     // Нова задача — швидке створення «Завдань» ПРОЄКТУ (у просторі проєкту).
@@ -155,7 +157,8 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
     const lead = !archive && isLead(role);
     const sprintName = t.sprintId ? projectSprints.find(s => s.id === t.sprintId)?.name : undefined;
     return (
-      <View key={t.id} style={{ flex: 1, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), borderRadius: radius.cardCompact, padding: 16, gap: 10 }}>
+      // Omni: суцільна картка задачі (surface.card + м'яка тінь).
+      <View key={t.id} style={[{ flex: 1, backgroundColor: tk.surface.card, borderRadius: radius.card, padding: 16, gap: 10 }, shadow[dark ? 'dark' : 'light'].card]}>
         <Pressable
           onPress={() => (t.backlogKind ? setDraft(t) : setOpenTaskId(t.id))}
           accessibilityRole="button"
@@ -204,12 +207,32 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
   ];
 
   return (
-    <ProjectScreenShell project={project} isDark={dark} title={archive ? tr.projectArchive : tr.projectBacklogNav}>
+    <ProjectScreenShell
+      project={project}
+      isDark={dark}
+      title={archive ? tr.projectArchive : tr.projectBacklogNav}
+      // Omni KPI: скільки записів показано в поточному зрізі.
+      kpis={<KpiCounter value={filtered.length} label={archive ? tr.projectArchive : sectionLabel} />}
+      // Omni: розділ беклогу — pill-вкладки (той самий стан `tab`, що й
+      // колишній рядок чипів «Розділ»: зміна скидає фільтри так само).
+      tabs={!archive ? (
+        <SectionTabs
+          tabs={[
+            { key: 'backlog', label: tr.projectBacklogNav, icon: 'tray' },
+            { key: 'idea', label: tr.pbIdeas, icon: 'lightbulb.fill' },
+            { key: 'bug', label: tr.pbBugs, icon: 'exclamationmark.circle' },
+          ]}
+          value={tab}
+          onChange={v => { setTab(v as Tab); setSprint('all'); setPerson('all'); setPriority('all'); }}
+          accessibilityLabel={tr.pbSection}
+          bleed={isWide ? 0 : 20}
+        />
+      ) : undefined}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 14, width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center' }}>
-        {!archive && choices(tr.pbSection, tab, v => { setTab(v as Tab); setSprint('all'); setPerson('all'); setPriority('all'); },
-          [{ id: 'backlog', name: tr.projectBacklogNav }, { id: 'idea', name: tr.pbIdeas }, { id: 'bug', name: tr.pbBugs }])}
+        {/* Omni: пошук і фільтри — одна суцільна картка над списком. */}
+        <BentoCard compact style={{ gap: 12 }}>
         <TeamInput label={tr.pbSearch} value={search} onChange={setSearch} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           <ActionChip icon="person.fill" label={tr.pbAssignedToMe} selected={mine} onPress={() => setMine(!mine)} colors={c} />
@@ -237,10 +260,16 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
           {filtersActive ? <ActionButton label={tr.pbResetFilters} icon="xmark" tone="neutral" onPress={resetFilters} colors={c} /> : null}
           {!archive && role !== 'viewer' ? <ActionButton label={newLabel} icon="plus" tone="primary" onPress={onNew} colors={c} /> : null}
         </ActionBar>
+        </BentoCard>
         {!!error && <Text accessibilityRole="alert" style={{ color: tk.status.danger, fontFamily: fontFamily.medium }}>{error}</Text>}
         {groups.filter(g => g.tasks.length).map(g => (
           <View key={g.id} style={{ gap: 8 }}>
-            <Text accessibilityRole="header" style={[type.h2, type.numeric, { color: c.text }]}>{g.name} · {g.tasks.length}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text accessibilityRole="header" accessibilityLabel={`${g.name} · ${g.tasks.length}`} style={[type.h2, { color: c.text }]}>{g.name}</Text>
+              <View style={{ minWidth: 24, height: 22, paddingHorizontal: 8, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: tk.surface.card }}>
+                <Text style={[type.caption, type.numeric, { color: c.sub, fontFamily: fontFamily.semibold }]}>{g.tasks.length}</Text>
+              </View>
+            </View>
             <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={12}>{g.tasks.map(renderCard)}</ResponsiveGrid>
           </View>
         ))}

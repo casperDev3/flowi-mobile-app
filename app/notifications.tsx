@@ -49,8 +49,8 @@ import { useI18n } from '@/store/i18n';
 import { INVITE_EVENT_PENDING, inviteIdFromPayload, syncMyInvites } from '@/store/invite-inbox';
 import { notificationRoute } from '@/utils/pushLink';
 import { fontFamily } from '@/constants/theme';
-import { MeshBackground } from '@/components/ds';
-import { glassOf, glassRimFor, glassRim } from '@/components/shared/dsTheme';
+import { KpiCounter, MeshBackground, PageHeader } from '@/components/ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 import { AccentIcon } from '@/components/shared/GlassBits';
 
 type Tab = 'inbox' | 'reminders';
@@ -82,9 +82,11 @@ export default function NotificationsScreen() {
     text:   k.text.primary,
     sub:    k.text.secondary,
     accent: glassOf(k).accent.lavender.ink, // DS v2.1: lavender ink на склі
-    dim:    glassOf(k).surfaceSubtle,
+    // Omni (DS v2.2): картки суцільні (surface.card), вкладене — surface.subtle;
+    // скло лишається лише функціональному шару (шапка, кнопки).
+    dim:    k.surface.subtle,
     unreadBg: k.accent.lavenderSoft,
-    card:   glassOf(k).surface,
+    card:   k.surface.card,
   }), [k]);
 
   const rowColors: NotificationRowColors = useMemo(() => ({
@@ -191,15 +193,31 @@ export default function NotificationsScreen() {
             <IconSymbol name="gearshape.fill" size={16} color={c.sub} />
           </HeaderButton>
         </View>
-      }
-    />
+      }>
+      {/* Omni: KPI сторінки — великі тонкі числа (непрочитані червоною
+          дельтою не фарбуємо: це не прострочення). Лише вкладка інбоксу
+          і лише коли серверний список доступний. */}
+      {tab === 'inbox' && inbox.status !== 'offline' && inbox.status !== 'unavailable' && inbox.items.length > 0 ? (
+        <PageHeader
+          bleed={20}
+          kpis={
+            <>
+              <KpiCounter value={unread} label={tr.ncFilterUnread} />
+              <KpiCounter value={inbox.visibleItems.length} label={tr.ncTabInbox} />
+            </>
+          }
+        />
+      ) : null}
+    </ScreenHeader>
   );
 
   const tabs = (
-    <View style={[st.segment, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]} accessibilityRole="tablist">
+    // Omni: вкладки розділу — pill-таби з іконкою (активна — чорна pill,
+    // у темній — біла); лічильник непрочитаних — коралова pill.
+    <View style={st.segment} accessibilityRole="tablist">
       {([
-        { key: 'inbox' as const, label: tr.ncTabInbox, count: unread },
-        { key: 'reminders' as const, label: tr.ncTabReminders, count: 0 },
+        { key: 'inbox' as const, label: tr.ncTabInbox, count: unread, icon: 'bell' as const },
+        { key: 'reminders' as const, label: tr.ncTabReminders, count: 0, icon: 'clock' as const },
       ]).map(option => {
         const active = tab === option.key;
         return (
@@ -209,7 +227,8 @@ export default function NotificationsScreen() {
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={option.count > 0 ? `${option.label}, ${fillTemplate(tr.ncUnreadCount, { count: option.count })}` : option.label}
-            style={[st.segmentBtn, active && { backgroundColor: k.action.primary }]}>
+            style={[st.segmentBtn, active ? { backgroundColor: k.action.primary } : { backgroundColor: c.card }]}>
+            <IconSymbol name={option.icon} size={14} color={active ? k.text.onAction : c.sub} />
             <Text style={[st.segmentText, { color: active ? k.text.onAction : c.text }]}>{option.label}</Text>
             {option.count > 0 ? (
               <View style={[st.countPill, { backgroundColor: k.accent.coral }]}>
@@ -233,7 +252,7 @@ export default function NotificationsScreen() {
     <View style={{ marginTop: 10 }}>
       {tabs}
       {banner ? (
-        <View style={[st.banner, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+        <View style={[st.banner, { backgroundColor: c.card }]}>
           <IconSymbol name={banner.icon} size={16} color={c.sub} />
           <Text style={[st.bannerText, { color: c.sub }]}>{banner.text}</Text>
           {banner.retry ? (
@@ -327,8 +346,8 @@ export default function NotificationsScreen() {
 
 const st = StyleSheet.create({
   pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
-  segment:     { flexDirection: 'row', borderRadius: 999, padding: 4, marginBottom: 12 },
-  segmentBtn:  { flex: 1, minHeight: 40, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  segment:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  segmentBtn:  { minHeight: 44, paddingHorizontal: 16, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   segmentText: { fontSize: 14, fontFamily: fontFamily.semibold },
   countPill:   { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   countText:   { color: '#fff', fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },

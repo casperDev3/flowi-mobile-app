@@ -28,10 +28,12 @@ import { SearchHitRow } from '@/components/containers/SearchHitRow';
 import { CONTAINERS_ACCENT as ACCENT, useContainersColors } from '@/components/containers/theme';
 import { useContainersData, type PhotoTarget } from '@/components/containers/useContainersData';
 import { DetailPane } from '@/components/shared/DetailPane';
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
-import { EmptyState, MeshBackground } from '@/components/ds';
+// Omni (DS v2.2): шапка — AppHeader поверх ScreenHeader (інсет, «Назад», 🔔, аватар).
+import { AppHeader } from '@/components/shared/AppHeader';
+import { HeaderButton } from '@/components/shared/ScreenHeader';
+import { EmptyState, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { fontFamily, radius, type as dsType } from '@/constants/theme';
+import { fontFamily, radius, shadow, type as dsType } from '@/constants/theme';
 import { detailColumnWidthFor, sizeClassFor } from '@/constants/tokens';
 import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
@@ -135,6 +137,13 @@ export default function ContainersScreen() {
     let n = 0;
     for (const stats of statsById.values()) n += stats.discarded;
     return n;
+  }, [statsById]);
+  /** KPI шапки (Omni): речі в коробках і позичені — з уже порахованої статистики. */
+  const kpiTotals = useMemo(() => {
+    let items = 0;
+    let lent = 0;
+    for (const stats of statsById.values()) { items += stats.count; lent += stats.lent; }
+    return { items, lent };
   }, [statsById]);
 
   const detail = useMemo(() => data.containers.find(box => box.id === detailId) ?? null, [data.containers, detailId]);
@@ -368,8 +377,8 @@ export default function ContainersScreen() {
   } else if (treeColumn) {
     body = (
       <View style={{ flex: 1, flexDirection: 'row' }}>
-        {/* Колонка дерева — біла картка на canvas, без рамки-роздільника (DS v2). */}
-        <ScrollView style={{ ...c.gl.card, width: TREE_COLUMN_WIDTH, flexGrow: 0, marginLeft: 16, marginBottom: 16, borderRadius: radius.cardCompact }}
+        {/* Колонка дерева — суцільна bento-картка на canvas, без рамки-роздільника (DS v2.2). */}
+        <ScrollView style={{ backgroundColor: c.t.surface.card, ...shadow[c.isDark ? 'dark' : 'light'].card, width: TREE_COLUMN_WIDTH, flexGrow: 0, marginLeft: 16, marginBottom: 16, borderRadius: radius.cardCompact }}
           contentContainerStyle={{ padding: 8, paddingBottom: 100 }}>
           <PlaceTreeList {...treeProps} mode="column" selected={selectedPlace} onSelect={setSelectedPlace} />
         </ScrollView>
@@ -380,17 +389,11 @@ export default function ContainersScreen() {
     body = grid;
   }
 
-  const segment = (value: ViewMode, label: string, icon: 'square.grid.2x2' | 'folder') => {
-    const active = view === value;
-    return (
-      <TouchableOpacity onPress={() => setView(value)} accessibilityRole="tab" accessibilityState={{ selected: active }}
-        style={{ flex: 1, flexDirection: 'row', gap: 6, minHeight: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
-          backgroundColor: active ? c.t.action.primary : 'transparent' }}>
-        <IconSymbol name={icon} size={13} color={active ? c.t.text.onAction : c.sub} />
-        <Text style={{ color: active ? c.t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>
-      </TouchableOpacity>
-    );
-  };
+  const viewTabs = [
+    { key: 'grid' as const, label: tr.ctrViewGrid, icon: 'square.grid.2x2' as const },
+    { key: 'places' as const, label: tr.ctrViewPlaces, icon: 'folder' as const },
+  ];
+  const ready = data.status === 'ready';
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg1 }}>
@@ -400,9 +403,8 @@ export default function ContainersScreen() {
           деталь — модальний лист поверх списку. Верхній інсет дає ScreenHeader. */}
       <View style={{ flex: 1, flexDirection: isExpanded ? 'row' : 'column' }}>
         <View style={{ flex: 1 }}>
-          <ScreenHeader
+          <AppHeader
             title={tr.containers}
-            color={c.text}
             paddingBottom={14}
             back={{
               onPress: () => router.back(),
@@ -410,47 +412,52 @@ export default function ContainersScreen() {
               color: c.sub,
               style: { ...c.gl.card, borderColor: 'transparent' },
             }}
+            kpis={ready && data.containers.length > 0 ? (
+              <>
+                <KpiCounter value={data.containers.length} label={tr.ctrAllBoxes} />
+                <KpiCounter value={kpiTotals.items} label={tr.ctrStatusInBox} />
+                <KpiCounter value={kpiTotals.lent} label={tr.ctrStatusLent}
+                  valueColor={kpiTotals.lent > 0 ? c.t.status.warning : undefined} />
+              </>
+            ) : undefined}
             actions={
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <HeaderButton onPress={() => setScanning(true)} accessibilityLabel={tr.ctrScan}
-                  style={{ ...c.gl.card, borderColor: 'transparent', borderRadius: radius.pill }}>
+              <>
+                <HeaderButton onPress={() => setScanning(true)} accessibilityLabel={tr.ctrScan}>
                   <IconSymbol name="viewfinder" size={17} color={c.text} />
-                </HeaderButton>
-                <HeaderButton onPress={() => setPrintIds([])} accessibilityLabel={tr.ctrPrint}
-                  style={{ ...c.gl.card, borderColor: 'transparent', borderRadius: radius.pill }}>
-                  <IconSymbol name="doc.text" size={16} color={c.text} />
                 </HeaderButton>
                 {/* Головна дія екрана — pill action.primary. */}
                 <HeaderButton onPress={openNew} accessibilityLabel={tr.add}
                   style={{ backgroundColor: c.t.action.primary, borderColor: 'transparent', borderRadius: radius.pill }}>
                   <IconSymbol name="plus" size={17} color={c.t.text.onAction} />
                 </HeaderButton>
+              </>
+            }>
+            {/* Пошук + «Друк» — інструменти вмісту, не шапки (на телефоні в шапці вже 🔔 і аватар). */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill,
+                paddingHorizontal: 16, gap: 8, minHeight: 44, backgroundColor: c.t.surface.card,
+                borderWidth: 1, borderColor: c.t.border.hairline }}>
+                <IconSymbol name="magnifyingglass" size={15} color={c.accent} />
+                <TextInput placeholder={tr.searchItems} placeholderTextColor={c.muted} value={search} onChangeText={setSearch}
+                  accessibilityLabel={tr.searchItems} returnKeyType="search"
+                  style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.regular, color: c.text, paddingVertical: 10 }} />
+                {search.length > 0 ? (
+                  <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel={tr.close}
+                    style={{ width: 36, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                    <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
+                  </TouchableOpacity>
+                ) : null}
               </View>
-            }
-          />
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill,
-            paddingHorizontal: 16, gap: 8, marginHorizontal: 20, marginBottom: 12, minHeight: 44,
-            ...c.gl.card }}>
-            <IconSymbol name="magnifyingglass" size={15} color={c.accent} />
-            <TextInput placeholder={tr.searchItems} placeholderTextColor={c.muted} value={search} onChangeText={setSearch}
-              accessibilityLabel={tr.searchItems} returnKeyType="search"
-              style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.regular, color: c.text, paddingVertical: 10 }} />
-            {search.length > 0 ? (
-              <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel={tr.close}
-                style={{ width: 36, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
+              <TouchableOpacity onPress={() => setPrintIds([])} accessibilityRole="button" accessibilityLabel={tr.ctrPrint}
+                style={{ width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: c.t.surface.card, borderWidth: 1, borderColor: c.t.border.hairline }}>
+                <IconSymbol name="doc.text" size={16} color={c.text} />
               </TouchableOpacity>
-            ) : null}
-          </View>
-
-          {!isSearching && data.status !== 'failed' ? (
-            <View accessibilityRole="tablist" style={{ flexDirection: 'row', marginHorizontal: 20, marginBottom: 16, padding: 4,
-              borderRadius: radius.pill, ...c.gl.card }}>
-              {segment('grid', tr.ctrViewGrid, 'square.grid.2x2')}
-              {segment('places', tr.ctrViewPlaces, 'folder')}
             </View>
-          ) : null}
+            {!isSearching && data.status !== 'failed' ? (
+              <SectionTabs tabs={viewTabs} value={view} onChange={setView} accessibilityLabel={tr.containers} />
+            ) : null}
+          </AppHeader>
 
           {body}
         </View>

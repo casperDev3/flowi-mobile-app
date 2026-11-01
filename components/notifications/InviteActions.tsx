@@ -17,7 +17,6 @@ import { inviteFailureText } from '@/store/invite-messages';
 import { haptic } from '@/utils/haptics';
 import { fontFamily } from '@/constants/theme';
 import { useDSTheme } from '@/components/shared/useDSTheme';
-import { glassOf } from '@/components/shared/dsTheme';
 
 interface Props {
   inviteId: string;
@@ -113,7 +112,7 @@ export function InviteActions({ inviteId, accent: _accent, text, sub, border: _b
         disabled={busy}
         accessibilityRole="button"
         accessibilityState={{ disabled: busy, busy: busy && state.decision === 'decline' }}
-        style={[st.btn, { backgroundColor: glassOf(t).surfaceSubtle, opacity: busy ? 0.7 : 1 }]}>
+        style={[st.btn, { backgroundColor: t.surface.subtle, opacity: busy ? 0.7 : 1 }]}>
         {busy && state.decision === 'decline'
           ? <ActivityIndicator color={sub} size="small" />
           : <Text style={[st.btnText, { color: t.action.secondaryText }]}>{tr.inviteDecline}</Text>}

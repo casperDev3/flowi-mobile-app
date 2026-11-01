@@ -24,13 +24,13 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { Events, track } from '@/utils/analytics';
 import { ACCENT, ACCENT_CAL, ACCENT_PROT, ACCENT_PULSE, HEALTH_ACCENTS } from '@/utils/healthTheme';
-import { getHealthDSColors } from '@/components/health/palette';
+import { getHealthCardColors } from '@/components/health/palette';
 import {
   CHECKUPS_KEY, Checkup, HABITS_KEY, Habit, MEDS_KEY, Medication, VACCINES_KEY, Vaccine,
   buildHealthReport, habitDoneToday, medDueToday,
 } from '@/utils/preventionUtils';
-import { fontFamily } from '@/constants/theme';
-import { useGlassStyles } from '@/components/finance/finPalette';
+import { fontFamily, shadow } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
 
 export function PreventionTab({ h }: HealthTabProps) {
   const grid = useHealthTabGrid();
@@ -43,8 +43,9 @@ export function PreventionTab({ h }: HealthTabProps) {
   const router = useRouter();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const c = getHealthDSColors(isDark);
-  const gs = useGlassStyles();
+  const c = getHealthCardColors(isDark);
+  // Omni (DS v2.2): плитки й картка звіту — суцільні (вміст не скло).
+  const solidCard = dsTokens(isDark).surface.card;
 
   const [meds, setMeds] = useState<Medication[]>([]);
   const [checkups, setCheckups] = useState<Checkup[]>([]);
@@ -105,29 +106,29 @@ export function PreventionTab({ h }: HealthTabProps) {
         <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
           <HubTile title={tr.meds} icon="pills.fill" color={HEALTH_ACCENTS.prevention}
             stat={activeMeds ? `${tr.medActive}: ${activeMeds}` : tr.medsSub} badge={medsDue}
-            onPress={() => router.push('/health-meds')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={c.card} />
+            onPress={() => router.push('/health-meds')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={solidCard} />
         </View>
         <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
           <HubTile title={tr.checkups} icon="cross.case.fill" color={ACCENT_PULSE}
             stat={checkups.length ? `${checkups.length}` : tr.checkupsSub}
-            onPress={() => router.push('/health-checkups')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={c.card} />
+            onPress={() => router.push('/health-checkups')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={solidCard} />
         </View>
         <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
           <HubTile title={tr.vaccines} icon="syringe" color={ACCENT_CAL}
             stat={vaccines.length ? `${vaccines.length}` : tr.vaccinesSub}
-            onPress={() => router.push('/health-vaccines')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={c.card} />
+            onPress={() => router.push('/health-vaccines')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={solidCard} />
         </View>
         <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
           <HubTile title={tr.habits} icon="checklist" color={ACCENT_PROT}
             stat={habits.length ? `${habitsLeft} ${tr.dueToday}` : tr.habitsSub} badge={habitsLeft}
-            onPress={() => router.push('/health-habits')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={c.card} />
+            onPress={() => router.push('/health-habits')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={solidCard} />
         </View>
       </View>
 
       {/* Експорт звіту для лікаря */}
       <TouchableOpacity onPress={exportReport} activeOpacity={0.85} style={{ marginTop: 12 }}
         accessibilityRole="button" accessibilityLabel={tr.exportReport}>
-        <View style={[s.report, { ...gs.card }]}>
+        <View style={[s.report, { backgroundColor: solidCard }, shadow[isDark ? 'dark' : 'light'].card]}>
           <View style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name="square.and.arrow.up" size={18} color={ACCENT} />
           </View>
@@ -145,5 +146,5 @@ export function PreventionTab({ h }: HealthTabProps) {
 const s = StyleSheet.create({
   tileGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6, marginVertical: -6 },
   tileCell: { padding: 6 },
-  report:   { borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center' },
+  report:   { borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center' },
 });

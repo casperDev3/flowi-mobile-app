@@ -23,7 +23,7 @@ import { RingCell } from '@/components/health/RingCell';
 import type { HealthTabProps } from '@/components/health/tabs/types';
 import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { SkeletonCard } from '@/components/shared/Skeleton';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useChartType } from '@/store/chart-prefs';
@@ -34,11 +34,17 @@ import {
   ACCENT, ACCENT_CAL, ACCENT_MOOD, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT,
   type HealthColors, fmtSleep,
 } from '@/utils/healthTheme';
-import { getHealthDSColors } from '@/components/health/palette';
+import { getHealthCardColors } from '@/components/health/palette';
 import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
 import { EntryType, HealthEntry, getWeeklyInsights } from '@/utils/healthUtils';
 import { fontFamily } from '@/constants/theme';
 import { useGlassStyles } from '@/components/finance/finPalette';
+
+/** Omni: icon-chip шапки картки тренду — за метрикою. */
+const METRIC_ICON: Partial<Record<EntryType, IconSymbolName>> = {
+  calories: 'flame.fill', steps: 'figure.walk', water: 'drop.fill',
+  sleep: 'moon.fill', weight: 'scalemass.fill', pulse: 'waveform.path.ecg',
+};
 
 interface Metric { type: EntryType; label: string; color: string; agg: Agg; unit: string; goal?: number }
 
@@ -59,7 +65,7 @@ export function OverviewTab({ h }: HealthTabProps) {
   // Палітра й список метрик — у useMemo: SummaryCard обгорнутий у React.memo,
   // і новий обʼєкт на кожен ререндер зводив би memo нанівець, а кожна картка
   // заново перебирає всі записи через buildTrend.
-  const c = useMemo(() => getHealthDSColors(isDark), [isDark]);
+  const c = useMemo(() => getHealthCardColors(isDark), [isDark]);
   const gs = useGlassStyles();
   const k = dsTokens(isDark);
   const coral = glassTokens(isDark).accent.coral;
@@ -93,7 +99,7 @@ export function OverviewTab({ h }: HealthTabProps) {
   // Картка «сьогодні»: кільця + вітальні. На планшеті — на всю ширину вгорі:
   // це головне, що читають на вкладці, і чотири кільця просять простору.
   const todayCard = (
-    <HealthCard c={c} title={tr.todayLabel}>
+    <HealthCard c={c} title={tr.todayLabel} icon="heart.fill">
       <View style={{ flexDirection: 'row', gap: 4 }}>
         {/* Кільце міряє ЗʼЇДЕНЕ проти ліміту їжі й нічого більше:
             спалене — окреме число, а не поправка до цього. */}
@@ -123,7 +129,7 @@ export function OverviewTab({ h }: HealthTabProps) {
       key: 'insights',
       node: (
         // Інсайти — AI-блок DS v2: м'яке лавандове тло замість білої картки.
-        <HealthCard c={c} title={tr.insights} style={{ backgroundColor: k.accent.lavenderSoft }}>
+        <HealthCard c={c} title={tr.insights} icon="sparkles" accent="lavender" variant="ai">
           {insights.map((ins, i) => {
             const up = ins.deltaPct > 0;
             const col = ins.good ? k.status.success : k.status.danger;
@@ -227,7 +233,7 @@ const SummaryCard = React.memo(function SummaryCard({ m, period, entries, c, tr 
         : `${tr.average}: ${fmtMetric(m, d.avg)}`);
 
   return (
-    <HealthCard c={c} title={m.label} right={<>
+    <HealthCard c={c} title={m.label} icon={METRIC_ICON[m.type] ?? 'chart.bar.fill'} right={<>
         <Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.44 }}>{hasAny ? fmtMetric(m, headline) : '—'}</Text>
         <ChartTypeToggle value={chartType} onChange={setChartType} color={ACCENT} c={c} tr={tr} />
       </>}>

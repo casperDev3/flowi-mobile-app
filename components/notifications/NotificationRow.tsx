@@ -1,5 +1,5 @@
 import { Atlas } from '@/constants/atlas';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
 /**
  * Картка одного сповіщення інбоксу.
  *
@@ -12,7 +12,7 @@ import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-nativ
 
 import type { InboxItem } from '@/api/notifications';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
+import { dsTheme } from '@/components/shared/dsTheme';
 
 import { eventLook } from './labels';
 
@@ -46,13 +46,14 @@ export const NotificationRow = React.memo(function NotificationRow({
   const handleOpen = useCallback(() => onOpen(item), [onOpen, item]);
   const handleArchive = useCallback(() => onArchive(item), [onArchive, item]);
   const meta = [item.project?.name, timeText].filter(Boolean).join(' · ');
-  // DS v2: картка — surface.card без рамки й блюру.
+  // Omni (DS v2.2): суцільна картка surface.card з м'якою тінню, без рамки й
+  // скла; непрочитана — тінт lavenderSoft.
   const t = dsTheme(isDark);
   const a11y = [unread ? unreadLabel : null, item.title, item.body, meta].filter(Boolean).join('. ');
 
   return (
     <View
-      style={[styles.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }, unread && { backgroundColor: colors.unreadBg }]}>
+      style={[styles.card, { backgroundColor: t.surface.card }, shadow[isDark ? 'dark' : 'light'].card, unread && { backgroundColor: colors.unreadBg }]}>
       <View style={styles.row}>
       <Pressable
         onPress={handleOpen}
@@ -92,7 +93,7 @@ export const NotificationRow = React.memo(function NotificationRow({
         accessibilityRole="button"
         accessibilityLabel={`${archiveLabel}: ${item.title}`}
         style={styles.archiveBtn}>
-        <View style={[styles.archiveIcon, { backgroundColor: glassOf(t).surfaceSubtle }]}>
+        <View style={[styles.archiveIcon, { backgroundColor: t.surface.subtle }]}>
           <IconSymbol name="xmark" size={12} color={colors.sub} />
         </View>
       </TouchableOpacity>
@@ -103,9 +104,9 @@ export const NotificationRow = React.memo(function NotificationRow({
 });
 
 const styles = StyleSheet.create({
+  // Без overflow:'hidden' — він обрізав би м'яку тінь картки на iOS.
   card: {
     borderRadius: Atlas.radius.xlarge,
-    overflow: 'hidden',
     marginBottom: 8,
   },
   row: { flexDirection: 'row', alignItems: 'flex-start' },

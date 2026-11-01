@@ -96,7 +96,9 @@ import { WIDE_CONTENT_MAX_WIDTH, useContentWidth, useSheetSurface } from '@/hook
 import { wideModalStyles } from '@/components/finance/wideModal';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
-import { GlassBackdrop, GlassSurface, MeshBackground } from '@/components/ds';
+import {
+  BentoCard, BentoGrid, BentoPeriodPill, GlassBackdrop, KpiCounter, MeshBackground, PageHeader, SegmentedProgress,
+} from '@/components/ds';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -545,6 +547,18 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
   /** Дві колонки — лише коли є що ставити поруч: підсумок і рядки. */
   const splitColumns = isExpanded && !multiMonth && totals.totalBudget > 0 && displayBudgets.length > 0;
 
+  // KPI шапки (лише окремий екран; вбудована вкладка має шапку «Фінансів»).
+  // Без лімітів показувати нічого — нулі брехали б, що бюджет порожній.
+  const spentPct = totals.totalBudget > 0 ? Math.round((totals.totalSpent / totals.totalBudget) * 100) : 0;
+  const budgetKpis = !embedded && !multiMonth && totals.totalBudget > 0 ? (
+    <>
+      <KpiCounter value={fmt(totals.totalSpent)} label={tr.budgetSpentCaps.charAt(0) + tr.budgetSpentCaps.slice(1).toLowerCase()} delta={`${spentPct}%`}
+        deltaTone={totals.totalSpent > totals.totalBudget ? 'down' : 'neutral'} />
+      <KpiCounter value={fmt(Math.max(0, totals.totalBudget - totals.totalSpent))} label={tr.budgetLeft}
+        valueColor={totals.totalSpent > totals.totalBudget ? c.red : undefined} />
+    </>
+  ) : undefined;
+
   return (
     <View style={{ flex: 1 }}>
       {!embedded ? <Stack.Screen options={{ headerShown: false }} /> : null}
@@ -552,6 +566,9 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
 
       {/* Шапка, перемикач місяця і вміст стоять в ОДНІЙ колонці: на планшеті
           хедер, розтягнутий на всю ширину, «від'їжджав» від списку під ним. */}
+      {/* Omni (DS v2.2): під заголовком — KPI місяця (витрачено / залишок), ті
+          самі budgetTotals, що й картка нижче. Окремий екран лишається на
+          ScreenHeader (стрілка «Назад» / крихти), глобальна шапка — у «Фінансах». */}
       {!embedded ? (
       <View style={contentWidth}>
         <ScreenHeader
@@ -583,6 +600,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             dimColor={c.dim}
             borderColor={c.border}
           />
+          {budgetKpis ? <PageHeader kpis={budgetKpis} bleed={20} style={{ marginTop: 12 }} /> : null}
         </ScreenHeader>
       </View>
       ) : null}
@@ -707,36 +725,48 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
           </>
         )}
 
-        {/* Ландшафт: підсумок — ліва колонка, категорії — права. На
-            вужчому вікні обидві обгортки просто стоять одна під одною. */}
-        <View style={splitColumns ? st.split : undefined}>
-        <View style={splitColumns ? st.splitAside : undefined}>
+        {/* Omni: підсумок і категорії — BentoCard у BentoGrid. Ландшафт —
+            підсумок ліворуч (1 колонка), категорії праворуч (2 колонки);
+            вужче — одна під одною в тому самому порядку. */}
+        {!multiMonth && (totals.totalBudget > 0 || displayBudgets.length > 0) ? (
+        <BentoGrid columns={{ compact: 1, medium: 1, expanded: splitColumns ? 3 : 1 }} style={{ marginBottom: space.cardGap }}>
         {/* Total summary card */}
-        {!multiMonth && totals.totalBudget > 0 && (
-          <GlassSurface radius={radius.cardCompact} tint="lime" style={st.summaryCard}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-              <View>
+        {totals.totalBudget > 0 ? (
+          <BentoCard
+            key="summary"
+            compact
+            title={tr.navBudget}
+            icon="chart.pie.fill"
+            accent="lime"
+            headerRight={<BentoPeriodPill label={`${tr.months[activeMonth.getMonth()]} ${activeMonth.getFullYear()}`} />}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
+              <View style={{ flexShrink: 1 }}>
                 <Text style={{ ...dsType.caption, color: c.sub, fontFamily: fontFamily.medium }}>{tr.budgetSpentCaps}</Text>
-                {/* KPI — display-цифри DS: тонкі, великі, табличні. */}
-                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ ...dsType.displaySm, color: c.text, marginTop: 4 }}>
+                {/* KPI — великі тонкі табличні цифри (Omni). */}
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ ...dsType.displaySm, fontFamily: fontFamily.light, color: c.text, marginTop: 4 }}>
                   {fmt(totals.totalSpent)}
                 </Text>
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
+              <View style={{ alignItems: 'flex-end', flexShrink: 1 }}>
                 <Text style={{ ...dsType.caption, color: c.sub, fontFamily: fontFamily.medium }}>{tr.budgetBudgetCaps}</Text>
-                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ ...dsType.displaySm, fontSize: 28, lineHeight: 32, color: c.sub, marginTop: 4 }}>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ ...dsType.displaySm, fontFamily: fontFamily.light, fontSize: 28, lineHeight: 32, color: c.sub, marginTop: 4 }}>
                   {fmt(totals.totalBudget)}
                 </Text>
               </View>
             </View>
-            <ProgressBar spent={totals.totalSpent} limit={totals.totalBudget} c={c} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+            {/* Omni: сегментний прогрес місяця (фірмовий градієнт — підсвітка
+                даних). Перевищення — червоним «Залишок» і відсотком нижче. */}
+            <SegmentedProgress
+              value={totals.totalSpent / totals.totalBudget}
+              accessibilityLabel={`${tr.budgetSpentCaps}: ${spentPct}%`}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
               <Text style={{ fontSize: 12, color: c.sub }}>
                 {tr.budgetLeft}: <Text style={{ fontFamily: fontFamily.semibold, color: totals.totalSpent > totals.totalBudget ? c.red : c.text }}>
                   {fmt(Math.max(0, totals.totalBudget - totals.totalSpent))}
                 </Text>
               </Text>
-              <Text style={{ fontSize: 12, color: c.sub }}>
+              <Text style={{ fontSize: 12, fontFamily: fontFamily.semibold, color: totals.totalSpent > totals.totalBudget ? c.red : c.text, fontVariant: ['tabular-nums'] }}>
                 {`${Math.round((totals.totalSpent / totals.totalBudget) * 100)}%`}
               </Text>
             </View>
@@ -748,14 +778,12 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
                 {tr.budgetOutsideLimits}: <Text style={{ fontFamily: fontFamily.semibold, color: c.text }}>{fmt(totals.unbudgetedSpent)}</Text>
               </Text>
             )}
-          </GlassSurface>
-        )}
-        </View>
+          </BentoCard>
+        ) : null}
 
-        <View style={splitColumns ? st.splitMain : undefined}>
         {/* Category rows */}
-        {!multiMonth && displayBudgets.length > 0 && (
-          <GlassSurface radius={radius.cardCompact} style={st.card}>
+        {displayBudgets.length > 0 ? (
+          <BentoCard key="rows" compact padded={false} span={splitColumns ? 2 : 1}>
             {displayBudgets.map((item, idx) => (
               <BudgetCategoryRow
                 key={item.category}
@@ -770,16 +798,16 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
                 onPress={openEdit}
               />
             ))}
-          </GlassSurface>
-        )}
-        </View>
-        </View>
+          </BentoCard>
+        ) : null}
+        </BentoGrid>
+        ) : null}
 
         {/* Empty state */}
         {!multiMonth && displayBudgets.length === 0 && !loadFailed && (
           <View style={{ alignItems: 'center', paddingVertical: 64 }}>
-            <View style={[st.emptyIcon, { ...c.gl.card }]}>
-              <IconSymbol name="chart.pie.fill" size={36} color={c.muted} />
+            <View style={[st.emptyIcon, { backgroundColor: c.limeTint }]}>
+              <IconSymbol name="chart.pie.fill" size={36} color={c.lime} />
             </View>
             <Text style={{ fontSize: 17, fontFamily: fontFamily.semibold, color: c.text, marginTop: 16 }}>
               {tr.budgetEmptyTitle}
@@ -982,20 +1010,6 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
   );
 }
 
-// ─── ProgressBar ──────────────────────────────────────────────────────────────
-
-function ProgressBar({ spent, limit, c }: { spent: number; limit: number; c: BudgetColors }) {
-  const pct = barRatio(spent, limit);
-  // DS v2.1: прогрес — акцент модуля (lime fill); ближче до ліміту — бурштин,
-  // понад — корал (тік-алерт).
-  const color = isOverLimit(spent, limit) ? c.coral : pct > 0.8 ? c.amber : c.limeFill;
-  return (
-    <View style={[{ height: 8, borderRadius: radius.pill, overflow: 'hidden' }, { backgroundColor: c.dim }]}>
-      <View style={{ height: '100%', width: `${pct * 100}%` as `${number}%`, borderRadius: radius.pill, backgroundColor: color }} />
-    </View>
-  );
-}
-
 // ─── Рядок категорії ─────────────────────────────────────────────────────────
 
 /**
@@ -1027,7 +1041,7 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
       <View style={[st.categoryRow,
         divider && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
         {/* Icon */}
-        <View style={[st.catIconBox, { backgroundColor: item.isAutoAdded ? c.dim : c.limeTint }]}>
+        <View style={[st.catIconBox, { backgroundColor: item.isAutoAdded ? c.t.surface.subtle : c.limeTint }]}>
           <IconSymbol name={item.icon} size={16} color={item.isAutoAdded ? c.sub : c.lime} />
         </View>
         {/* Info */}
@@ -1053,7 +1067,7 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
             <Text style={{ fontSize: 11, color: c.red }}>⚠ {unsyncableLabel}</Text>
           ) : null}
           {item.limit > 0 ? (
-            <View style={[st.progressTrack, { backgroundColor: c.dim }]}>
+            <View style={[st.progressTrack, { backgroundColor: c.t.surface.subtle }]}>
               <View style={[st.progressFill, { backgroundColor: barColor, width: `${pct * 100}%` as `${number}%` }]} />
             </View>
           ) : (
@@ -1072,11 +1086,6 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  summaryCard:  { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: space.cardGap },
-  card:         { borderRadius: radius.cardCompact, overflow: 'hidden', marginBottom: space.cardGap },
-  split:        { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
-  splitAside:   { flex: 1, minWidth: 0 },
-  splitMain:    { flex: 1.6, minWidth: 0 },
   categoryRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   catIconBox:   { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   progressTrack:{ height: 6, borderRadius: radius.pill, overflow: 'hidden' },

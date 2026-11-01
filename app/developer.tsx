@@ -22,7 +22,7 @@ import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 import { fontFamily } from '@/constants/theme';
 import { glassStyles } from '@/components/finance/finPalette';
-import { MeshBackground } from '@/components/ds';
+import { BentoCard, BentoGrid, MeshBackground } from '@/components/ds';
 
 const SOCIALS: {
   key: string;
@@ -127,32 +127,36 @@ export default function DeveloperScreen() {
           contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
           showsVerticalScrollIndicator={false}>
 
-          {/* Developer card */}
-          <View style={[st.devCard, { ...c.gl.card }]}>
-            {/* Avatar */}
-            {/* Аватар — коло action.primary (градієнти DS лишає лише promo/AI). */}
-            <View style={[st.avatar, { backgroundColor: k.action.primary }]}>
-              <Text style={[st.avatarText, { color: k.text.onAction }]}>IL</Text>
+          {/* Omni: профіль розробника — єдина темна (featured) картка сторінки
+              з білою pill-дією; соцмережі — звичайна bento-картка поруч. */}
+          <BentoGrid columns={{ compact: 1, medium: 2, expanded: 2 }}>
+          <BentoCard variant="dark">
+            <View style={st.devCard}>
+              {/* Аватар — біле коло на темній картці (градієнти DS лишає лише promo/AI). */}
+              <View style={[st.avatar, { backgroundColor: k.featured.action }]}>
+                <Text style={[st.avatarText, { color: k.featured.actionText }]}>IL</Text>
+              </View>
+
+              <Text style={[st.devName, { color: k.featured.text }]}>Igor Lialiuk</Text>
+              <Text style={[st.devRole, { color: k.featured.textSecondary }]}>Software Engineer</Text>
+
+              <Pressable
+                onPress={() => Linking.openURL('https://github.com/casperDev3')}
+                accessibilityRole="link"
+                accessibilityLabel="GitHub: casperDev3"
+                style={({ pressed }) => [st.githubBtn, {
+                  backgroundColor: k.featured.action,
+                  opacity: pressed ? 0.7 : 1,
+                }]}>
+                <MaterialCommunityIcons name="github" size={16} color={k.featured.actionText} />
+                <Text style={[st.githubBtnText, { color: k.featured.actionText }]}>casperDev3</Text>
+              </Pressable>
             </View>
-
-            <Text style={[st.devName, { color: c.text }]}>Igor Lialiuk</Text>
-            <Text style={[st.devRole, { color: c.sub }]}>Software Engineer</Text>
-
-            <Pressable
-              onPress={() => Linking.openURL('https://github.com/casperDev3')}
-              style={({ pressed }) => [st.githubBtn, {
-                ...c.gl.subtle,
-                opacity: pressed ? 0.7 : 1,
-              }]}>
-              <MaterialCommunityIcons name="github" size={16} color={k.action.secondaryText} />
-              <Text style={[st.githubBtnText, { color: k.action.secondaryText }]}>casperDev3</Text>
-            </Pressable>
-          </View>
+          </BentoCard>
 
           {/* Socials */}
-          <Text style={[st.sectionLabel, { color: c.sub }]}>СОЦІАЛЬНІ МЕРЕЖІ</Text>
-
-          <View style={[st.socialsCard, { ...c.gl.card }]}>
+          <BentoCard title="Соціальні мережі" icon="person.2.fill" accent="lavender">
+          <View style={[st.socialsCard, { backgroundColor: k.surface.subtle }]}>
             {SOCIALS.map((s, i) => {
               const iconColor = s.color(isDark);
               const bgColor   = s.bg(isDark);
@@ -160,6 +164,8 @@ export default function DeveloperScreen() {
                 <Pressable
                   key={s.key}
                   onPress={() => Linking.openURL(s.url)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`${s.label}: ${s.handle}`}
                   style={({ pressed }) => [
                     st.socialRow,
                     i < SOCIALS.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
@@ -177,6 +183,8 @@ export default function DeveloperScreen() {
               );
             })}
           </View>
+          </BentoCard>
+          </BentoGrid>
 
         </ScrollView>
       </SafeAreaView>
@@ -186,12 +194,9 @@ export default function DeveloperScreen() {
 
 const st = StyleSheet.create({
   pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
-  sectionLabel:   { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginBottom: 8, marginTop: 4, marginLeft: 4 },
   devCard: {
-    borderRadius: 24,
-    padding: 24,
     alignItems: 'center',
-    marginBottom: 24,
+    paddingVertical: 8,
   },
   avatar: {
     width: 72,
@@ -214,11 +219,12 @@ const st = StyleSheet.create({
     borderRadius: 999,
   },
   githubBtnText:  { fontSize: 13, fontFamily: fontFamily.semibold },
+  // Вкладена група рядків усередині bento-картки (surface.subtle).
   socialsCard: {
-    borderRadius: 24,
+    borderRadius: 16,
     overflow: 'hidden',
   },
-  socialRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 13 },
+  socialRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, gap: 13 },
   socialIconWrap: { width: 42, height: 42, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   socialLabel:    { fontSize: 15, fontFamily: fontFamily.semibold },
   socialHandle:   { fontSize: 12, fontFamily: fontFamily.regular, marginTop: 1 },

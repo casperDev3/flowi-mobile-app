@@ -8,6 +8,7 @@ import React, { useCallback, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import { MasonryColumns } from '@/components/shared/MasonryColumns';
+import { KpiCounter } from '@/components/ds';
 import { GroupScreenShell } from '@/components/training/GroupScreenShell';
 import { useGroupStream, useGroupSummary } from '@/components/training/hooks';
 import { importProgramPlan, readPersonalExercises, readPersonalPrograms } from '@/components/training/importPersonal';
@@ -75,9 +76,12 @@ export default function ProgramsScreen() {
           accessibilityRole="button"
           accessibilityLabel={p.name}
           style={{ marginBottom: 10 }}>
-          <Card c={c} accent={p.color}>
+          <Card c={c}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{ width: 10, alignSelf: 'stretch', borderRadius: 5, backgroundColor: p.color || TG_ACCENT }} />
+              {/* Omni icon-chip кольору програми (замість лівої смуги). */}
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: (p.color || TG_ACCENT) + '26', alignItems: 'center', justifyContent: 'center' }}>
+                <IconSymbol name="list.bullet.clipboard" size={16} color={p.color || TG_ACCENT} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold }} numberOfLines={2}>{p.name}</Text>
                 <Text style={{ color: c.sub, fontSize: 13, marginTop: 4 }}>
@@ -103,7 +107,15 @@ export default function ProgramsScreen() {
       issue={stream.issue}
       gone={stream.gone}
       onRefresh={() => { void stream.sync(); }}
-      refreshing={stream.syncing}>
+      refreshing={stream.syncing}
+      kpis={programs.length ? (
+        <>
+          <KpiCounter value={programs.length} label={tr.tgPrograms} />
+          {isCoach ? (
+            <KpiCounter value={assignments.filter(a => a.status === 'active').length} label={tr.tgAssignments} />
+          ) : null}
+        </>
+      ) : undefined}>
       {notice ? <Notice c={c} text={notice} tone="error" /> : null}
       {stream.loaded && !programs.length ? (
         <EmptyState c={c} icon="list.bullet.clipboard" title={tr.tgNoPrograms} body={isCoach ? tr.tgNoPlanCoach : tr.tgNoProgramsMember} />

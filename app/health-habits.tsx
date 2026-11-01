@@ -20,9 +20,9 @@ import { dsTokens } from '@/hooks/use-ds';
 import { HABITS_KEY, Habit, genId, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
 import { useWideModal } from '@/components/health/HealthLayout';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
 import { useGlassStyles } from '@/components/finance/finPalette';
-import { GlassBackdrop, MeshBackground } from '@/components/ds';
+import { GlassBackdrop, KpiCounter, MeshBackground, PageHeader, SegmentedProgress } from '@/components/ds';
 
 // Типізовано: раніше це був string[], і назва без відповідника в маппінгу
 // мовчки малювала порожнє місце на Android.
@@ -114,6 +114,9 @@ export default function HabitsScreen() {
     setHabits(p => p.filter(x => x.id !== h.id));
   };
 
+  const doneCount = habits.filter(h => habitDoneToday(h)).length;
+  const bestStreak = habits.reduce((m, h) => Math.max(m, habitStreak(h)), 0);
+
   return (
     // NAT-14: екран поданий як formSheet, де корінь не отримує визначеної
     // висоти — без minHeight `flex: 1` схлопувався до висоти вмісту, і нижні
@@ -131,6 +134,23 @@ export default function HabitsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Omni: KPI дня — скільки звичок уже відмічено й найдовша серія;
+            під ними — сегментний прогрес дня фірмовим градієнтом. */}
+        {habits.length > 0 && !loadFailed ? (
+          <View style={{ paddingHorizontal: 20, paddingBottom: 12, gap: 10 }}>
+            <PageHeader
+              bleed={20}
+              kpis={
+                <>
+                  <KpiCounter value={`${doneCount}/${habits.length}`} label={tr.dueToday} />
+                  {bestStreak > 0 ? <KpiCounter value={bestStreak} label={`${tr.streak}, ${tr.daysStreak}`} /> : null}
+                </>
+              }
+            />
+            <SegmentedProgress value={doneCount / habits.length} accessibilityLabel={`${tr.habits}: ${doneCount}/${habits.length}`} />
+          </View>
+        ) : null}
+
         <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
           {loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={retryLoad} />}
           {reminderBlocked && (
@@ -141,20 +161,22 @@ export default function HabitsScreen() {
           {loadFailed ? null : habits.length === 0 ? <Empty c={c} text={tr.habitsSub} icon="checklist" /> : habits.map(h => {
             const done = habitDoneToday(h); const streak = habitStreak(h);
             return (
-              <View key={h.id} style={[s.card, { ...gs.card }]}>
+              // Omni (DS v2.2): суцільна картка вмісту (не скло) з м'якою тінню.
+              <View key={h.id} style={[s.card, { backgroundColor: k.surface.card }, shadow[isDark ? 'dark' : 'light'].card]}>
                 <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: h.color + '20', alignItems: 'center', justifyContent: 'center' }}>
                   <IconSymbol name={h.icon} size={17} color={h.color} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{h.title}</Text>
+                  <Text style={[{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }, done && { color: c.sub, textDecorationLine: 'line-through' }]}>{h.title}</Text>
                   <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
                     🔥 {tr.streak}: {streak} {tr.daysStreak}{h.reminderAt ? ` · ⏰ ${h.reminderAt}` : ''}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => remove(h)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4, marginRight: 4 }}>
+                <TouchableOpacity onPress={() => remove(h)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${h.title}`} style={s.removeBtn}>
                   <IconSymbol name="trash" size={15} color={c.sub} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => toggle(h)}
+                  accessibilityRole="checkbox" accessibilityState={{ checked: done }} accessibilityLabel={h.title}
                   style={[s.check, { borderColor: done ? k.action.primary : c.border, backgroundColor: done ? k.action.primary : 'transparent' }]}>
                   {done && <IconSymbol name="checkmark" size={18} color={k.text.onAction} />}
                 </TouchableOpacity>
@@ -212,7 +234,9 @@ const s = StyleSheet.create({
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
   title:     { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
   addBtn:    { width: 44, height: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  card:      { borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  card:      { borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  // 44×44 — мінімальна ціль дотику (раніше 23pt + hitSlop).
+  removeBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   check:     { width: 44, height: 44, borderRadius: 22, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   pick:      { width: 44, height: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   overlay:   { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)' /* surface.overlay */, justifyContent: 'flex-end' },

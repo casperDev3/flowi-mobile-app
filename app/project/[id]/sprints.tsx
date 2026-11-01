@@ -52,9 +52,11 @@ import {
   type Sprint, type SprintDatesError, type SprintSort, type SprintStatusFilter,
 } from '@/utils/sprintUtils';
 import { isSprintOverdue, sprintBurndown, velocityWindow } from '@/utils/projectStatsMetrics';
-import { fontFamily, radius, theme, type } from '@/constants/theme';
+import { fontFamily, radius, shadow, theme, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { KpiCounter, SectionTabs, SegmentedProgress } from '@/components/ds';
+import { useResponsive } from '@/hooks/use-responsive';
+import { glassOf } from '@/components/shared/dsTheme';
 
 /** Протермінований спринт — бурштиновий: червоний зайнятий простроченими задачами. */
 const SPRINT_OVERDUE_COLOR = theme.light.accent.amber;
@@ -94,6 +96,7 @@ export default function ProjectSprintsScreen() {
   const canEdit = useProjectRole(projectId) !== 'viewer';
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
   const tk = dsTokens(isDark);
+  const { isWide } = useResponsive();
 
   const { items: allSprints, setItems: setSprints, reload: reloadSprints } = useSyncedList<Sprint>('sprints', { enabled: true });
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -190,6 +193,10 @@ export default function ProjectSprintsScreen() {
     for (const sp of pool) counts[sprintStatus(sp, now)] += 1;
     return counts;
   }, [projectSprints, showArchived, now]);
+  const overdueCount = useMemo(
+    () => projectSprints.filter(sp => !isSprintArchived(sp) && isSprintOverdue(sp, now)).length,
+    [projectSprints, now],
+  );
   const filtersActive = statusFilter !== 'all' || showArchived || sort !== 'start-desc';
 
   const resetDraft = () => {
@@ -240,7 +247,7 @@ export default function ProjectSprintsScreen() {
   const shortDate = (iso: string | undefined) =>
     iso ? new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '';
 
-  const inputStyle = { borderRadius: radius.control, backgroundColor: glassOf(tk).surfaceSubtle, minHeight: 44, paddingHorizontal: 14, paddingVertical: 8, color: c.text, fontFamily: fontFamily.regular } as const;
+  const inputStyle = { borderRadius: radius.control, backgroundColor: tk.surface.subtle, minHeight: 44, paddingHorizontal: 14, paddingVertical: 8, color: c.text, fontFamily: fontFamily.regular } as const;
 
   /** Спільна форма: назва + дати «з»/«по» + помилка/попередження. */
   const renderDraftForm = (submitLabel: string) => (
@@ -363,7 +370,8 @@ export default function ProjectSprintsScreen() {
       <View
         key={sprint.id}
         onLayout={e => onRowLayout(sprint.id, e.nativeEvent.layout.y)}
-        style={{ borderRadius: radius.cardCompact, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 16, marginBottom: 12 }}>
+        // Omni: суцільна bento-картка спринта (surface.card + м'яка тінь).
+        style={[{ borderRadius: radius.card, backgroundColor: tk.surface.card, padding: 16, marginBottom: 12 }, shadow[isDark ? 'dark' : 'light'].card]}>
         {/* Звичайний View, а не TouchableOpacity: пенал/закриття — окремі
             дотикові цілі, і вкладені TouchableOpacity в RN ненадійно
             передають дотик у дочірні — рядок і кнопки мають бути сиблінгами. */}
@@ -410,7 +418,7 @@ export default function ProjectSprintsScreen() {
             {dated ? `${shortDate(sprint.startDate)} – ${shortDate(sprint.endDate)}` : tr.sprintUndated}
           </Text>
           {archived ? (
-            <View style={{ borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, paddingHorizontal: 8, paddingVertical: 2 }}>
+            <View style={{ borderRadius: radius.pill, backgroundColor: tk.surface.subtle, paddingHorizontal: 8, paddingVertical: 2 }}>
               <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium }}>{tr.sprintArchivedBadge}</Text>
             </View>
           ) : sprintStatus(sprint, now) === 'planned' ? (
@@ -439,9 +447,14 @@ export default function ProjectSprintsScreen() {
         </View>
 
         {progress.total > 0 ? (
-          <View style={{ height: 6, borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, marginTop: 10, marginLeft: 20, overflow: 'hidden' }}>
-            <View style={{ width: `${Math.round((progress.done / progress.total) * 100)}%`, height: 6, borderRadius: radius.pill, backgroundColor: closed ? c.sub : tk.accent.amber }} />
-          </View>
+          // Omni: сегментний прогрес спринта.
+          <SegmentedProgress
+            value={progress.done / progress.total}
+            showValue
+            height={8}
+            accessibilityLabel={`${sprint.name}: ${progress.done}/${progress.total}`}
+            style={{ marginTop: 12, marginLeft: 20 }}
+          />
         ) : null}
 
         {burndown ? (
@@ -500,7 +513,7 @@ export default function ProjectSprintsScreen() {
                     placeholder={tr.sprintAddTaskIn.replace('{name}', sprint.name)}
                     accessibilityLabel={tr.sprintAddTaskIn.replace('{name}', sprint.name)}
                     placeholderTextColor={tk.text.muted}
-                    style={{ flex: 1, borderRadius: radius.control, backgroundColor: glassOf(tk).surfaceSubtle, minHeight: 44, paddingHorizontal: 14, paddingVertical: 7, color: c.text, fontSize: 14, fontFamily: fontFamily.regular }}
+                    style={{ flex: 1, borderRadius: radius.control, backgroundColor: tk.surface.subtle, minHeight: 44, paddingHorizontal: 14, paddingVertical: 7, color: c.text, fontSize: 14, fontFamily: fontFamily.regular }}
                   />
                   <IconAction icon="plus" label={tr.sprintAddTaskA11y} color={c.text} onPress={() => addTask(sprint)} colors={c} />
                 </View>
@@ -572,6 +585,29 @@ export default function ProjectSprintsScreen() {
       project={project}
       isDark={isDark}
       title={tr.sprints}
+      // Omni KPI — з лічильників, що вже рахуються для вкладок статусу.
+      kpis={projectSprints.length > 0 ? (
+        <>
+          <KpiCounter value={statusCounts.active} label={tr.sprintStatusActive} />
+          <KpiCounter value={statusCounts.planned} label={tr.sprintStatusPlanned} />
+          <KpiCounter
+            value={overdueCount}
+            label={tr.sprintOverdue}
+            valueColor={overdueCount > 0 ? glassOf(tk).accent.amber.ink : undefined}
+          />
+        </>
+      ) : undefined}
+      tabs={projectSprints.length > 0 ? (
+        // Omni: фільтр статусу — pill-вкладки з лічильниками (той самий
+        // view.status, що й раніше давали чипи).
+        <SectionTabs
+          tabs={STATUS_FILTERS.map(key => ({ key, label: statusLabel(key), count: statusCounts[key] }))}
+          value={statusFilter}
+          onChange={key => setView(prev => ({ ...prev, status: key }))}
+          accessibilityLabel={tr.sprintStatusFilterA11y}
+          bleed={isWide ? 0 : 20}
+        />
+      ) : undefined}
       actions={(
         <>
           {canEdit ? (
@@ -594,39 +630,21 @@ export default function ProjectSprintsScreen() {
         // виглядає мертвою.
         keyboardShouldPersistTaps="handled">
         {draft && !draft.sprint && (
-          <View style={{ borderRadius: radius.cardCompact, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 16, marginBottom: 12, gap: 8 }}>
+          <View style={[{ borderRadius: radius.card, backgroundColor: tk.surface.card, padding: 16, marginBottom: 12, gap: 8 }, shadow[isDark ? 'dark' : 'light'].card]}>
             {renderDraftForm(tr.create)}
           </View>
         )}
-        {projectSprints.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            accessibilityLabel={tr.sprintStatusFilterA11y}
-            style={{ marginBottom: 12, flexGrow: 0 }}
-            contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-            {STATUS_FILTERS.map(key => (
-              <ActionChip
-                key={key}
-                label={statusLabel(key)}
-                count={statusCounts[key]}
-                selected={statusFilter === key}
-                onPress={() => setView(prev => ({ ...prev, status: key }))}
-                colors={c}
-              />
-            ))}
-            {archivedCount > 0 ? (
-              <ActionChip
-                icon="archivebox"
-                label={tr.sprintShowArchived}
-                count={archivedCount}
-                selected={showArchived}
-                onPress={() => setView(prev => ({ ...prev, showArchived: !prev.showArchived }))}
-                colors={c}
-              />
-            ) : null}
-          </ScrollView>
+        {archivedCount > 0 ? (
+          <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+            <ActionChip
+              icon="archivebox"
+              label={tr.sprintShowArchived}
+              count={archivedCount}
+              selected={showArchived}
+              onPress={() => setView(prev => ({ ...prev, showArchived: !prev.showArchived }))}
+              colors={c}
+            />
+          </View>
         ) : null}
         {projectSprints.length === 0 && !draft ? (
           <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 30 }}>{tr.sprintNoSprintsHint}</Text>

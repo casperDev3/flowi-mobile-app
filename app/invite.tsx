@@ -40,9 +40,8 @@ import {
   type WorkspaceCheckSuccess,
 } from '@/store/workspace';
 import { haptic } from '@/utils/haptics';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
 import { MeshBackground } from '@/components/ds';
-import { glassRimFor } from '@/components/shared/dsTheme';
 
 type Stage = 'loading' | 'switch-confirm' | 'confirm-workspace' | 'preview' | 'joining' | 'joined' | 'already-member' | 'error';
 
@@ -329,7 +328,7 @@ export default function InviteScreen() {
           )}
 
           {stage === 'switch-confirm' && (
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+            <View style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}>
               <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold, marginBottom: 8 }}>{tr.inviteSwitchWorkspaceTitle}</Text>
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 16 }}>{tr.inviteSwitchWorkspaceMsg}</Text>
               <TouchableOpacity onPress={confirmSwitch} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
@@ -342,7 +341,7 @@ export default function InviteScreen() {
           )}
 
           {stage === 'confirm-workspace' && pendingWorkspace && (
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+            <View style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}>
               <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold, marginBottom: 8 }}>{tr.inviteConfirmWorkspaceTitle}</Text>
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 16 }}>
                 {tr.inviteConfirmWorkspaceMsg.replace('{name}', pendingWorkspace.info.name || pendingWorkspace.origin)}
@@ -357,7 +356,7 @@ export default function InviteScreen() {
           )}
 
           {stage === 'preview' && preview && (
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+            <View style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <View style={[st.colorDot, { backgroundColor: preview.project.color || c.accent }]} />
                 <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 18, fontFamily: fontFamily.semibold }}>{preview.project.name}</Text>
@@ -396,7 +395,7 @@ export default function InviteScreen() {
           )}
 
           {stage === 'joined' && (
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), alignItems: 'center' }]}>
+            <View style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card, alignItems: 'center' }]}>
               <IconSymbol name="checkmark.circle.fill" size={40} color={c.accent} />
               <Text style={{ color: c.text, fontSize: 17, fontFamily: fontFamily.semibold, marginTop: 12, marginBottom: 16 }}>{tr.inviteJoinedTitle}</Text>
               <TouchableOpacity onPress={openProject} style={[st.primaryBtn, { backgroundColor: k.action.primary, alignSelf: 'stretch' }]}>
@@ -406,7 +405,7 @@ export default function InviteScreen() {
           )}
 
           {stage === 'already-member' && alreadyMember && (
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), alignItems: 'center' }]}>
+            <View style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card, alignItems: 'center' }]}>
               <IconSymbol name="person.crop.circle" size={40} color={c.accent} />
               <Text accessibilityRole="header" style={{ color: c.text, fontSize: 17, fontFamily: fontFamily.semibold, marginTop: 12, marginBottom: 6, textAlign: 'center' }}>
                 {tr.inviteAlreadyMemberTitle}

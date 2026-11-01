@@ -41,7 +41,9 @@ import { OverviewTab } from '@/components/health/tabs/OverviewTab';
 import { PreventionTab } from '@/components/health/tabs/PreventionTab';
 import { SleepTab } from '@/components/health/tabs/SleepTab';
 import { MonthPicker } from '@/components/shared/MonthPicker';
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+// Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
+import { HeaderButton } from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { sheetSurfaceStyle } from '@/hooks/use-content-width';
@@ -58,7 +60,7 @@ import {
   type HealthColors, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
 import { HealthEntry, getMonthEntries } from '@/utils/healthUtils';
-import { MeshBackground } from '@/components/ds';
+import { KpiCounter, MeshBackground } from '@/components/ds';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
 import { AccentIcon } from '@/components/shared/GlassBits';
 
@@ -115,14 +117,31 @@ export default function HealthHubScreen() {
 
   const onQuickSubmit = (records: QuickRecord[]) => records.forEach(r => h.addEntry({ type: r.type, value: r.value }));
 
+  // ─── KPI дня (Omni: великі тонкі числа в шапці) ─────────────────────────────
+  // Ті самі h.today / h.cal, що й кільця «Огляду»; до першого читання — нічого
+  // (нулі до завантаження збрехали б). Тап відкриває вкладку метрики.
+  const kpis = h.initialized ? (
+    <>
+      <KpiCounter value={h.cal.consumed} label={tr.calories} onPress={() => setTab('nutrition')} />
+      <KpiCounter
+        value={h.today.steps >= 1000 ? `${(h.today.steps / 1000).toFixed(1)}т` : h.today.steps}
+        label={tr.steps}
+        onPress={() => setTab('activity')}
+      />
+      <KpiCounter value={h.today.sleep ? fmtSleep(h.today.sleep) : '—'} label={tr.sleep} onPress={() => setTab('sleep')} />
+    </>
+  ) : undefined;
+
   return (
     <View style={{ flex: 1 }}>
       <MeshBackground />
       <View style={{ flex: 1 }}>
 
-        <ScreenHeader
+        {/* Omni: глобальна шапка (☰ · дзвіник · акаунт) + KPI дня; під нею —
+            pill-вкладки розділу. */}
+        <AppHeader
           title={tr.health}
-          color={c.text}
+          kpis={kpis}
           actions={
             <>
               {isWide && (
@@ -143,7 +162,7 @@ export default function HealthHubScreen() {
             </>
           }>
           <HealthTabBar value={tab} onChange={setTab} tr={tr} c={c} preventionBadge={medsDue} layout={tabBarLayout} />
-        </ScreenHeader>
+        </AppHeader>
 
         {tab === 'overview'   && <OverviewTab h={h} />}
         {tab === 'nutrition'  && <NutritionTab h={h} />}

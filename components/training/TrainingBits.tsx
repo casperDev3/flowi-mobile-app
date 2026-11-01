@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { fontFamily, radius, space, type } from '@/constants/theme';
+import { fontFamily, radius, shadow, space, type } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 
 import { TG_ACCENT, TG_ERR, TG_WARN, TG_XP, type TrainingColors } from './theme';
@@ -44,9 +44,9 @@ export function Card({ c, children, style, accent }: {
     <View
       style={[
         styles.card,
-        // DS v2.1: скло (заливка + спекулярний обідок) без власного блюру —
-        // картки тренувань живуть у списках (лідерборд, учасники, сесії).
-        { ...c.gl.card, ...c.g.shadow },
+        // Omni (DS v2.2): суцільна bento-картка (surface.card + м'яка тінь, без
+        // рамки) — скло лишається функціональному шару (шапка, аркуші).
+        { backgroundColor: c.t.surface.card, ...shadow[c.isDark ? 'dark' : 'light'].card },
         // Стан (виконано / увага) — тонована рамка акцентом + легка змивка.
         accent ? { borderWidth: 1, borderColor: accent + '66', borderTopColor: accent + '66', borderBottomColor: accent + '66' } : null,
         style,
@@ -115,7 +115,7 @@ export function Badge({ label, color }: { label: string; color: string }) {
   );
 }
 
-export function PrimaryButton({ label, onPress, disabled, busy, color, icon, style, variant = 'solid' }: {
+export function PrimaryButton({ label, onPress, disabled, busy, color, icon, style, variant = 'solid', textColor }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
@@ -124,13 +124,15 @@ export function PrimaryButton({ label, onPress, disabled, busy, color, icon, sty
   icon?: IconSymbolName;
   style?: StyleProp<ViewStyle>;
   variant?: 'solid' | 'soft';
+  /** Колір підпису для solid з власним тлом (напр. біла pill на темній картці). */
+  textColor?: string;
 }) {
   const { t } = useDS();
   const gs = useGlassStyles();
   const solid = variant === 'solid';
   // Без явного кольору — головна дія DS: pill action.primary / вторинна subtle.
   const tone = color ?? (solid ? t.action.primary : t.action.secondaryText);
-  const fg = solid ? (color ? '#fff' : t.text.onAction) : tone;
+  const fg = solid ? (textColor ?? (color ? '#fff' : t.text.onAction)) : tone;
   const bg = solid ? tone : color ? color + '18' : (gs.subtle.backgroundColor as string);
   return (
     <TouchableOpacity
@@ -225,7 +227,7 @@ export function EmptyState({ c, icon, title, body, action }: {
 }) {
   return (
     <View style={styles.empty}>
-      <View style={[styles.emptyIcon, { ...c.gl.subtle, backgroundColor: c.accentTint }]}>
+      <View style={[styles.emptyIcon, { backgroundColor: c.accentTint }]}>
         <IconSymbol name={icon} size={26} color={c.accent} />
       </View>
       <Text style={[type.h2, { color: c.text, fontSize: 17, textAlign: 'center' }]}>

@@ -15,7 +15,6 @@ import { fontFamily } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 import { useMotion } from '@/hooks/use-motion';
 import { haptic } from '@/utils/haptics';
-import { useGlassStyles } from '@/components/finance/finPalette';
 
 // ─── Animated SVG Circle ──────────────────────────────────────────────────────
 
@@ -42,8 +41,10 @@ interface RingCellProps {
 
 export function RingCell({ pct, color, label, value }: RingCellProps) {
   const { reduced } = useMotion();
-  const { t } = useDS();
-  const gs = useGlassStyles();
+  const { t, isDark } = useDS();
+  // Omni (DS v2.2): кільця лежать на суцільній BentoCard — скляний subtle там
+  // зникав; доріжка — тихий нейтральний тон (як штрих HatchedBars).
+  const track = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(17,17,19,0.08)';
 
   // Visual ring is capped at 100 %; text label may show >100 % (preserves old behaviour).
   const capped       = Math.min(pct, 1);
@@ -100,7 +101,7 @@ export function RingCell({ pct, color, label, value }: RingCellProps) {
             cx={SIZE / 2}
             cy={SIZE / 2}
             r={R}
-            stroke={(gs.subtle.backgroundColor as string)}
+            stroke={track}
             strokeWidth={STROKE}
             fill="none"
           />

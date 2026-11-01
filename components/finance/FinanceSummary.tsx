@@ -23,7 +23,7 @@ import { useDS } from '@/hooks/use-ds';
 import type { Account, AccountKind } from '@/utils/accounts';
 import type { Currency, CurrencyTotals } from '@/utils/financeUtils';
 import { useGlassStyles } from '@/components/finance/finPalette';
-import { GlassSurface, IconChip } from '@/components/ds';
+import { BentoCard, IconChip, SegmentedProgress } from '@/components/ds';
 
 interface Colors {
   border: string;
@@ -281,7 +281,6 @@ export function PeriodFlowCard({
   style?: StyleProp<ViewStyle>;
 }) {
   const { t: ds } = useDS();
-  const gs = useGlassStyles();
   const curOf = (code: string): Currency =>
     currencies.find(cu => cu.code === code) ?? { code, symbol: code, kind: 'fiat', decimals: 2 };
   const flowCodes = Object.keys(totalsByCurrency)
@@ -290,23 +289,32 @@ export function PeriodFlowCard({
       return t && (t.income !== 0 || t.expense !== 0);
     })
     .sort((a, b) => (a === primaryCode ? -1 : b === primaryCode ? 1 : a.localeCompare(b)));
+  const picker = onPickPrimary ? (
+    <TouchableOpacity
+      onPress={onPickPrimary}
+      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+      accessibilityRole="button"
+      accessibilityLabel={primaryCode}
+      style={{ backgroundColor: ds.surface.subtle, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, minHeight: 32, borderRadius: radius.pill }}>
+      <Text style={{ fontSize: 12, fontFamily: fontFamily.semibold, color: ds.text.primary, letterSpacing: 0.5 }}>{primaryCode}</Text>
+      <IconSymbol name="chevron.down" size={10} color={ds.text.secondary} style={{ marginLeft: 4 }} />
+    </TouchableOpacity>
+  ) : undefined;
+  // Omni (DS v2.2): суцільна BentoCard — «icon-chip + назва», праворуч
+  // pill основної валюти (як period-pill Omni); норма заощаджень — сегментний
+  // прогрес фірмовим градієнтом.
   return (
-      <GlassSurface radius={radius.cardCompact} tint="lime" style={[s.card, style]}>
+      <BentoCard
+        compact
+        title={title}
+        icon={title ? 'chart.bar.fill' : undefined}
+        accent="lime"
+        headerRight={title ? picker : undefined}
+        style={style}>
 
-        {onPickPrimary && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            {title ? <Text style={[s.cardTitle, { color: ds.text.primary, flex: 1 }]}>{title}</Text> : <View style={{ flex: 1 }} />}
-            <TouchableOpacity
-              onPress={onPickPrimary}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel={primaryCode}
-              style={{ ...gs.subtle, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, minHeight: 32, borderRadius: radius.pill }}>
-              <Text style={{ fontSize: 12, fontFamily: fontFamily.semibold, color: ds.text.primary, letterSpacing: 0.5 }}>{primaryCode}</Text>
-              <IconSymbol name="chevron.down" size={10} color={ds.text.secondary} style={{ marginLeft: 4 }} />
-            </TouchableOpacity>
-          </View>
-        )}
+        {!title && picker ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10 }}>{picker}</View>
+        ) : null}
 
         {flowCodes.length === 0 ? (
           <View style={{ flexDirection: 'row', gap: 18 }}>
@@ -346,9 +354,12 @@ export function PeriodFlowCard({
                   <FlowCell label={expenseLabel} value={fmt(t.expense, cur)} color={ds.text.primary} sub={ds.text.secondary} dot={ds.status.danger} />
                 </View>
                 {t.income > 0 && (
-                  <View style={{ ...gs.subtle, height: 6, marginTop: 10, borderRadius: radius.pill, overflow: 'hidden' }}>
-                    <View style={{ height: '100%', borderRadius: radius.pill, width: `${savingsPct}%` as any, backgroundColor: ds.accent.amber }} />
-                  </View>
+                  <SegmentedProgress
+                    value={savingsPct / 100}
+                    height={8}
+                    accessibilityLabel={`${savingsLabel} ${cur.code}: ${savingsPct}%`}
+                    style={{ marginTop: 12 }}
+                  />
                 )}
               </View>
             );
@@ -360,7 +371,7 @@ export function PeriodFlowCard({
             {transfersNoteLabel}
           </Text>
         )}
-      </GlassSurface>
+      </BentoCard>
   );
 }
 

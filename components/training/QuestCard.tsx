@@ -21,7 +21,9 @@ import type { Translations } from '@/store/translations';
 import { formatMetricValue, metricInfo, progressFraction } from '@/utils/trainingQuests';
 import type { Quest, QuestProgress } from '@/utils/trainingTypes';
 
-import { Badge, Card, PrimaryButton, ProgressBar } from './TrainingBits';
+import { SegmentedProgress } from '@/components/ds';
+
+import { Badge, Card, PrimaryButton } from './TrainingBits';
 import { fmt, TG_ACCENT, TG_OK, TG_XP, type TrainingColors } from './theme';
 import { fontFamily } from '@/constants/theme';
 
@@ -106,7 +108,8 @@ export function QuestCard({ c, quest, progress, mode, doneCount, assigneeCount, 
 
       {measurable && mode === 'member' ? (
         <View style={{ marginTop: 12, gap: 6 }}>
-          <ProgressBar c={c} fraction={fraction} color={done ? TG_OK : TG_ACCENT} />
+          {/* Omni: сегментний прогрес у фірмовому градієнті (підсвітка даних). */}
+          <SegmentedProgress value={fraction} showValue accessibilityLabel={quest.title} />
           <Text style={{ color: c.sub, fontSize: 12 }}>
             {`${formatMetricValue(progress?.currentValue)} / ${formatMetricValue(quest.targetValue)} ${unit} · ${tr.tgQuestAuto}`}
           </Text>

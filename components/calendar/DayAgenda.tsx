@@ -26,7 +26,6 @@ import { MeetingCard } from './MeetingCard';
 import type { CalendarColors } from './palette';
 import { fontFamily, radius, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassRimFor } from '@/components/shared/dsTheme';
 
 const MIN_TOUCH = 44;
 
@@ -89,7 +88,7 @@ export function DayAgenda({
       </View>
 
       {empty ? (
-        <View style={[st.emptyBox, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+        <View style={[st.emptyBox, { backgroundColor: c.card }]}>
           <IconSymbol name="calendar.badge.checkmark" size={26} color={c.sub} />
           <Text style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.semibold, marginTop: 8 }}>{tr.calNothingPlanned}</Text>
           <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 4, textAlign: 'center' }}>{tr.calNothingPlannedHint}</Text>
@@ -98,15 +97,17 @@ export function DayAgenda({
 
       {sprints.length > 0 && (
         <View style={{ gap: 6 }}>
-          <Text style={[st.section, { color: c.sub }]}>{tr.calSectionSprints}</Text>
+          <SectionHead icon="flag.fill" label={tr.calSectionSprints} count={sprints.length} c={c} />
           {sprints.map(bar => (
             <TouchableOpacity
               key={bar.sprint.id}
               onPress={() => onSprintPress(bar)}
               accessibilityRole="button"
               accessibilityLabel={`${tr.calSprintA11y} ${bar.number} · ${bar.sprint.name} · ${bar.project.name}`}
-              style={[st.row, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
-              <View style={[st.sprintSwatch, { backgroundColor: bar.project.color }]} />
+              style={[st.row, { backgroundColor: c.card }]}>
+              <View style={[st.sprintChip, { backgroundColor: c.dim }]}>
+                <IconSymbol name="flag.fill" size={13} color={bar.project.color} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }} numberOfLines={1}>
                   №{bar.number} · {bar.sprint.name}
@@ -123,14 +124,14 @@ export function DayAgenda({
 
       {tasks.length > 0 && (
         <View style={{ gap: 6 }}>
-          <Text style={[st.section, { color: c.sub }]}>{tr.calSectionDeadlines}</Text>
+          <SectionHead icon="checklist" label={tr.calSectionDeadlines} count={tasks.length} c={c} />
           {tasks.map(item => (
             <TouchableOpacity
               key={item.task.id}
               onPress={() => onTaskPress(item.task)}
               accessibilityRole="button"
               accessibilityLabel={`${item.task.title}${item.done ? `, ${tr.done}` : ''}`}
-              style={[st.row, { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), opacity: item.done ? 0.55 : 1 }]}>
+              style={[st.row, { backgroundColor: c.card, opacity: item.done ? 0.55 : 1 }]}>
               <IconSymbol
                 name={item.done ? 'checkmark.circle.fill' : 'circle'}
                 size={18}
@@ -151,7 +152,7 @@ export function DayAgenda({
 
       {meetings.length > 0 && (
         <View style={{ gap: 8 }}>
-          <Text style={[st.section, { color: c.sub }]}>{tr.calSectionMeetings}</Text>
+          <SectionHead icon="person.2.fill" label={tr.calSectionMeetings} count={meetings.length} c={c} />
           {meetings.map(m => (
             <MeetingCard
               key={m.id}
@@ -175,14 +176,37 @@ export function DayAgenda({
   );
 }
 
+/**
+ * Omni: шапка секції дня — кругла icon-chip + назва + лічильник у pill
+ * (як шапка колонки канбану Omni), замість дрібного uppercase-підпису.
+ */
+function SectionHead({ icon, label, count, c }: {
+  icon: 'flag.fill' | 'checklist' | 'person.2.fill'; label: string; count: number; c: CalendarColors;
+}) {
+  return (
+    <View style={st.sectionRow} accessible accessibilityRole="header" accessibilityLabel={`${label}, ${count}`}>
+      <View style={[st.sectionChip, { backgroundColor: c.card }]}>
+        <IconSymbol name={icon} size={12} color={c.text} />
+      </View>
+      <Text style={[st.section, { color: c.text }]}>{label}</Text>
+      <View style={[st.countPill, { backgroundColor: c.card }]}>
+        <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{count}</Text>
+      </View>
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 28 },
+  sectionChip: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  countPill: { minWidth: 22, height: 20, paddingHorizontal: 7, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  sprintChip: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 32 },
   addBtn: { width: MIN_TOUCH, height: MIN_TOUCH, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  section: { fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  section: { fontSize: 14, fontFamily: fontFamily.semibold },
   row: {
     minHeight: MIN_TOUCH, flexDirection: 'row', alignItems: 'center', gap: 10,
     borderRadius: radius.nested, paddingHorizontal: 16, paddingVertical: 12,
   },
-  sprintSwatch: { width: 4, alignSelf: 'stretch', borderRadius: 2 },
   emptyBox: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 20, borderRadius: radius.cardCompact },
 });

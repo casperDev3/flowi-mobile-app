@@ -39,13 +39,16 @@ import {
   SubscriptionDetailBody,
   SubscriptionDetailHeader,
   SubscriptionRow,
+  paymentWhenLabel,
   type SubscriptionUiColors,
 } from '@/components/finance/SubscriptionDetail';
+import type { Translations } from '@/store/translations';
 import { useTodayKey } from '@/hooks/use-today-key';
 import { DetailPane } from '@/components/shared/DetailPane';
 import { detailColumnWidthFor } from '@/constants/tokens';
 import { RecurringIncomesSection } from '@/components/finance/RecurringIncomesSection';
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { HeaderButton } from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { finPalette } from '@/components/finance/finPalette';
@@ -89,7 +92,9 @@ import {
   type SubscriptionDraft,
   type SubscriptionDraftError,
 } from '@/utils/subscriptions';
-import { GlassBackdrop, GlassSurface, MeshBackground } from '@/components/ds';
+import {
+  BentoCard, BentoGrid, GlassBackdrop, KpiCounter, MeshBackground, useBentoColors,
+} from '@/components/ds';
 
 const ALL = '__all';
 const NO_PROJECT = '__none';
@@ -671,6 +676,22 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
     return acc ? `${acc.name} · ${acc.currency}` : null;
   };
 
+  /** Найближча жива оплата (live уже відсортовано за датою наступної оплати). */
+  const nextLive = live[0] ?? null;
+  const overdueCount = useMemo(
+    () => live.filter(sub => subscriptionStatus(sub, today) === 'overdue').length,
+    [live, today],
+  );
+  // KPI шапки (лише окремий екран): живі підписки + червона дельта прострочених.
+  const subsKpis = !embedded && initialized && subs.length > 0 ? (
+    <KpiCounter
+      value={live.length}
+      label={tr.navSubscriptions}
+      delta={overdueCount > 0 ? `${overdueCount} · ${tr.subOverdue}` : undefined}
+      deltaTone="down"
+    />
+  ) : undefined;
+
   return (
     <View style={{ flex: 1 }}>
       {!embedded ? <Stack.Screen options={{ headerShown: false }} /> : null}
@@ -681,9 +702,9 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
           {/* Шапка — спільна: на планшеті «Підписки» відкриваються прямо з
               сайдбара, і стрілку «Назад» ScreenHeader там сам ховає. */}
           {!embedded ? (
-          <ScreenHeader
+          <AppHeader
             title={tr.navSubscriptions}
-            color={c.text}
+            kpis={subsKpis}
             back={{
               onPress: () => router.back(),
               label: tr.back,
@@ -725,18 +746,35 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
               ) : null}
             </View>
 
-            {/* Підсумки за валютами */}
-            {totals.length > 0 ? (
-              <GlassSurface radius={radius.cardCompact} tint="lime" style={st.totalsCard}>
-                <Text style={[st.totalsLabel, { color: c.sub }]}>{tr.subTotals}</Text>
-                {/* Підсумок — display-цифри DS (тонкі, табличні). */}
-                <Text style={{ ...dsType.displaySm, fontSize: 32, lineHeight: 36, color: c.text, marginTop: 4 }}>
-                  {formatTotalsLine(totals, 'monthly', tr.subPerMonth, currencies, locale)}
-                </Text>
-                <Text style={{ ...dsType.body, ...dsType.numeric, color: c.sub, marginTop: 6 }}>
-                  {formatTotalsLine(totals, 'yearly', tr.subPerYear, currencies, locale)}
-                </Text>
-              </GlassSurface>
+            {/* Omni (DS v2.2): підсумки — BentoCard; поруч (планшет) або під ним
+                (телефон) — ЄДИНА темна картка сторінки: найближча оплата
+                крупно, біла pill «Оплачено» — те саме, що кнопка рядка. */}
+            {totals.length > 0 || nextLive ? (
+              <BentoGrid columns={{ compact: 1, medium: 2, expanded: 2 }} style={{ marginBottom: space.cardGapCompact }}>
+                {totals.length > 0 ? (
+                  <BentoCard key="totals" compact title={tr.subTotals} icon="repeat" accent="lime">
+                    {/* Підсумок — великі тонкі табличні цифри. */}
+                    <Text style={{ ...dsType.displaySm, fontFamily: fontFamily.light, fontSize: 32, lineHeight: 36, color: c.text }}>
+                      {formatTotalsLine(totals, 'monthly', tr.subPerMonth, currencies, locale)}
+                    </Text>
+                    <Text style={{ ...dsType.body, ...dsType.numeric, color: c.sub, marginTop: 6 }}>
+                      {formatTotalsLine(totals, 'yearly', tr.subPerYear, currencies, locale)}
+                    </Text>
+                  </BentoCard>
+                ) : null}
+                {nextLive ? (
+                  <BentoCard key="next" compact variant="dark" title={tr.subNextPayment} icon="calendar">
+                    <NextPaymentBody
+                      sub={nextLive}
+                      today={today}
+                      currencies={currencies}
+                      locale={locale}
+                      tr={tr}
+                      onPay={quickRenew}
+                    />
+                  </BentoCard>
+                ) : null}
+              </BentoGrid>
             ) : null}
 
             {/* Фільтр за проєктом */}
@@ -760,7 +798,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                       accessibilityRole="button"
                       accessibilityState={{ selected: on }}
                       accessibilityLabel={`${tr.project}: ${opt.label}`}
-                      style={[st.filterChip, { backgroundColor: on ? c.action : c.card }]}>
+                      style={[st.filterChip, on ? { backgroundColor: c.action } : { backgroundColor: c.t.surface.card, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border }]}>
                       {opt.color ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: opt.color }} /> : null}
                       <Text numberOfLines={1} style={{ color: on ? c.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold, maxWidth: 160 }}>{opt.label}</Text>
                     </TouchableOpacity>
@@ -775,8 +813,8 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
             {/* Порожньо */}
             {initialized && subs.length === 0 ? (
               <View style={{ alignItems: 'center', paddingVertical: 64 }}>
-                <View style={[st.emptyIcon, { ...c.gl.card }]}>
-                  <IconSymbol name="repeat" size={34} color={c.muted} />
+                <View style={[st.emptyIcon, { backgroundColor: c.limeTint }]}>
+                  <IconSymbol name="repeat" size={34} color={c.lime} />
                 </View>
                 <Text style={{ fontSize: 17, fontFamily: fontFamily.semibold, color: c.text, marginTop: 16 }}>{tr.subEmptyTitle}</Text>
                 <Text style={{ fontSize: 14, color: c.sub, marginTop: 6, textAlign: 'center' }}>{tr.subEmptyHint}</Text>
@@ -964,9 +1002,46 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
   );
 }
 
+/**
+ * Тіло темної картки «Наступна оплата» (Omni featured): назва, сума великими
+ * тонкими цифрами, дата й «через N дн.», біла pill «Оплачено». Кольори — з
+ * useBentoColors(): на темній картці text.primary був би чорним по чорному.
+ */
+function NextPaymentBody({ sub, today, currencies, locale, tr, onPay }: {
+  sub: Subscription;
+  today: string;
+  currencies: readonly Currency[];
+  locale: string;
+  tr: Translations;
+  onPay: (id: string) => void;
+}) {
+  const bc = useBentoColors();
+  const overdue = subscriptionStatus(sub, today) === 'overdue';
+  return (
+    <View>
+      <Text numberOfLines={1} style={{ color: bc.text, fontSize: 18, fontFamily: fontFamily.semibold }}>{sub.name}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}
+        style={{ ...dsType.displaySm, fontFamily: fontFamily.light, color: bc.text, marginTop: 4 }}>
+        {formatSubscriptionMoney(sub.amount, sub.currency, currencies, locale)}
+      </Text>
+      <Text numberOfLines={1} style={{ ...dsType.caption, ...dsType.numeric, color: bc.textSecondary, marginTop: 4 }}>
+        {formatDateKey(sub.nextPaymentDate, locale)} · {paymentWhenLabel(sub.nextPaymentDate, today, tr)}
+        {overdue ? ` · ${tr.subOverdue}` : ''}
+      </Text>
+      <TouchableOpacity
+        onPress={() => onPay(sub.id)}
+        accessibilityRole="button"
+        accessibilityLabel={`${tr.subPayNow}: ${sub.name}`}
+        style={[st.payPill, { backgroundColor: bc.actionBg }]}>
+        <IconSymbol name="checkmark" size={14} color={bc.actionText} />
+        <Text style={{ color: bc.actionText, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.subPayNow}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
-  totalsCard:    { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: space.cardGapCompact },
-  totalsLabel:   { ...dsType.caption, fontFamily: fontFamily.medium },
+  payPill:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, borderRadius: radius.pill, marginTop: 14 },
   sectionLabel:  { ...dsType.h2, marginBottom: 6 },
   filterChip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.pill, minHeight: 36, paddingHorizontal: 14, paddingVertical: 8 },
   emptyIcon:     { width: 80, height: 80, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },

@@ -20,7 +20,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { Layout } from '@/constants/tokens';
-import { fontFamily, glass, theme } from '@/constants/theme';
+import { fontFamily } from '@/constants/theme';
 import { dsTokensFor } from '@/components/health/palette';
 import type { Translations } from '@/store/translations';
 import { type HealthColors } from '@/utils/healthTheme';
@@ -116,9 +116,10 @@ export interface HealthTabBarProps {
 }
 
 /**
- * Смуга вкладок: pill-чипи DS v2.1 (скло subtle), активна — скляна pill з
- * коралом (змивка + обідок + іконка coral.ink);
- * бейдж справ — коралом (алерт).
+ * Смуга вкладок за Omni (DS v2.2, як SectionTabs): активна — суцільна pill
+ * action.primary (чорна; у темній — біла) з text.onAction; решта — тиха
+ * subtle-pill з волосяним обідком і text.secondary (≥ 4.5:1). Бейдж справ —
+ * коралом (алерт).
  *
  * На телефоні скролиться горизонтально, а не тисне шість підписів у ширину
  * екрана. На планшеті — один ряд без прокрутки.
@@ -126,9 +127,6 @@ export interface HealthTabBarProps {
 export function HealthTabBar({ value, onChange, tr, c, preventionBadge = 0, layout }: HealthTabBarProps) {
   const lay = layout ?? { scroll: true, showIcons: true, tabWidth: 0 };
   const k = dsTokensFor(c);
-  // DS v2.1: активна вкладка — скляна pill з коралом (акцент модуля «Здоровʼя»):
-  // змивка coral.tint + обідок і іконка coral.ink; підпис лишається text.primary.
-  const coral = glass[k === theme.dark ? 'dark' : 'light'].accent.coral;
   const tabs = HEALTH_TAB_META.map(meta => {
     const active = meta.id === value;
     const badge = meta.id === 'prevention' ? preventionBadge : 0;
@@ -141,18 +139,18 @@ export function HealthTabBar({ value, onChange, tr, c, preventionBadge = 0, layo
         accessibilityRole="tab"
         accessibilityState={{ selected: active }}
         accessibilityLabel={badge > 0 ? `${meta.a11yLabel(tr)}, ${badge}` : meta.a11yLabel(tr)}
-        style={[s.tab, !lay.scroll && s.tabFill, {
-          backgroundColor: active ? coral.tint : c.dim,
-          borderWidth: 1,
-          borderColor: active ? coral.ink : 'transparent',
-        }]}>
-        {lay.showIcons && <IconSymbol name={meta.icon} size={14} color={active ? coral.ink : c.sub} />}
+        hitSlop={{ top: 2, bottom: 2 }}
+        style={[s.tab, !lay.scroll && s.tabFill, active
+          ? { backgroundColor: k.action.primary, borderWidth: StyleSheet.hairlineWidth, borderColor: k.action.primary }
+          : { backgroundColor: c.dim, borderWidth: StyleSheet.hairlineWidth, borderColor: k.border.hairline },
+        ]}>
+        {lay.showIcons && <IconSymbol name={meta.icon} size={14} color={active ? k.text.onAction : k.text.secondary} />}
         <Text
           numberOfLines={1}
           adjustsFontSizeToFit={!lay.scroll}
           minimumFontScale={0.8}
           maxFontSizeMultiplier={1.4}
-          style={[s.label, !lay.scroll && s.labelFill, { color: k.text.primary }]}>
+          style={[s.label, !lay.scroll && s.labelFill, { color: active ? k.text.onAction : k.text.secondary }]}>
           {label}
         </Text>
         {badge > 0 && (

@@ -36,7 +36,7 @@ import {
 } from '@/utils/taskStatuses';
 import { fontFamily, radius, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { BentoCard } from '@/components/ds';
 
 /** Дебаунс запису назви статусу (мс) — див. коментар над `changeStatusName`. */
 const STATUS_NAME_COMMIT_DELAY = 500;
@@ -65,7 +65,7 @@ export default function ProjectSettingsScreen() {
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
   const tk = dsTokens(isDark);
   // DS v2: поле вводу — subtle-тло без рамки.
-  const inputBase = { borderRadius: radius.control, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), paddingHorizontal: 14, paddingVertical: 10, color: c.text, fontFamily: fontFamily.regular } as const;
+  const inputBase = { borderRadius: radius.control, backgroundColor: tk.surface.subtle, paddingHorizontal: 14, paddingVertical: 10, color: c.text, fontFamily: fontFamily.regular } as const;
 
   const [name, setName] = useState('');
   const [color, setColor] = useState(PROJECT_COLORS[0]);
@@ -299,7 +299,8 @@ export default function ProjectSettingsScreen() {
 
         {/* Назва/колір/опис/термін */}
         {project&&<ProjectAppearanceForm key={project.id} project={project} canEdit={role==='owner'} textColor={c.text}/>}
-        <Text style={[type.h2, { color: c.text, marginBottom: 8 }]}>{tr.projectSettingsInfo}</Text>
+        {/* Omni: кожна група налаштувань — суцільна bento-картка з шапкою. */}
+        <BentoCard title={tr.projectSettingsInfo} icon="info.circle" accent="lavender" style={{ marginBottom: 16 }}>
         <TextInput
           value={name}
           onChangeText={v => { setName(v); setDirty(true); }}
@@ -338,22 +339,24 @@ export default function ProjectSettingsScreen() {
           style={[inputBase, { minHeight: 44, fontSize: 14, fontVariant: ['tabular-nums'], marginBottom: 12 }]}
         />
         {isOwner && dirty ? (
-          <TouchableOpacity onPress={saveInfo} disabled={!name.trim()} style={{ backgroundColor: name.trim() ? tk.action.primary : tk.state.disabledBg, borderRadius: radius.pill, minHeight: 48, justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
+          <TouchableOpacity onPress={saveInfo} disabled={!name.trim()} style={{ backgroundColor: name.trim() ? tk.action.primary : tk.state.disabledBg, borderRadius: radius.pill, minHeight: 48, justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
             <Text style={{ color: name.trim() ? tk.text.onAction : tk.state.disabledText, fontFamily: fontFamily.semibold, fontSize: 15 }}>{tr.save}</Text>
           </TouchableOpacity>
-        ) : <View style={{ marginBottom: 12 }} />}
+        ) : <View style={{ marginBottom: 4 }} />}
 
-        <Text style={[type.caption, { color: c.sub, marginBottom: 6 }]}>
+        <Text style={[type.caption, { color: c.sub }]}>
           {tr.projectTemplateLabel}: {project?.template === 'simple' ? tr.projectTemplateSimple : tr.projectTemplateWork}
         </Text>
+        </BentoCard>
 
+        {projectId ? <BentoCard compact style={{ marginBottom: 16, gap: 8 }}>
         {/* Команда (WORKSPACE_PROJECTS_PLAN.md §4) — видно всім ролям: власник
             керує складом, учасник/глядач бачать команду й можуть вийти. */}
         {projectId ? (
           <TouchableOpacity
             onPress={() => router.push(`/project/${encodeURIComponent(projectId)}/members` as never)}
             accessibilityRole="button"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), minHeight: 52, paddingHorizontal: 16, marginTop: 4, marginBottom: 12 }}>
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, backgroundColor: tk.surface.subtle, minHeight: 52, paddingHorizontal: 16 }}>
             <IconSymbol name="person.2.fill" size={17} color={c.sub} />
             <Text style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.projectSettingsMembersRow}</Text>
             <IconSymbol name="chevron.right" size={14} color={c.sub} />
@@ -365,20 +368,20 @@ export default function ProjectSettingsScreen() {
           <TouchableOpacity
             onPress={() => router.push(`/project/${encodeURIComponent(projectId)}/activity` as never)}
             accessibilityRole="button"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), minHeight: 52, paddingHorizontal: 16, marginBottom: 20 }}>
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, backgroundColor: tk.surface.subtle, minHeight: 52, paddingHorizontal: 16 }}>
             <IconSymbol name="clock.arrow.circlepath" size={17} color={c.sub} />
             <Text style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.projectActivityTitle}</Text>
             <IconSymbol name="chevron.right" size={14} color={c.sub} />
           </TouchableOpacity>
         ) : null}
+        </BentoCard> : null}
 
         {/* Розділи */}
         {(isOwner || role === 'manager') && (
           <>
-            <Text style={[type.h2, { color: c.text, marginTop: 16, marginBottom: 8 }]}>{tr.projectSettingsModules}</Text>
-            <View style={{ borderRadius: radius.cardCompact, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginBottom: 20, overflow: 'hidden' }}>
+            <BentoCard title={tr.projectSettingsModules} icon="square.grid.2x2" accent="lavender" style={{ marginBottom: 16 }}>
               {MODULE_ROWS.map((row, i) => (
-                <View key={row.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: i < MODULE_ROWS.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: c.border }}>
+                <View key={row.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, minHeight: 48, borderBottomWidth: i < MODULE_ROWS.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: c.border }}>
                   <IconSymbol name={row.icon} size={17} color={c.sub} />
                   <Text style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{String(tr[row.labelKey])}</Text>
                   <Switch
@@ -395,27 +398,36 @@ export default function ProjectSettingsScreen() {
                   />
                 </View>
               ))}
-            </View>
+            </BentoCard>
           </>
         )}
 
         {/* Workflow статусів */}
         {(isOwner || role === "manager") && (
           <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 6 }}>
-              <Text style={[type.h2, { flex: 1, color: c.text }]}>{tr.projectSettingsStatuses}</Text>
-              <TouchableOpacity onPress={addStatus} accessibilityRole="button" accessibilityLabel={tr.projectStatusAdd}>
-                <IconSymbol name="plus" size={16} color={c.text} />
-              </TouchableOpacity>
-            </View>
+            <BentoCard
+              title={tr.projectSettingsStatuses}
+              icon="list.bullet"
+              accent="lavender"
+              style={{ marginBottom: 16 }}
+              headerRight={
+                <TouchableOpacity
+                  onPress={addStatus}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.projectStatusAdd}
+                  hitSlop={4}
+                  style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: tk.surface.subtle }}>
+                  <IconSymbol name="plus" size={16} color={c.text} />
+                </TouchableOpacity>
+              }>
             {scopedColumns.length === 0 ? (
-              <TouchableOpacity onPress={seedStatuses} style={{ borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, minHeight: 48, justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
+              <TouchableOpacity onPress={seedStatuses} style={{ borderRadius: radius.pill, backgroundColor: tk.surface.subtle, minHeight: 48, justifyContent: 'center', alignItems: 'center' }}>
                 <Text style={{ color: tk.action.secondaryText, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.projectStatusSeed}</Text>
               </TouchableOpacity>
             ) : (
-              <View style={{ marginBottom: 20 }}>
+              <View>
                 {scopedColumns.map((col, i) => (
-                  <View key={col.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 12, marginBottom: 8 }}>
+                  <View key={col.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.nested, backgroundColor: tk.surface.subtle, padding: 12, marginBottom: 8 }}>
                     <View style={{ flexDirection: 'row', gap: 3 }}>
                       <TouchableOpacity disabled={i === 0} onPress={() => move(col, -1)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
                         <IconSymbol name="chevron.up" size={13} color={i === 0 ? c.border : c.sub} />
@@ -433,7 +445,7 @@ export default function ProjectSettingsScreen() {
                       onChangeText={v => changeStatusName(col.id, v)}
                       style={{ flex: 1, color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}
                     />
-                    <TouchableOpacity onPress={() => cycleType(col)} style={{ borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <TouchableOpacity onPress={() => cycleType(col)} style={{ borderRadius: radius.pill, backgroundColor: tk.surface.subtle, paddingHorizontal: 10, paddingVertical: 4 }}>
                       <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.medium }}>{typeLabel(col.type ?? 'todo')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -448,6 +460,7 @@ export default function ProjectSettingsScreen() {
                 ))}
               </View>
             )}
+            </BentoCard>
           </>
         )}
       </ScrollView>

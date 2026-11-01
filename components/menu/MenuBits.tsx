@@ -8,13 +8,12 @@
  */
 import { Atlas } from '@/constants/atlas';
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 
 import { MENU_OK, MENU_WARN, type MenuColors } from './theme';
-import { fontFamily } from '@/constants/theme';
-import { glassRimFor } from '@/components/shared/dsTheme';
+import { fontFamily, shadow } from '@/constants/theme';
 
 export function menuBits(c: MenuColors, busy: boolean) {
   const text = (value: string, muted = false) => (
@@ -43,6 +42,9 @@ export function menuBits(c: MenuColors, busy: boolean) {
         paddingVertical: 11,
         borderRadius: 999,
         backgroundColor: selected ? c.primary : c.dim,
+        // Тонка межа — щоб тиха pill читалась і на canvas, і на білій картці.
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: selected ? 'transparent' : c.border,
         opacity: busy || disabled ? 0.5 : pressed ? 0.7 : 1,
         justifyContent: 'center',
         alignItems: 'center',
@@ -72,7 +74,7 @@ export function menuBits(c: MenuColors, busy: boolean) {
     <View
       key={key}
       style={{
-        backgroundColor: c.card, ...glassRimFor(c.card, 'card'),
+        backgroundColor: c.card, ...shadow[c.isDark ? 'dark' : 'light'].card,
         borderRadius: Atlas.radius.xlarge,
         padding: 20,
         gap: 12,

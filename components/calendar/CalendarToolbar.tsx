@@ -21,7 +21,6 @@ import {
   CALENDAR_VIEWS, PERSONAL_FILTER, type CalendarProject, type CalendarView, type ProjectFilter,
 } from './calendarModel';
 import { PERSONAL_TASK_COLOR, type CalendarColors } from './palette';
-import { glassRimFor } from '@/components/shared/dsTheme';
 
 const VIEW_KEYS: Record<CalendarView, 'calViewMonth' | 'calViewWeek' | 'calViewDay'> = {
   month: 'calViewMonth', week: 'calViewWeek', day: 'calViewDay',
@@ -77,7 +76,7 @@ export function CalendarToolbar({
   showDone, onToggleDone, onlyMine, onToggleOnlyMine, canFilterMine, showFilters = true, wide, c, tr,
 }: CalendarToolbarProps) {
   const segments = (
-    <View accessibilityRole="tablist" style={[st.segments, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }, wide && { width: 300 }]}>
+    <View accessibilityRole="tablist" style={[st.segments, { backgroundColor: c.card }, wide && { width: 300 }]}>
       {CALENDAR_VIEWS.map(v => {
         const active = v === view;
         return (
@@ -97,7 +96,7 @@ export function CalendarToolbar({
   const nav = (
     <View style={[st.navRow, wide && { flex: 1 }]}>
       <TouchableOpacity onPress={onPrev} accessibilityRole="button" accessibilityLabel={tr.calPrevPeriod}
-        style={[st.navBtn, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+        style={[st.navBtn, { backgroundColor: c.card }]}>
         <IconSymbol name="chevron.left" size={15} color={c.sub} />
       </TouchableOpacity>
       <Text accessibilityRole="header" style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}
@@ -105,7 +104,7 @@ export function CalendarToolbar({
         {title}
       </Text>
       <TouchableOpacity onPress={onNext} accessibilityRole="button" accessibilityLabel={tr.calNextPeriod}
-        style={[st.navBtn, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+        style={[st.navBtn, { backgroundColor: c.card }]}>
         <IconSymbol name="chevron.right" size={15} color={c.sub} />
       </TouchableOpacity>
     </View>
@@ -119,7 +118,7 @@ export function CalendarToolbar({
       accessibilityState={{ selected: active }}
       accessibilityLabel={label}
       // DS v2: чип — pill; активний — action.primary, колір проєкту лишається крапкою.
-      style={[st.chip, active ? { backgroundColor: c.select } : { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+      style={[st.chip, active ? { backgroundColor: c.select } : { backgroundColor: c.card }]}>
       {icon ? <IconSymbol name={icon} size={12} color={active ? c.onSelect : c.sub} /> : null}
       {color && !icon ? <View style={[st.dot, { backgroundColor: color }]} /> : null}
       <Text style={{ color: active ? c.onSelect : c.text, fontSize: 12, fontFamily: fontFamily.semibold }} numberOfLines={1}>{label}</Text>

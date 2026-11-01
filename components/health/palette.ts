@@ -35,6 +35,17 @@ export function getHealthDSColors(isDark: boolean, reduceTransparency = false): 
 }
 
 /**
+ * Omni (DS v2.2): палітра для ВМІСТУ на суцільних BentoCard (вкладки,
+ * налаштування розділу). Скляні dim/track на білій картці зникають (контраст
+ * ≈1:1), тож підкладки рядків/сегментів/доріжок — суцільний surface.subtle.
+ * Решта ключів — як у getHealthDSColors (шапка й аркуші лишаються склом).
+ */
+export function getHealthCardColors(isDark: boolean, reduceTransparency = false): HealthColors {
+  const t = isDark ? theme.dark : theme.light;
+  return { ...getHealthDSColors(isDark, reduceTransparency), dim: t.surface.subtle, track: t.surface.subtle };
+}
+
+/**
  * Токени DS за самою палітрою розділу — для компонентів, які отримують лише
  * `c` (без isDark) і не мають тягнути store/theme-context (їх імпортують
  * чисті тести). Розпізнає і DS-палітру, і легасі getHealthColors().

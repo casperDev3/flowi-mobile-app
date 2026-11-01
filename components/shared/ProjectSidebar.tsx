@@ -37,7 +37,7 @@ import {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Atlas } from '@/constants/atlas';
 import { GlassBackdrop } from '@/components/ds/Glass';
-import { fontFamily, moduleAccent, radius } from '@/constants/theme';
+import { fontFamily, radius } from '@/constants/theme';
 import { dsTokens, glassTokens } from '@/hooks/use-ds';
 import { useReduceTransparency } from '@/hooks/use-reduce-transparency';
 import { goProjectsList, projectRoute, visibleProjectNavItems, type ProjectSectionKey } from '@/constants/projectNav';
@@ -94,30 +94,27 @@ export function ProjectSidebar({
   const accent = project?.color ?? '#7C3AED';
 
   // DS v2.1 (Liquid Glass): скло над mesh, як особистий сайдбар. Активний
-  // розділ — скляна pill, тонована акцентом модуля «Проєкти» (lavender):
-  // довільний колір проєкту не гарантує контрасту іконки/підпису, тож він
-  // лишається на плитці-ідентичності й картці таймерів.
+  // розділ — Omni-pill (див. activeBg нижче); довільний колір проєкту не
+  // гарантує контрасту іконки/підпису, тож він лишається на
+  // плитці-ідентичності й картці таймерів.
   const t = dsTokens(isDark);
   const g = glassTokens(isDark);
   const reduceTransparency = useReduceTransparency();
-  const pa = g.accent[moduleAccent.projects];
   const c = {
     bg:       reduceTransparency ? t.surface.card : g.surface,
     border:   t.border.hairline,
     text:     t.text.primary,
     sub:      t.text.secondary,
     accent,
-    activeBg: reduceTransparency ? pa.solid : pa.tint,
-    onActive: reduceTransparency ? pa.onSolid : pa.ink,
-    activeText: reduceTransparency ? pa.onSolid : t.text.primary,
+    // Omni (DS v2.2): активний розділ — чорна pill action.primary (у темній —
+    // біла) з text.onAction, як в особистому сайдбарі й таб-барі.
+    activeBg: t.action.primary,
+    onActive: t.text.onAction,
+    activeText: t.text.onAction,
   };
-  const activeExtra = reduceTransparency ? null : {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: g.rim,
-    ...(Platform.OS === 'ios'
-      ? { shadowColor: pa.glow, shadowOpacity: isDark ? 0.5 : 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 3 } }
-      : null),
-  };
+  const activeExtra = reduceTransparency ? null : (Platform.OS === 'ios'
+    ? { shadowColor: '#000', shadowOpacity: isDark ? 0.4 : 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 3 } }
+    : null);
 
   const goSection = (route: string) => router.push(route as never);
   const name = project?.name ?? '';

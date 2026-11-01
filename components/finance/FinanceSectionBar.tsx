@@ -48,14 +48,19 @@ export function FinanceTabBar({ tabs, active, onChange, c, tr, stretch = true }:
   stretch?: boolean;
 }) {
   const { isWide, height } = useResponsive();
-  const { t, isDark } = useDS();
+  const { t, g, isDark, reduceTransparency } = useDS();
   const gs = useGlassStyles();
   const [moreOpen, setMoreOpen] = useState(false);
   const { inline, more } = splitFinanceTabs(tabs);
   const moreActive = more.includes(active);
   const moreLabel = moreActive ? financeTabLabel(active, tr) : tr.finTabMore;
 
-  const segment = (key: string, label: string, on: boolean, onPress: () => void, extra?: React.ReactNode, hint?: string) => (
+  // Omni (DS v2.2): окремі pill-вкладки (як SectionTabs) — активна суцільна
+  // action.primary (чорна; у темній — біла), решта — тиха скляна pill з
+  // волосяним обідком (смуга живе у функціональному шарі — шапці). Іконки —
+  // лише на планшеті: на телефоні чотири pill з іконками не вміщаються в ряд.
+  const idle = reduceTransparency ? t.surface.subtle : g.surfaceSubtle;
+  const segment = (key: string, label: string, on: boolean, onPress: () => void, icon?: IconSymbolName, extra?: React.ReactNode, hint?: string) => (
     <TouchableOpacity
       key={key}
       onPress={onPress}
@@ -64,8 +69,15 @@ export function FinanceTabBar({ tabs, active, onChange, c, tr, stretch = true }:
       accessibilityLabel={label}
       accessibilityHint={hint}
       hitSlop={SEG_HIT}
-      style={[st.seg, stretch && st.segStretch, on && { backgroundColor: t.action.primary }]}>
-      <Text numberOfLines={1} style={{ color: on ? t.text.onAction : t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>
+      style={[
+        st.seg,
+        stretch && st.segStretch,
+        on
+          ? { backgroundColor: t.action.primary }
+          : { backgroundColor: idle, borderWidth: StyleSheet.hairlineWidth, borderColor: t.border.hairline },
+      ]}>
+      {icon && !stretch ? <IconSymbol name={icon} size={14} color={on ? t.text.onAction : t.text.secondary} style={{ marginRight: 6 }} /> : null}
+      <Text numberOfLines={1} style={{ color: on ? t.text.onAction : t.text.secondary, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>
       {extra}
     </TouchableOpacity>
   );
@@ -75,13 +87,14 @@ export function FinanceTabBar({ tabs, active, onChange, c, tr, stretch = true }:
       <View
         accessibilityRole="tablist"
         accessibilityLabel={tr.finTabsLabel}
-        style={[st.segBar, { ...gs.card }, stretch ? { alignSelf: 'stretch' } : { alignSelf: 'flex-start' }]}>
-        {inline.map(tab => segment(tab, financeTabLabel(tab, tr), tab === active, () => onChange(tab)))}
+        style={[st.segBar, stretch ? { alignSelf: 'stretch' } : { alignSelf: 'flex-start' }]}>
+        {inline.map(tab => segment(tab, financeTabLabel(tab, tr), tab === active, () => onChange(tab), TAB_ICON[tab]))}
         {more.length > 0 ? segment(
           'more',
           moreLabel,
           moreActive,
           () => setMoreOpen(true),
+          moreActive ? TAB_ICON[active] : 'ellipsis',
           <IconSymbol name="chevron.down" size={10} color={moreActive ? t.text.onAction : t.text.secondary} style={{ marginLeft: 3 }} />,
           tr.finMoreSections,
         ) : null}
@@ -117,7 +130,8 @@ export function FinanceTabBar({ tabs, active, onChange, c, tr, stretch = true }:
   );
 }
 
-// 40 + 3 + 3 у межах смуги (padding 3) = 46: ціль ≥44 без виходу за bounds батька (A11Y-08).
+// 40 + 3 + 3 = 46: ціль ≥44; смуга має вертикальні поля 3, тож hitSlop не
+// виходить за bounds батька (A11Y-08).
 const SEG_HIT = { top: 3, bottom: 3, left: 1, right: 1 } as const;
 
 const TAB_ICON: Record<FinanceTab, IconSymbolName> = {
@@ -434,9 +448,9 @@ function PeriodSheet({ visible, onClose, period, onPick, c, tr, isWide, isDark }
 
 const st = StyleSheet.create({
   // Сегментований перемикач DS v2: біла pill-доріжка, активний сегмент — pill action.primary.
-  segBar: { flexDirection: 'row', borderRadius: radius.pill, padding: 3, marginTop: 10, gap: 2 },
+  segBar: { flexDirection: 'row', paddingVertical: 3, marginTop: 10, gap: 8 },
   seg: { flexDirection: 'row', minHeight: 40, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  segStretch: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: 6 },
+  segStretch: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: 8 },
   periodBox: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 4 },
   arrow: { width: 32, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
   chip: { minHeight: 36, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },

@@ -23,7 +23,7 @@ import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { LoadErrorNotice, ReminderBlockedNotice, useSheetScreenMinHeight } from '@/components/health/HealthNotices';
 import { fontFamily } from '@/constants/theme';
 import { useGlassStyles } from '@/components/finance/finPalette';
-import { GlassBackdrop, MeshBackground } from '@/components/ds';
+import { BentoCard, GlassBackdrop, KpiCounter, MeshBackground, PageHeader, SegmentedProgress } from '@/components/ds';
 
 const ACC = HEALTH_ACCENTS.prevention;
 
@@ -111,6 +111,10 @@ export default function MedsScreen() {
     }
   };
 
+  const activeMeds = meds.filter(m => m.active);
+  const dosesTotal = activeMeds.reduce((n, m) => n + m.times.length, 0);
+  const dosesTaken = activeMeds.reduce((n, m) => n + Math.min(medTakenToday(m), m.times.length), 0);
+
   return (
     // NAT-14: formSheet не дає кореню визначеної висоти — без minHeight
     // `flex: 1` схлопується до висоти вмісту, і низ аркуша лишається прозорим.
@@ -127,6 +131,20 @@ export default function MedsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Omni: KPI — активні ліки й прийоми на сьогодні. */}
+        {initialized && meds.length > 0 ? (
+          <PageHeader
+            bleed={20}
+            style={{ paddingHorizontal: 20, paddingBottom: 8 }}
+            kpis={
+              <>
+                <KpiCounter value={activeMeds.length} label={tr.medActive} />
+                {dosesTotal > 0 ? <KpiCounter value={`${dosesTaken}/${dosesTotal}`} label={tr.taken} /> : null}
+              </>
+            }
+          />
+        ) : null}
+
         <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
           {loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={retryLoad} />}
           {reminderBlocked && (
@@ -139,7 +157,8 @@ export default function MedsScreen() {
           ) : meds.map(m => {
             const taken = medTakenToday(m); const total = m.times.length; const done = taken >= total;
             return (
-              <View key={m.id} style={[s.card, { ...gs.card, opacity: m.active ? 1 : 0.5 }]}>
+              // Omni (DS v2.2): суцільна BentoCard; прийоми дня — сегментний прогрес.
+              <BentoCard key={m.id} compact style={[s.card, { opacity: m.active ? 1 : 0.5 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <View style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: ACC + '20', alignItems: 'center', justifyContent: 'center' }}>
                     <IconSymbol name="pills.fill" size={18} color={ACC} />
@@ -150,10 +169,14 @@ export default function MedsScreen() {
                       {m.dose ? `${m.dose} · ` : ''}{m.times.join(', ')} · {tr.adherence} {medAdherence(m)}%
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={() => remove(m)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
+                  <TouchableOpacity onPress={() => remove(m)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${m.name}`} style={s.removeBtn}>
                     <IconSymbol name="trash" size={15} color={c.sub} />
                   </TouchableOpacity>
                 </View>
+                {total > 0 ? (
+                  <SegmentedProgress value={taken / total} segments={Math.min(15, Math.max(total, 1))} height={8}
+                    accessibilityLabel={`${m.name}: ${tr.taken} ${taken}/${total}`} style={{ marginTop: 12 }} />
+                ) : null}
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 8 }}>
                   <Text style={{ color: c.sub, fontSize: 12, flex: 1 }}>{tr.taken}: {taken}/{total}</Text>
                   <TouchableOpacity onPress={() => toggleActive(m)} style={[s.smallBtn, { backgroundColor: c.dim }]}>
@@ -165,7 +188,7 @@ export default function MedsScreen() {
                     <Text style={{ color: done ? c.text : m.active ? k.text.onAction : k.state.disabledText, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 4 }}>{done ? tr.taken : tr.takeNow}</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
+              </BentoCard>
             );
           })}
         </ScrollView>
@@ -204,7 +227,9 @@ const s = StyleSheet.create({
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
   title:     { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
   addBtn:    { width: 44, height: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  card:      { borderRadius: 20, padding: 20, marginBottom: 12 },
+  card:      { marginBottom: 12 },
+  // 44×44 — мінімальна ціль дотику (раніше 23pt + hitSlop).
+  removeBtn: { width: 44, height: 44, marginRight: -12, alignItems: 'center', justifyContent: 'center' },
   smallBtn:  { borderRadius: 999, minHeight: 36, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 6 },
   takeBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: 999, minHeight: 36, paddingHorizontal: 16, paddingVertical: 6 },
   overlay:   { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)' /* surface.overlay */, justifyContent: 'flex-end' },

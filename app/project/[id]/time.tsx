@@ -44,7 +44,8 @@ import { recordProjectId, sortRecords, taskProjectMap, type TimeRecord } from '@
 import type { EditableTask } from '@/utils/timeEntryEdit';
 import { fontFamily, radius, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { BentoCard, BentoGrid, HatchedBars, KpiCounter } from '@/components/ds';
+import { localDateKey } from '@/utils/dateUtils';
 
 export default function ProjectTimeScreen() {
   const { id: projectId } = useLocalSearchParams<{ id: string }>();
@@ -87,6 +88,23 @@ export default function ProjectTimeScreen() {
     [entries, projectId, taskProjects],
   );
   const totalSeconds = useMemo(() => own.reduce((acc, e) => acc + (e.duration || 0), 0), [own]);
+  // Omni: останні 7 днів стовпцями (сьогодні — фірмовий градієнт) — з тих
+  // самих записів проєкту, що й список нижче.
+  const last7 = useMemo(() => {
+    const byDay = new Map<string, number>();
+    for (const e of own) {
+      const d = new Date(e.date);
+      if (Number.isNaN(d.getTime())) continue;
+      const key = localDateKey(d);
+      byDay.set(key, (byDay.get(key) ?? 0) + (e.duration || 0));
+    }
+    const today = new Date();
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (6 - i));
+      return { key: localDateKey(d), weekday: (d.getDay() + 6) % 7, seconds: byDay.get(localDateKey(d)) ?? 0 };
+    });
+  }, [own]);
+  const weekSeconds = last7.reduce((acc, d) => acc + d.seconds, 0);
   const rowAnomalies = useMemo(() => anomalyMap(detectAnomalies(entries, taskProjects)), [entries, taskProjects]);
 
   const units = useMemo(
@@ -150,6 +168,14 @@ export default function ProjectTimeScreen() {
       project={project}
       isDark={isDark}
       title={tr.navTime}
+      // Omni KPI: усього · за 7 днів · кількість записів (ті самі записи проєкту).
+      kpis={
+        <>
+          <KpiCounter value={fmtDur(totalSeconds)} label={tr.totalLabel} accessibilityLabel={`${tr.totalLabel}: ${fmtDur(totalSeconds)}`} />
+          <KpiCounter value={fmtDur(weekSeconds)} label={tr.days7} />
+          <KpiCounter value={own.length} label={tr.timeRecords} />
+        </>
+      }
       actions={canEdit ? (
         <HeaderButton
           onPress={() => openEntry(null)}
@@ -163,14 +189,19 @@ export default function ProjectTimeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
 
-        {/* DS v2: підсумок — KPI-картка з великими тонкими цифрами. */}
-        <View
-          accessible
-          accessibilityLabel={`${tr.totalLabel}: ${fmtDur(totalSeconds)}`}
-          style={{ backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), borderRadius: radius.cardCompact, padding: 20, marginTop: 4, marginBottom: 12 }}>
-          <Text style={[type.caption, { color: c.sub }]}>{tr.totalLabel}</Text>
-          <Text style={[type.displaySm, { color: c.text, marginTop: 4 }]} numberOfLines={1} adjustsFontSizeToFit>{fmtDur(totalSeconds)}</Text>
-        </View>
+        {/* Omni: тижневий графік — штриховані стовпці, сьогодні — градієнт. */}
+        {own.length > 0 ? (
+          <BentoGrid style={{ marginTop: 4, marginBottom: 12 }}>
+            <BentoCard title={tr.days7} icon="chart.bar.fill" accent="amber" span="full">
+              <HatchedBars
+                data={last7.map(d => ({ label: tr.weekdays[d.weekday], value: d.seconds, display: fmtDur(d.seconds) }))}
+                activeIndex={6}
+                height={110}
+                accessibilityLabel={`${tr.days7}: ${last7.map(d => `${tr.weekdays[d.weekday]} ${fmtDur(d.seconds)}`).join(', ')}`}
+              />
+            </BentoCard>
+          </BentoGrid>
+        ) : null}
 
         {own.length === 0 ? (
           <Text style={[type.body, { color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 30 }]}>{tr.timeNoEntries}</Text>
@@ -199,10 +230,10 @@ export default function ProjectTimeScreen() {
                 alignItems: 'center',
                 // DS v2: рядок — картка без рамки; аномалія — рамка кольору
                 // прапорця (без бічної смуги), значок ⚠ лишається.
-                borderRadius: radius.nested,
+                borderRadius: radius.cardCompact,
                 borderWidth: 1.5,
                 borderColor: flag ?? 'transparent',
-                backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'),
+                backgroundColor: tk.surface.card,
                 padding: 14,
                 marginBottom: 8,
                 overflow: 'hidden',
@@ -224,7 +255,7 @@ export default function ProjectTimeScreen() {
                     onPress={() => trimEntry(entry, trim)}
                     accessibilityRole="button"
                     accessibilityLabel={`${tr.anomalyTrimTo.replace('{duration}', fmtDur(trim))}: ${title}`}
-                    style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, minHeight: 32, paddingHorizontal: 12, marginTop: 8 }}>
+                    style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: radius.pill, backgroundColor: tk.surface.subtle, minHeight: 32, paddingHorizontal: 12, marginTop: 8 }}>
                     <IconSymbol name="arrow.down.trend" size={11} color={tk.action.secondaryText} />
                     <Text style={{ color: tk.action.secondaryText, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginLeft: 5 }}>
                       {tr.anomalyTrimTo.replace('{duration}', fmtDur(trim))}

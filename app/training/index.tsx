@@ -6,7 +6,10 @@ import { Stack, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+// Omni (DS v2.2): AppHeader = ScreenHeader + 🔔 і аватар; KPI під заголовком.
+import { AppHeader } from '@/components/shared/AppHeader';
+import { HeaderButton } from '@/components/shared/ScreenHeader';
+import { KpiCounter } from '@/components/ds';
 import { CreateGroupSheet, JoinGroupSheet } from '@/components/training/GroupSheets';
 import { useTrainingGroups, useTrainingScope } from '@/components/training/hooks';
 import { fmt, TG_ACCENT, useTrainingColors } from '@/components/training/theme';
@@ -62,10 +65,16 @@ export default function TrainingGroupsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <ScreenBackground c={c} />
       <View style={contentWidth}>
-        <ScreenHeader
+        <AppHeader
           title={tr.tgTitle}
-          color={c.text}
           back={{ onPress: () => router.back(), label: tr.back, color: c.text }}
+          kpis={loaded && active.length ? (
+            <>
+              <KpiCounter value={active.length} label={tr.tgTitle} />
+              <KpiCounter value={active.filter(g => g.role === 'coach').length} label={tr.tgRoleCoach} />
+              <KpiCounter value={active.filter(g => g.role !== 'coach').length} label={tr.tgRoleMember} />
+            </>
+          ) : undefined}
           actions={online ? (
             <HeaderButton onPress={() => setSheet('join')} accessibilityLabel={tr.tgJoinGroup}>
               <IconSymbol name="person.badge.plus" size={18} color={c.text} />

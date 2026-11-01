@@ -138,7 +138,7 @@ export function RestTimerBar({ c, endsAt, onAdd, onSkip, onDone }: {
       accessibilityLiveRegion="polite"
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 16,
-        ...c.gl.card,
+        backgroundColor: c.t.surface.card, borderWidth: 1, borderColor: c.border,
       }}>
       <IconSymbol name="timer" size={20} color={c.sub} />
       <View style={{ flex: 1 }}>

@@ -12,7 +12,7 @@ import React, { useEffect, useState } from 'react';
 import { Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { fontFamily, radius, space, touchTarget, type as dsType } from '@/constants/theme';
+import { fontFamily, radius, shadow, space, touchTarget, type as dsType } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 import type { Translations } from '@/store/translations';
 import {
@@ -77,8 +77,9 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
   const overdue = status === 'overdue';
   const archived = status === 'archived';
   const tint = sub.color || '#8B5CF6';
-  const { t: ds } = useDS();
-  const gs = useGlassStyles();
+  const { t: ds, isDark } = useDS();
+  // Omni (DS v2.2): рядок — суцільна картка списку (surface.card + м'яка тінь),
+  // вкладені чипи — surface.subtle (скляний subtle на білій картці зникав).
   return (
     <TouchableOpacity
       onPress={() => onPress(sub.id)}
@@ -89,9 +90,9 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
       style={[st.row, {
         // Вибраний — 2px рамка action.primary (прозора у спокої — без сіпання).
         borderColor: selected ? ds.action.primary : 'transparent',
-        backgroundColor: (gs.card.backgroundColor as string),
+        backgroundColor: ds.surface.card,
         opacity: archived ? 0.6 : 1,
-      }]}>
+      }, shadow[isDark ? 'dark' : 'light'].card]}>
       <View style={[st.iconBox, { backgroundColor: tint + '22' }]}>
         <IconSymbol name={(sub.icon || 'repeat') as IconSymbolName} size={18} color={tint} />
       </View>
@@ -108,7 +109,7 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
           <Text numberOfLines={1} style={{ color: ds.text.secondary, fontSize: 11, fontFamily: fontFamily.regular }}>{formatPeriod(sub.period, lang)}</Text>
           {project ? (
-            <View style={[st.projectChip, { ...gs.subtle }]}>
+            <View style={[st.projectChip, { backgroundColor: ds.surface.subtle }]}>
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: project.color }} />
               <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, maxWidth: 120 }}>{project.name}</Text>
             </View>
@@ -125,7 +126,7 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
             accessibilityRole="button"
             accessibilityLabel={`${tr.subPayNow}: ${sub.name}`}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            style={[st.renewMini, { backgroundColor: overdue ? ds.action.primary : (gs.subtle.backgroundColor as string) }]}>
+            style={[st.renewMini, { backgroundColor: overdue ? ds.action.primary : ds.surface.subtle }]}>
             <IconSymbol name="checkmark" size={11} color={overdue ? ds.text.onAction : ds.action.secondaryText} />
             <Text style={{ color: overdue ? ds.text.onAction : ds.action.secondaryText, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.subPayNow}</Text>
           </TouchableOpacity>
@@ -138,9 +139,8 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
 function StatusChip({ label, color }: { label: string; color: string }) {
   // DS v2: статус — крапкою кольору, підпис text.primary (корал не тримає дрібний текст).
   const { t: ds } = useDS();
-  const gs = useGlassStyles();
   return (
-    <View style={[st.statusChip, { ...gs.subtle }]}>
+    <View style={[st.statusChip, { backgroundColor: ds.surface.subtle }]}>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
       <Text style={{ color: ds.text.primary, fontSize: 11, fontFamily: fontFamily.semibold }}>{label}</Text>
     </View>

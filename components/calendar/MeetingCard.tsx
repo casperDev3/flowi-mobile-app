@@ -20,7 +20,6 @@ import type { Meeting } from '@/utils/meetings';
 import type { CalendarColors } from './palette';
 import { fontFamily, radius } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassOf } from '@/components/shared/dsTheme';
 
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 
@@ -66,11 +65,11 @@ export const MeetingCard = React.memo(function MeetingCard({
       accessibilityState={{ selected }}>
       <View style={[st.card, {
         opacity: !selected && isPast && !isNow ? 0.55 : 1,
-        // DS v2: картка surface.card без бічної смуги; колір наради — крапка
-        // біля часу, вибрана — subtle-тло з тонкою рамкою кольору наради.
-        backgroundColor: selected ? glassOf(t).surfaceSubtle : c.card,
-        borderWidth: selected ? 1.5 : 0,
-        borderColor: mtg.color,
+        // Omni (DS v2.2): суцільна картка без бічної смуги; колір наради —
+        // крапка біля часу; вибрана — рамка «ви тут» (action.primary).
+        backgroundColor: c.card,
+        borderWidth: 1.5,
+        borderColor: selected ? t.action.primary : 'transparent',
       }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ alignItems: 'center', minWidth: 52 }}>
@@ -134,6 +133,6 @@ export const MeetingCard = React.memo(function MeetingCard({
 });
 
 const st = StyleSheet.create({
-  card: { borderRadius: radius.nested, paddingVertical: 12, paddingHorizontal: 12, overflow: 'hidden' },
+  card: { borderRadius: radius.cardCompact, paddingVertical: 12, paddingHorizontal: 12, overflow: 'hidden' },
   iconBtn: { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

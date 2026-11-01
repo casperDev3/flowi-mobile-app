@@ -18,7 +18,7 @@ import type { TimeColors } from '@/components/time/TimePalette';
 import { fontFamily, radius, space, type as dsType } from '@/constants/theme';
 import type { Translations } from '@/store/translations';
 import type { ProjectShare } from '@/utils/timeEntries';
-import { GlassSurface } from '@/components/ds';
+import { BentoCard, GlassSurface } from '@/components/ds';
 
 export interface TimeKpiProps {
   c: TimeColors;
@@ -100,10 +100,10 @@ export function TimeProjectBreakdown({
   if (top.length === 0) return null;
 
   return (
-    <GlassSurface radius={radius.cardCompact} style={[s.card, style]}>
-      <Text style={[s.cardTitle, { color: c.text }]}>{tr.timeProjectBreakdown}</Text>
-      {top.map(item => (
-        <View key={item.projectId ?? 'personal'} style={{ marginTop: 12 }}>
+    // Omni: bento-картка з шапкою; смужки — кольором проєкту (це дані).
+    <BentoCard compact icon="chart.pie.fill" accent="amber" title={tr.timeProjectBreakdown} style={style}>
+      {top.map((item, i) => (
+        <View key={item.projectId ?? 'personal'} style={{ marginTop: i === 0 ? 0 : 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.color }} />
             <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.medium, marginLeft: 8, flex: 1 }}>
@@ -112,7 +112,7 @@ export function TimeProjectBreakdown({
             <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginRight: 8, ...dsType.numeric }}>{Math.round(item.share * 100)}%</Text>
             <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, ...dsType.numeric }}>{formatDuration(item.seconds)}</Text>
           </View>
-          <View style={[s.progressBg, { backgroundColor: c.dim }]}>
+          <View style={[s.progressBg, { backgroundColor: c.t.surface.subtle }]}>
             {/* Мінімум 2% ширини: смужка на 0.4% не читається як смужка,
                 а рядок без неї виглядає як помилка малювання. */}
             <View style={[s.progressFill, { width: `${Math.max(2, Math.round(item.share * 100))}%`, backgroundColor: item.color }]} />
@@ -124,7 +124,7 @@ export function TimeProjectBreakdown({
           {tr.timeMoreProjects.replace('{count}', String(rest.length))} · {formatDuration(restSeconds)}
         </Text>
       )}
-    </GlassSurface>
+    </BentoCard>
   );
 }
 

@@ -25,7 +25,7 @@ import { localDateInputToIso, localDateKey } from '@/utils/dateUtils';
 import { LoadErrorNotice, useSheetScreenMinHeight } from '@/components/health/HealthNotices';
 import { fontFamily } from '@/constants/theme';
 import { useGlassStyles } from '@/components/finance/finPalette';
-import { GlassBackdrop, GlassSurface, MeshBackground } from '@/components/ds';
+import { BentoCard, GlassBackdrop, KpiCounter, MeshBackground, PageHeader } from '@/components/ds';
 
 export default function VaccinesScreen() {
   const contentWidth = useContentWidth();
@@ -107,6 +107,20 @@ export default function VaccinesScreen() {
     <VaccineCard item={item} onRemove={remove} isDark={isDark} c={c} tr={tr} locale={locale} />
   ), [remove, isDark, c, tr, locale]);
 
+  const upcomingCount = items.filter(i => i.nextDate && new Date(i.nextDate).getTime() >= Date.now() - 86400000).length;
+  const kpiRow = initialized && items.length > 0 ? (
+    <PageHeader
+      bleed={20}
+      style={{ paddingHorizontal: 20, paddingBottom: 8 }}
+      kpis={
+        <>
+          <KpiCounter value={items.length} label={tr.vaccines} />
+          {upcomingCount > 0 ? <KpiCounter value={upcomingCount} label={tr.upcoming} /> : null}
+        </>
+      }
+    />
+  ) : null;
+
   return (
     // NAT-14: formSheet не дає кореню визначеної висоти — без minHeight
     // `flex: 1` схлопується до висоти вмісту, і низ аркуша лишається прозорим.
@@ -125,6 +139,9 @@ export default function VaccinesScreen() {
 
         {/* Історія щеплень накопичується роками, тож список
             віртуалізований: ScrollView тримав би в памʼяті всі картки. */}
+        {/* Omni: KPI розділу — записів усього й скільки мають наступну дату попереду. */}
+        {kpiRow}
+
         <FlatList
           data={items}
           keyExtractor={keyExtractor}
@@ -173,7 +190,8 @@ const VaccineCard = React.memo(function VaccineCard({ item, onRemove, isDark, c,
   const fmtD = (d: string) => new Date(d).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
-    <GlassSurface blur={false} radius={20} style={s.card}>
+    // Omni (DS v2.2): суцільна BentoCard (вміст — не скло).
+    <BentoCard compact style={s.card}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name="syringe" size={17} color={ACCENT_CAL} />
@@ -182,7 +200,7 @@ const VaccineCard = React.memo(function VaccineCard({ item, onRemove, isDark, c,
           <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{item.name}{item.doseNo ? ` · №${item.doseNo}` : ''}</Text>
           <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{fmtD(item.date)}</Text>
         </View>
-        <TouchableOpacity onPress={() => onRemove(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
+        <TouchableOpacity onPress={() => onRemove(item)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${item.name}`} style={s.removeBtn}>
           <IconSymbol name="trash" size={15} color={c.sub} />
         </TouchableOpacity>
       </View>
@@ -192,7 +210,7 @@ const VaccineCard = React.memo(function VaccineCard({ item, onRemove, isDark, c,
           <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginLeft: 6 }}>{tr.upcoming}: {fmtD(item.nextDate)}</Text>
         </View>
       ) : null}
-    </GlassSurface>
+    </BentoCard>
   );
 });
 
@@ -200,7 +218,9 @@ const s = StyleSheet.create({
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
   title:     { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
   addBtn:    { width: 44, height: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  card:      { borderRadius: 20, padding: 20, marginBottom: 12 },
+  card:      { marginBottom: 12 },
+  // 44×44 — мінімальна ціль дотику; від'ємне поле лишає іконку на старому місці.
+  removeBtn: { width: 44, height: 44, marginRight: -12, alignItems: 'center', justifyContent: 'center' },
   next:      { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, marginTop: 10 },
   overlay:   { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)' /* surface.overlay */, justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },

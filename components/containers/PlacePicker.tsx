@@ -1,6 +1,6 @@
 import { fontFamily, radius } from '@/constants/theme';
 import React, { useMemo, useState } from 'react';
-import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput, type TextStyle, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useI18n } from '@/store/i18n';
@@ -77,7 +77,7 @@ export function PlacePicker({
             <View style={{ flexDirection: 'row', gap: 6 }}>
               <TextInput value={draft} onChangeText={setDraft} autoFocus placeholder={tr.ctrPlaceNamePlaceholder}
                 placeholderTextColor={c.muted} onSubmitEditing={create} returnKeyType="done" accessibilityLabel={tr.ctrPlaceName}
-                style={[sheetStyles.input, { ...c.gl.card, flex: 1, color: c.text }]} />
+                style={[sheetStyles.input, { ...(c.gl.card as TextStyle), flex: 1, color: c.text }]} />
               <TouchableOpacity onPress={create} disabled={!draft.trim()} accessibilityRole="button" accessibilityLabel={tr.add}
                 style={{ width: 48, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
                   backgroundColor: draft.trim() ? c.t.action.primary : c.card }}>

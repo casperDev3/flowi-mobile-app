@@ -15,8 +15,7 @@ import type { Meal, MenuEntry } from '@/store/menu-api';
 
 import { cap, dateLabel, daySummary, MEAL_META, weekdayLabel } from './model';
 import type { MenuColors } from './theme';
-import { fontFamily } from '@/constants/theme';
-import { glassRimFor } from '@/components/shared/dsTheme';
+import { fontFamily, shadow } from '@/constants/theme';
 
 const dayA11y = (d: string, isToday: boolean) =>
   cap(weekdayLabel(d, 'long')) + ', ' + dateLabel(d) + (isToday ? ', сьогодні' : '');
@@ -115,7 +114,7 @@ export function DayList({
     <View
       accessibilityRole="list"
       style={{
-        backgroundColor: c.card, ...glassRimFor(c.card, 'card'),
+        backgroundColor: c.card, ...shadow[c.isDark ? 'dark' : 'light'].card,
         borderRadius: Atlas.radius.xlarge,
         overflow: 'hidden',
       }}>

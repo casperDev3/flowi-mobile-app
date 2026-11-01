@@ -16,6 +16,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 
+import { SegmentedProgress } from '@/components/ds';
 import { GroupScreenShell } from '@/components/training/GroupScreenShell';
 import { useGroupStream, useGroupSummary, usePersonalSessions, useTrainingScope } from '@/components/training/hooks';
 import { statusColor, statusLabel, formatSessionDate } from '@/components/training/SessionCards';
@@ -214,6 +215,11 @@ export default function TrainingSessionScreen() {
               </Text>
             ) : null}
           </View>
+          {/* Omni: сегментний прогрес підходів (фірмовий градієнт — підсвітка даних). */}
+          {draft && counts.total > 0 ? (
+            <SegmentedProgress value={counts.done / counts.total} style={{ marginTop: 10 }}
+              accessibilityLabel={`${title}: ${counts.done}/${counts.total}`} />
+          ) : null}
         </Card>
       ) : null}
 

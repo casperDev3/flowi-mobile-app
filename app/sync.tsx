@@ -36,7 +36,8 @@ import { EMPTY_LOCAL_ONLY, type LocalOnlyReport } from '@/utils/syncDivergence';
 import { markDirty, SYNC_SINGLETON_KEYS } from '@/store/synced-storage';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { glassStyles, type GlassStyles } from '@/components/finance/finPalette';
-import { GlassSurface, MeshBackground } from '@/components/ds';
+import { BentoCard, KpiCounter, MeshBackground, PageHeader } from '@/components/ds';
+import { useResponsive } from '@/hooks/use-responsive';
 
 const DATA_KEY_LABELS: Record<string, string> = {
   tasks: 'Завдання', transactions: 'Транзакції', time_entries: 'Час',
@@ -80,6 +81,7 @@ export default function SyncScreen() {
   // новий об'єкт кольорів щоразу зводив би мемоізацію нанівець.
   // DS v2: токени теми. `accent` — нейтральний (text.primary): головна дія
   // малюється pill action.primary, статуси — крапками status.*.
+  const { isCompact } = useResponsive();
   const c: Palette = useMemo(() => ({
     bg1:    g.mesh.base,
     bg2:    g.mesh.base,
@@ -87,8 +89,10 @@ export default function SyncScreen() {
     text:   t.text.primary,
     sub:    t.text.secondary,
     accent: g.accent.info.ink, green: t.status.success, orange: t.status.warning, red: t.status.danger,
-    dim:    g.surfaceSubtle,
-    card:   reduceTransparency ? g.solid.card : g.surface,
+    // Omni (DS v2.2): вміст — на суцільних bento-картках, тож вкладені рядки —
+    // суцільний subtle (скляний subtle на білій картці не видно).
+    dim:    t.surface.subtle,
+    card:   t.surface.card,
     t, isDark,
     gl: glassStyles(isDark, reduceTransparency),
     accentTint: g.accent.info.tint,
@@ -212,8 +216,23 @@ export default function SyncScreen() {
             { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
             { label: tr.sync },
           ]}
-          crumbColor={c.sub}
-        />
+          crumbColor={c.sub}>
+          {/* Omni KPI: стан черги — з даних, що вже є на екрані. */}
+          <PageHeader
+            bleed={isCompact ? 20 : 0}
+            kpis={
+              <>
+                <KpiCounter value={pendingCount} label={`${tr.syncPending}`}
+                  valueColor={isStalled ? c.orange : undefined} />
+                <KpiCounter value={conflicts.length} label="Конфлікти"
+                  valueColor={conflicts.length > 0 ? c.orange : undefined} />
+                {rejected.length > 0 ? (
+                  <KpiCounter value={rejected.length} label="Сервер не прийняв" valueColor={c.red} />
+                ) : null}
+              </>
+            }
+          />
+        </ScreenHeader>
 
         <ScrollView
           contentContainerStyle={[contentWidth, { padding: 20, paddingBottom: 48 }]}
@@ -225,12 +244,8 @@ export default function SyncScreen() {
               <TouchableOpacity accessibilityRole="button" onPress={()=>void Clipboard.setStringAsync(Object.values(row.text).join('\n\n'))}><Text style={{color:c.text,fontFamily:fontFamily.semibold,textDecorationLine:'underline'}}>Копіювати текст</Text></TouchableOpacity>
               <TouchableOpacity accessibilityRole="button" onPress={()=>void dismissRecoveryDraft(row.id).then(refreshConflicts)}><Text style={{color:c.sub}}>Видалити чернетку</Text></TouchableOpacity>
             </View>)}
-            {/* ── CLOUD SYNC CARD ── */}
-            <Text style={[st.sectionLabel, { color: c.sub, marginBottom: 8 }]}>
-              {tr.cloudSync.toUpperCase()}
-            </Text>
-
-            <GlassSurface radius={radius.cardCompact} style={st.card}>
+            {/* ── CLOUD SYNC CARD ── (Omni: bento-картка з шапкою icon-chip + назва) */}
+            <BentoCard title={tr.cloudSync} icon="icloud.fill" accent="info" style={st.card}>
 
               {/* Cloud status row */}
               {/* Статус — кольоровою крапкою; текст text.primary (4.5:1). */}
@@ -308,7 +323,7 @@ export default function SyncScreen() {
                   {tr.syncNow}
                 </Text>
               </TouchableOpacity>
-            </GlassSurface>
+            </BentoCard>
 
             {/* ── ЛИШЕ НА ЦЬОМУ ПРИСТРОЇ ──
                 Стоїть ВИЩЕ за карантин навмисно: карантин каже «сервер
@@ -317,10 +332,8 @@ export default function SyncScreen() {
                 успішно» читається як «усе на місці». */}
             {localOnly.total > 0 && (
               <View style={{ marginTop: 4 }}>
-                <Text style={[st.sectionLabel, { color: c.sub }]}>
-                  {tr.syncLocalOnlyTitle.toUpperCase()} ({localOnly.total})
-                </Text>
-                <GlassSurface radius={radius.cardCompact} style={[st.card, { marginTop: 8 }]}>
+                <BentoCard title={tr.syncLocalOnlyTitle} icon="exclamationmark.triangle.fill" accent="coral" style={st.card}
+                  headerRight={<Text style={[st.count, { color: c.sub }]}>{localOnly.total}</Text>}>
                   <Text style={[st.hintText, { color: c.sub, marginBottom: 10 }]}>
                     {tr.syncLocalOnlyHint}
                   </Text>
@@ -349,7 +362,7 @@ export default function SyncScreen() {
                       {tr.syncLocalOnlyAction}
                     </Text>
                   </TouchableOpacity>
-                </GlassSurface>
+                </BentoCard>
               </View>
             )}
 
@@ -367,10 +380,8 @@ export default function SyncScreen() {
             {/* ── КАРАНТИН ── */}
             {rejected.length > 0 && (
               <View style={{ marginTop: 4 }}>
-                <Text style={[st.sectionLabel, { color: c.sub }]}>
-                  СЕРВЕР НЕ ПРИЙНЯВ ({rejected.length})
-                </Text>
-                <GlassSurface radius={radius.cardCompact} style={[st.card, { marginTop: 8 }]}>
+                <BentoCard title="Сервер не прийняв" icon="xmark.circle.fill" accent="coral" style={st.card}
+                  headerRight={<Text style={[st.count, { color: c.sub }]}>{rejected.length}</Text>}>
                   <Text style={[st.hintText, { color: c.sub, marginBottom: 10 }]}>
                     Ці записи лишаються на пристрої. Решта синхронізації працює —
                     вони більше не блокують чергу.
@@ -399,7 +410,7 @@ export default function SyncScreen() {
                       </TouchableOpacity>
                     </View>
                   ))}
-                </GlassSurface>
+                </BentoCard>
               </View>
             )}
 
@@ -416,7 +427,7 @@ export default function SyncScreen() {
 
             {/* ── SUCCESS CLOUD ── */}
             {syncState === 'idle' && conflicts.length === 0 && lastSyncAt && (
-              <View style={[st.banner, { ...c.gl.card }]}>
+              <View style={[st.banner, { backgroundColor: c.card }, shadow[isDark ? 'dark' : 'light'].card]}>
                 <View style={[st.bannerIcon, { backgroundColor: c.green + '1F' }]}>
                   <IconSymbol name="checkmark" size={18} color={c.green} />
                 </View>
@@ -448,7 +459,7 @@ const ConflictCard = React.memo(function ConflictCard({ conflict, onResolve, c, 
   const diffs = getFieldDiffs(conflict.local, conflict.remote);
 
   return (
-    <View style={[st.conflictCard, { ...c.gl.card }, shadow[isDark ? 'dark' : 'light'].card]}>
+    <View style={[st.conflictCard, { backgroundColor: c.card }, shadow[isDark ? 'dark' : 'light'].card]}>
 
       <View style={[st.conflictHead, { borderBottomColor: c.border }]}>
         <View style={[st.conflictDot, { backgroundColor: c.t.status.warning }]} />
@@ -471,7 +482,7 @@ const ConflictCard = React.memo(function ConflictCard({ conflict, onResolve, c, 
           <Text style={[st.resolveBtnText, { color: c.t.text.onAction }]}>Залишити моє</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => onResolve(conflict.id, 'remote')}
-          style={[st.resolveBtn, { ...c.gl.subtle }]}>
+          style={[st.resolveBtn, { backgroundColor: c.dim }]}>
           <IconSymbol name="checkmark" size={13} color={c.t.action.secondaryText} />
           <Text style={[st.resolveBtnText, { color: c.t.action.secondaryText }]}>Прийняти інше</Text>
         </TouchableOpacity>
@@ -539,7 +550,8 @@ function fmtSyncTime(ms: number): string {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  card:          { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: space.cardGap },
+  card:          { marginBottom: space.cardGap },
+  count:         { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   statusRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.pill, marginBottom: 14 },
   statusDot:     { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   statusText:    { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },

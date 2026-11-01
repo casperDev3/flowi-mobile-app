@@ -52,6 +52,7 @@ import {
 import { haptic } from '@/utils/haptics';
 import { fontFamily, radius } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
+import { Avatar, KpiCounter } from '@/components/ds';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 const EXPIRY_OPTIONS: { hours: number; labelKey: 'projectMembersExpiry24h' | 'projectMembersExpiry7d' | 'projectMembersExpiry30d' }[] = [
@@ -491,6 +492,14 @@ export default function ProjectMembersScreen() {
       // Учасники — на рівень глибше за розділ і мають власну кнопку «Назад»;
       // шеврон «в особистий простір» поруч був другою стрілкою в шапці.
       hideSpaceExit
+      // Omni KPI: учасники · активні посилання · запрошення, що чекають.
+      kpis={members.length > 0 ? (
+        <>
+          <KpiCounter value={members.length} label={tr.projectMembersTitle} />
+          {canManage ? <KpiCounter value={invites.length} label={tr.projectMembersActiveLinks} /> : null}
+          {pendingInvites.length > 0 ? <KpiCounter value={pendingInvites.length} label={tr.projectMembersPendingSection} /> : null}
+        </>
+      ) : undefined}
       crumbs={project ? [{label:project.name,onPress:()=>router.push(`/project/${projectId}/overview` as never)},{label:tr.projectMembersTitle}] : undefined}
       // «Назад» — у проп back: ScreenHeader сам сховає стрілку на планшеті, де
       // оболонка вже малює крихти «Проєкт → …» (ScreenHeaderNav.ts).
@@ -508,7 +517,7 @@ export default function ProjectMembersScreen() {
         keyboardShouldPersistTaps="handled">
 
         {loadError && (
-          <View style={[st.hint, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginBottom: 12 }]}>
+          <View style={[st.hint, { backgroundColor: tk.surface.card, marginBottom: 12 }]}>
             <IconSymbol name="exclamationmark.circle" size={14} color={tk.accent.coral} />
             <Text style={{ color: c.text, fontSize: 12, marginLeft: 6, flex: 1 }}>{tr.projectMembersError}</Text>
             <TouchableOpacity
@@ -522,14 +531,14 @@ export default function ProjectMembersScreen() {
         )}
 
         {offline && (
-          <View style={[st.hint, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginBottom: 12 }]}>
+          <View style={[st.hint, { backgroundColor: tk.surface.card, marginBottom: 12 }]}>
             <IconSymbol name="exclamationmark.circle" size={14} color={c.sub} />
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 6, flex: 1 }}>{tr.projectMembersOfflineHint}</Text>
           </View>
         )}
 
         {transferring && (
-          <View style={[st.linkCard, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginBottom: 14 }]}>
+          <View style={[st.linkCard, { backgroundColor: tk.surface.card, marginBottom: 14 }]}>
             <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, marginBottom: 10 }}>{tr.projectMembersTransferOwnershipHint}</Text>
             {members.filter(m => m.role !== 'owner').length === 0 ? (
               <Text style={{ color: c.sub, fontSize: 12, marginBottom: 10 }}>{tr.projectMembersTransferOwnershipNoMembers}</Text>
@@ -568,7 +577,11 @@ export default function ProjectMembersScreen() {
               return (
                 <View
                   key={member.user.id}
-                  style={[st.memberRow, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
+                  style={[st.memberRow, { backgroundColor: tk.surface.card }]}>
+                  {/* Omni: аватар з ініціалами ліворуч від імені. */}
+                  <View style={{ marginRight: 12 }}>
+                    <Avatar person={{ id: String(member.user.id), name: member.user.name || member.user.email }} size={36} ringColor="transparent" />
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
                       {member.user.name || member.user.email}{isMe ? ` (${tr.projectMembersYou})` : ''}
@@ -676,7 +689,7 @@ export default function ProjectMembersScreen() {
             </TouchableOpacity>
 
             {createdInvite?.url && (
-              <View style={[st.linkCard, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
+              <View style={[st.linkCard, { backgroundColor: tk.surface.card }]}>
                 <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.projectMembersLinkCreated}</Text>
                 <Text numberOfLines={2} style={{ color: c.sub, fontSize: 12, marginBottom: 10 }}>{createdInvite.url}</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -684,7 +697,7 @@ export default function ProjectMembersScreen() {
                     <IconSymbol name="square.and.arrow.up" size={14} color={tk.text.onAction} />
                     <Text style={{ color: tk.text.onAction, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 6 }}>{tr.projectMembersShareLink}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={handleCopyLink} style={[st.smallBtn, { backgroundColor: glassOf(tk).surfaceSubtle, ...glassRim(tk, 'subtle') }]}>
+                  <TouchableOpacity onPress={handleCopyLink} style={[st.smallBtn, { backgroundColor: tk.surface.subtle }]}>
                     <IconSymbol name={copied ? 'checkmark' : 'doc.on.doc'} size={14} color={c.text} />
                     <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 6 }}>
                       {copied ? tr.projectMembersLinkCopied : tr.projectMembersCopyLink}
@@ -698,7 +711,7 @@ export default function ProjectMembersScreen() {
               <View style={{ marginBottom: 14 }}>
                 <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.projectMembersActiveLinks}</Text>
                 {invites.map(invite => (
-                  <View key={invite.id} style={[st.memberRow, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
+                  <View key={invite.id} style={[st.memberRow, { backgroundColor: tk.surface.card }]}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{roleLabel(invite.role)}</Text>
                       <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
@@ -731,7 +744,7 @@ export default function ProjectMembersScreen() {
                 keyboardType="email-address"
                 returnKeyType="send"
                 onSubmitEditing={() => { void handleInviteEmail(); }}
-                style={{ flex: 1, minHeight: 44, borderRadius: radius.pill, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), paddingHorizontal: 16, paddingVertical: 10, color: c.text, fontSize: 14, fontFamily: fontFamily.regular }}
+                style={{ flex: 1, minHeight: 44, borderRadius: radius.pill, backgroundColor: tk.surface.card, paddingHorizontal: 16, paddingVertical: 10, color: c.text, fontSize: 14, fontFamily: fontFamily.regular }}
               />
               <TouchableOpacity
                 onPress={handleInviteEmail}
@@ -750,7 +763,7 @@ export default function ProjectMembersScreen() {
             </Text>
             {emailError ? <Text accessibilityLiveRegion="polite" style={{ color: tk.status.danger, fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 20 }}>{emailError}</Text> : null}
             {emailNotice ? (
-              <View accessibilityLiveRegion="polite" style={[st.hint, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginBottom: 20, alignItems: 'flex-start' }]}>
+              <View accessibilityLiveRegion="polite" style={[st.hint, { backgroundColor: tk.surface.card, marginBottom: 20, alignItems: 'flex-start' }]}>
                 <IconSymbol name="bell" size={14} color={c.text} />
                 <View style={{ flex: 1, marginLeft: 8, gap: 4 }}>
                   {emailNotice.map((line, i) => (
@@ -780,7 +793,7 @@ export default function ProjectMembersScreen() {
                     : tr.projectMembersInviteSentAt.replace('{date}', new Date(sentAt).toLocaleDateString(dateLocale))
                       + ((invite.send_count ?? 1) > 1 ? ` · ×${invite.send_count}` : '');
                   return (
-                    <View key={invite.id} style={[st.memberRow, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), paddingVertical: 6 }]}>
+                    <View key={invite.id} style={[st.memberRow, { backgroundColor: tk.surface.card, paddingVertical: 6 }]}>
                       <View style={{ flex: 1, paddingVertical: 6 }}>
                         <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>
                           {invite.invitee?.name || invite.email}

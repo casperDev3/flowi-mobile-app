@@ -14,8 +14,7 @@ import { meals, type Meal, type MenuEntry } from '@/store/menu-api';
 
 import { entriesOf, longDayLabel, MEAL_META } from './model';
 import type { MenuColors } from './theme';
-import { fontFamily } from '@/constants/theme';
-import { glassRimFor } from '@/components/shared/dsTheme';
+import { fontFamily, shadow } from '@/constants/theme';
 
 export function DayPanel({
   day,
@@ -109,7 +108,7 @@ export function DayPanel({
   return (
     <View
       style={{
-        backgroundColor: c.card, ...glassRimFor(c.card, 'card'),
+        backgroundColor: c.card, ...shadow[c.isDark ? 'dark' : 'light'].card,
         borderRadius: Atlas.radius.xlarge,
         paddingHorizontal: 20,
         paddingTop: 20,

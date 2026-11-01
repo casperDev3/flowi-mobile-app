@@ -9,6 +9,7 @@ import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
 import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
+import { KpiCounter } from '@/components/ds';
 import { GroupScreenShell } from '@/components/training/GroupScreenShell';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useGroupStream, useGroupSummary, useTrainingScope } from '@/components/training/hooks';
@@ -122,6 +123,12 @@ export default function QuestsScreen() {
       gone={stream.gone}
       onRefresh={() => { void stream.sync(); }}
       refreshing={stream.syncing}
+      kpis={stream.loaded && visible.length ? (
+        <>
+          <KpiCounter value={active.length} label={tr.tgActiveQuests} />
+          <KpiCounter value={finished.length} label={tr.tgStatusCompleted} />
+        </>
+      ) : undefined}
       wide={isWide}>
       {error ? <Notice c={c} text={error} tone="error" /> : null}
       {stream.loaded && !visible.length ? <EmptyState c={c} icon="flag.checkered" title={tr.tgNoQuests} /> : null}

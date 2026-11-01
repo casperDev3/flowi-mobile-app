@@ -1,12 +1,13 @@
 /**
  * components/health/HealthBits.tsx — дрібні будівельні блоки вкладок здоровʼя.
  *
- * HealthCard — скляна картка DS v2.1 (<GlassSurface>: блюр на iOS, заливка
- * glass.surface + спекулярний обідок), радіус 20, поле 20, відступ знизу 12;
- * перед заголовком — крапка акценту модуля (coral). Заголовок секції живе
- * ВСЕРЕДИНІ картки (H2 16/600); окремих заголовків над картками з
- * кольоровою іконкою більше немає: у masonry заголовок, відірваний від своєї
- * картки, опинявся б в іншій колонці.
+ * HealthCard — Omni BentoCard (DS v2.2): СУЦІЛЬНА картка вмісту (surface.card
+ * + м'яка тінь, без рамки; скло лишається функціональному шару), поле 20,
+ * відступ знизу 12. Шапка за Omni: кругла icon-chip (акцент модуля — coral,
+ * або власний) + назва 16/600, праворуч — кнопка «+», значення чи перемикач.
+ * Заголовок живе ВСЕРЕДИНІ картки: у masonry заголовок, відірваний від своєї
+ * картки, опинявся б в іншій колонці. `variant="ai"` — лавандово-рожева
+ * змивка для інсайтів (AI-блок).
  *
  * Кольори розділів (калорії, сон, кроки…) лишаються лише на ДАНИХ —
  * кільцях, смужках і графіках. Елементи керування — один акцент розділу.
@@ -14,40 +15,44 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { fontFamily, radius, space, type } from '@/constants/theme';
-import { GlassSurface } from '@/components/ds';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, space, type, type GlassAccent } from '@/constants/theme';
+import { BentoCard, type BentoVariant } from '@/components/ds';
 import { ds, useDS } from '@/hooks/use-ds';
 import { type HealthColors } from '@/utils/healthTheme';
 
 /** Палітра, якої досить картці: підходить і HealthColors, і FinColors. */
 type CardColors = Pick<HealthColors, 'card' | 'border' | 'sub'>;
 
-export function HealthCard({ c, title, right, children, style, testID }: {
+export function HealthCard({ c, title, icon = 'heart.fill', accent = 'coral', variant = 'default', right, children, style, testID }: {
   c: CardColors;
-  /** Заголовок секції (верхній регістр робить стиль, не рядок). */
+  /** Заголовок секції. */
   title?: string;
+  /** Іконка icon-chip у шапці (Omni). */
+  icon?: IconSymbolName;
+  accent?: GlassAccent;
+  variant?: BentoVariant;
   /** Вміст праворуч від заголовка: кнопка «+», значення, перемикач. */
   right?: React.ReactNode;
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }) {
-  const { t, g } = useDS();
+  void c;
+  // Без назви, але з «правим» вмістом — лише правий ряд (як і раніше).
   return (
-    <GlassSurface testID={testID} radius={radius.cardCompact} style={[st.card, style]}>
-      {title || right ? (
-        <View style={st.head}>
-          {/* DS v2.1: крапка акценту модуля (coral) перед заголовком секції. */}
-          {title ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: g.accent.coral.fill }} /> : null}
-          {title ? (
-            <Text accessibilityRole="header" numberOfLines={1} style={[st.title, { color: t.text.primary }]}>{title}</Text>
-          ) : <View style={{ flex: 1 }} />}
-          {right}
-        </View>
-      ) : null}
+    <BentoCard
+      testID={testID}
+      compact
+      variant={variant}
+      title={title}
+      icon={title ? icon : undefined}
+      accent={accent}
+      headerRight={title ? right : undefined}
+      style={[st.card, style]}>
+      {!title && right ? <View style={st.head}><View style={{ flex: 1 }} />{right}</View> : null}
       {children}
-    </GlassSurface>
+    </BentoCard>
   );
 }
 
@@ -116,7 +121,8 @@ export const HEALTH_CARD_STYLE = {
 } as const;
 
 const st = StyleSheet.create({
-  card:  HEALTH_CARD_STYLE,
+  // Поле й радіус дає BentoCard (compact); тут — лише відступ між картками.
+  card:  { marginBottom: HEALTH_CARD_STYLE.marginBottom },
   head:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, minHeight: 22 },
   title: { flex: 1, ...type.h2 },
   add:   { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },

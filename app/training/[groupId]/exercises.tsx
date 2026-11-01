@@ -11,10 +11,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Text, TouchableOpacity, View } from 'react-native';
 
 import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
+import { KpiCounter } from '@/components/ds';
 import { GroupScreenShell } from '@/components/training/GroupScreenShell';
 import { useGroupStream, useGroupSummary } from '@/components/training/hooks';
 import { exercisesToImport, readPersonalExercises } from '@/components/training/importPersonal';
-import { fmt, TG_ACCENT, TG_ERR, useTrainingColors } from '@/components/training/theme';
+import { fmt, TG_ERR, useTrainingColors } from '@/components/training/theme';
 import { Card, EmptyState, Field, Notice, PrimaryButton, Stepper } from '@/components/training/TrainingBits';
 import { TrainingSheet } from '@/components/training/TrainingSheet';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -104,7 +105,10 @@ export default function GroupExercisesScreen() {
       accessibilityRole={isCoach ? 'button' : 'text'}
       accessibilityLabel={ex.name}
       style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: divider ? 1 : 0, borderTopColor: c.border }}>
-      <IconSymbol name="dumbbell.fill" size={16} color={TG_ACCENT} />
+      {/* Omni icon-chip. */}
+      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.accentTint, alignItems: 'center', justifyContent: 'center' }}>
+        <IconSymbol name="dumbbell.fill" size={15} color={c.accent} />
+      </View>
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }}>{ex.name}</Text>
         <Text style={{ color: c.sub, fontSize: 12 }}>
@@ -125,7 +129,8 @@ export default function GroupExercisesScreen() {
       issue={stream.issue}
       gone={stream.gone}
       onRefresh={() => { void stream.sync(); }}
-      refreshing={stream.syncing}>
+      refreshing={stream.syncing}
+      kpis={exercises.length ? <KpiCounter value={exercises.length} label={tr.tgExercises} /> : undefined}>
       {notice ? <Notice c={c} text={notice.text} tone={notice.tone} /> : null}
       {stream.loaded && !exercises.length ? <EmptyState c={c} icon="dumbbell.fill" title={tr.tgNoExercises} /> : null}
       {exercises.length && isWide ? (

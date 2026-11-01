@@ -34,16 +34,18 @@ import { isModuleEnabled, useUiModules } from '@/store/ui-preferences';
 import { Lang, type Translations } from '@/store/translations';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
-import { useTopInset } from '@/hooks/use-top-inset';
 import { useResponsive } from '@/hooks/use-responsive';
 import { wideModalStyles } from '@/components/finance/wideModal';
 import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { ProfileCard } from '@/components/settings/ProfileCard';
 import { ToolTiles } from '@/components/settings/ToolTiles';
 import { settingsColumnCount, settingsSectionLayout, type SettingsSectionId } from '@/components/settings/model';
-import { fontFamily } from '@/constants/theme';
-import { MeshBackground } from '@/components/ds';
-import { glassOf, glassRim, glassRimFor } from '@/components/shared/dsTheme';
+import { fontFamily, type GlassAccent } from '@/constants/theme';
+import { BentoCard, BentoCardHeader, KpiCounter, MeshBackground } from '@/components/ds';
+// Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
+import { AppHeader } from '@/components/shared/AppHeader';
+import { useUnreadNotificationsCount } from '@/components/notifications/use-notification-center';
+import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
 
 /**
  * Натискання рядка йде через один спільний колбек, а маршрут приходить
@@ -78,7 +80,6 @@ export default function SettingsScreen() {
   // NAT-01: стеля аркуша — ЧИСЛО від висоти вікна; відсоток від батька з
   // height:auto у Yoga не резолвиться і обмеження просто зникає.
   const sheetSurface = useSheetSurface();
-  const topInset = useTopInset();
   const tabBarInset = useTabBarInset();
   const { isWide, isExpanded } = useResponsive();
   // Тема й мова — діалогом посеред екрана на планшеті (як SheetModal), а не
@@ -99,6 +100,7 @@ export default function SettingsScreen() {
   // бувають модулі без перемикача на цій платформі, і лічильник «2» при
   // жодному вимкненому перемикачі читався б як збій.
   const { disabledModules } = useUiModules();
+  const unreadCount = useUnreadNotificationsCount();
   const disabledCount = useMemo(() => disabledModuleCount(disabledModules), [disabledModules]);
   const visibleTools = useMemo(
     () => TOOL_ROWS.filter(tool => isModuleEnabled(disabledModules, tool.module)),
@@ -268,8 +270,7 @@ export default function SettingsScreen() {
       case 'look':
         return (
           <View>
-            <SectionLabel label={tr.settingsHub.sectionLookNotify} color={c.sub} />
-            <View style={[st.card, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
+            <SettingsCard title={tr.settingsHub.sectionLookNotify} icon="paintbrush" accent="lavender">
               <SettingRow
                 icon="paintbrush"
                 iconColor="#6D4CF5"
@@ -338,14 +339,13 @@ export default function SettingsScreen() {
                 border={c.border}
                 last
               />
-            </View>
+            </SettingsCard>
           </View>
         );
       case 'data':
         return (
           <View>
-            <SectionLabel label={tr.sectionData} color={c.sub} />
-            <View style={[st.card, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
+            <SettingsCard title={tr.sectionData} icon="externaldrive" accent="info">
               <SettingRow
                 icon="arrow.triangle.2.circlepath"
                 iconColor="#6D4CF5"
@@ -428,7 +428,7 @@ export default function SettingsScreen() {
                   />
                 </>
               )}
-            </View>
+            </SettingsCard>
             {/* NAT-15: підпис мусить відповідати стану — інакше під «Онлайн»
                 стояло б «дані лише на пристрої». */}
             <Text style={[st.hint, { color: c.sub }]}>
@@ -439,9 +439,7 @@ export default function SettingsScreen() {
       case 'support':
         return (
           <View>
-            <SectionLabel label={tr.sectionSupport} color={c.sub} />
-            <View style={{ gap: 4, marginBottom: 12 }}>{[['privacy', lang === 'en' ? 'Privacy' : 'Приватність'], ['terms', lang === 'en' ? 'Terms' : 'Умови'], ['contact', lang === 'en' ? 'Contact' : 'Контакти']].map(([path, label]) => <TouchableOpacity key={path} accessibilityRole="link" onPress={() => void Linking.openURL(`https://flowi-web-app.vercel.app/${path}`)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: c.text }}>{label}</Text></TouchableOpacity>)}</View>
-            <View style={[st.card, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
+            <SettingsCard title={tr.sectionSupport} icon="lightbulb.fill" accent="amber">
               {/* Ідеї й баги — один екран (feedback-inbox.md §10.1). */}
               <SettingRow
                 icon="lightbulb.fill"
@@ -486,9 +484,9 @@ export default function SettingsScreen() {
                 border={c.border}
                 last
               />
-            </View>
+            </SettingsCard>
             <AdvertisingSettings />
-            <View style={[st.card, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
+            <BentoCard padded={false} style={st.sectionCard}>
               <SettingRow
                 icon="person.fill"
                 iconColor="#6D4CF5"
@@ -501,15 +499,16 @@ export default function SettingsScreen() {
                 border={c.border}
                 last
               />
-            </View>
+            </BentoCard>
+            {/* Правові посилання — рядком-футером під карткою розділу. */}
+            <View style={st.links}>{[['privacy', lang === 'en' ? 'Privacy' : 'Приватність'], ['terms', lang === 'en' ? 'Terms' : 'Умови'], ['contact', lang === 'en' ? 'Contact' : 'Контакти']].map(([path, label]) => <TouchableOpacity key={path} accessibilityRole="link" onPress={() => void Linking.openURL(`https://flowi-web-app.vercel.app/${path}`)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: c.text }}>{label}</Text></TouchableOpacity>)}</View>
           </View>
         );
       case 'account':
         if (!user) return null;
         return (
           <View>
-            <SectionLabel label={tr.sectionAccount} color={c.sub} />
-            <View style={[st.card, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
+            <SettingsCard title={tr.sectionAccount} icon="person.crop.circle" accent="lavender">
               <SettingRow
                 icon="person.crop.circle"
                 iconColor="#6D4CF5"
@@ -547,11 +546,25 @@ export default function SettingsScreen() {
                 </View>
                 <Text style={[st.rowLabel, { color: tk.status.danger, flex: 1 }]}>{tr.authLogout}</Text>
               </TouchableOpacity>
-            </View>
+            </SettingsCard>
           </View>
         );
     }
   };
+
+  // ─── KPI (Omni: великі тонкі числа в шапці) ────────────────────────────────
+  // Лише те, що екран і так знає: непрочитані сповіщення (серверний інбокс),
+  // заплановані нагадування ОС і кількість увімкнених інструментів. Тап —
+  // туди, де ці числа живуть.
+  const headerKpis = (
+    <>
+      {authed ? (
+        <KpiCounter value={unreadCount} label={tr.ncTabInbox} onPress={() => go('/notifications')} />
+      ) : null}
+      <KpiCounter value={scheduledCount} label={tr.ncTabReminders} onPress={() => go({ pathname: '/notifications', params: { tab: 'reminders' } } as Href)} />
+      <KpiCounter value={tiles.length} label={tr.navGroupTools} />
+    </>
+  );
 
   const sectionLayout = settingsSectionLayout(authed);
   const sectionEntries: MasonryEntry[] = sectionLayout.columns.map(id => ({
@@ -564,24 +577,16 @@ export default function SettingsScreen() {
     <View style={{ flex: 1 }}>
       <MeshBackground />
 
-      {/*
-       * Інсет лягає на КОНТЕЙНЕР, а не в contentContainerStyle списку. Різниця
-       * помітна при першому ж прокручуванні: padding усередині ScrollView
-       * скролиться разом із вмістом, тож рядки налаштувань поїхали б під
-       * статус-бар, де немає ні blur, ні підкладки — лише наскрізний градієнт.
-       * Тут верхня межа самого ScrollView стоїть під статус-баром, і вміст
-       * фізично не може під нього зайти.
-       */}
-      <View style={{ flex: 1, paddingTop: topInset }}>
+      {/* Omni: глобальна шапка (☰ · дзвіник · акаунт; рядок інструментів на
+          планшеті) з KPI. Верхній інсет дає ScreenHeader усередині AppHeader —
+          а вміст ScrollView під нею фізично не заходить під статус-бар. */}
+      <AppHeader title={tr.settings} kpis={headerKpis} paddingBottom={12} />
+      <View style={{ flex: 1 }}>
         <ScrollView
           // Ландшафт: дві колонки секцій у 720pt — це ~330pt на рядок, і
           // підписи обрізались. На expanded колонці даємо 960.
-          contentContainerStyle={[contentWidth, isExpanded && st.wideColumn, { paddingHorizontal: 20, paddingBottom: tabBarInset + 16 }]}
+          contentContainerStyle={[contentWidth, isExpanded && st.wideColumn, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: tabBarInset + 16 }]}
           showsVerticalScrollIndicator={false}>
-
-          <View style={{ marginTop: 10, marginBottom: 20 }}>
-            <Text style={[st.pageTitle, { color: c.text }]}>{tr.settings}</Text>
-          </View>
 
           {/* 1. Профіль */}
           <ProfileCard
@@ -597,7 +602,7 @@ export default function SettingsScreen() {
           {/* 2. Інструменти — лише входи в УВІМКНЕНІ модулі; усе вимкнено — секції немає. */}
           {tiles.length ? (
             <View>
-              <SectionLabel label={tr.navGroupTools} color={c.sub} />
+              <Text style={[st.sectionLabel, { color: c.text }]} accessibilityRole="header">{tr.navGroupTools}</Text>
               <ToolTiles tools={tiles} onPress={openTool} isDark={isDark} text={c.text} border={c.border} />
             </View>
           ) : null}
@@ -715,8 +720,25 @@ export default function SettingsScreen() {
   );
 }
 
-function SectionLabel({ label, color }: { label: string; color: string }) {
-  return <Text style={[st.sectionLabel, { color }]}>{label.toUpperCase()}</Text>;
+/**
+ * Секція налаштувань — Omni bento-картка: шапка «icon-chip + назва» (акцент —
+ * лише на icon-chip), під нею рядки з hairline-роздільниками. Суцільна
+ * surface.card, без скла.
+ */
+function SettingsCard({ title, icon, accent, children }: {
+  title: string;
+  icon: IconSymbolName;
+  accent: GlassAccent;
+  children?: React.ReactNode;
+}) {
+  return (
+    <BentoCard padded={false} style={st.sectionCard}>
+      <View style={st.cardHead}>
+        <BentoCardHeader title={title} icon={icon} accent={accent} />
+      </View>
+      {children}
+    </BentoCard>
+  );
 }
 
 interface SettingRowProps {
@@ -902,14 +924,16 @@ const DisclosureRow = React.memo(function DisclosureRow(
 
 const st = StyleSheet.create({
   // DS v2: H1 32/500; підписи секцій — 12 secondary без капсу.
-  pageTitle:   { fontSize: 32, lineHeight: 38, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
-  sectionLabel:{ fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.2, marginBottom: 8, marginTop: 24, marginLeft: 4 },
+  // Omni: заголовок групи плиток — 16/600 (як назва bento-картки).
+  sectionLabel:{ fontSize: 16, lineHeight: 22, fontFamily: fontFamily.semibold, marginBottom: 10, marginTop: 24, marginLeft: 4 },
+  sectionCard: { marginTop: 16 },
+  cardHead:    { paddingHorizontal: 16, paddingTop: 14, marginBottom: -4 },
+  links:       { flexDirection: 'row', flexWrap: 'wrap', columnGap: 20, paddingHorizontal: 8, marginTop: 4 },
   // Нижній відступ секції — справа самої картки: MasonryColumns вертикальних
   // проміжків не додає.
   sectionCell: { paddingBottom: 4 },
   hint:        { fontFamily: fontFamily.regular, fontSize: 12, lineHeight: 16, paddingHorizontal: 4, marginTop: 6 },
   wideColumn:  { maxWidth: 960 },
-  card:        { borderRadius: Atlas.radius.xlarge, overflow: 'hidden', paddingVertical: 4 },
   row:         { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 20, paddingVertical: 12, gap: 12 },
   rowIndent:   { paddingLeft: 36 },
   iconBox:     { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },

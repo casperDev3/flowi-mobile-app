@@ -15,7 +15,7 @@
  */
 import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
-import { ScrollView, Text, TouchableOpacity } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -30,9 +30,8 @@ import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
-import { fontFamily, radius } from '@/constants/theme';
+import { fontFamily, radius, shadow } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export default function ProjectMoreScreen() {
   const projectId = useProjectRouteId();
@@ -74,13 +73,16 @@ export default function ProjectMoreScreen() {
               accessibilityRole="button"
               accessibilityLabel={label}
               activeOpacity={0.75}
-              style={{
+              // Omni: суцільна картка з круглою icon-chip ліворуч.
+              style={[{
                 flexDirection: 'row', alignItems: 'center', gap: 12,
-                minHeight: 56, paddingHorizontal: 14,
+                minHeight: 64, paddingHorizontal: 14,
                 borderRadius: radius.cardCompact,
-                backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'),
-              }}>
-              <IconSymbol name={item.icon} size={20} color={c.sub} />
+                backgroundColor: tk.surface.card,
+              }, shadow[isDark ? 'dark' : 'light'].card]}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: tk.surface.subtle }}>
+                <IconSymbol name={item.icon} size={18} color={c.text} />
+              </View>
               <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, flex: 1 }}>{label}</Text>
               <IconSymbol name="chevron.right" size={16} color={c.sub} />
             </TouchableOpacity>

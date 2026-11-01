@@ -19,7 +19,7 @@ import { actualWorkload } from '@/utils/workloadActual';
 import { TeamOfflineStatus } from './TeamOfflineStatus';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useProject } from '@/hooks/use-project';
 import { useProjectRole } from '@/hooks/use-project-role';
@@ -32,6 +32,7 @@ import { useI18n } from '@/store/i18n';
 import { syncProject } from '@/store/project-sync';
 import { apiFetch } from '@/store/api';
 import { ProjectScreenShell, projectShellColors } from './ProjectScreenShell';
+import { BentoCard, BentoGrid, KpiCounter, SegmentedProgress } from '@/components/ds';
 import { ProjectSyncIndicator } from './ProjectSyncIndicator';
 import { TeamButton, TeamInput } from './TeamTaskPanel';
 import { ActionBar, ActionButton, ActionChip } from '@/components/shared/ActionBar';
@@ -177,12 +178,20 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
     router.push({ pathname: '/project/[id]/tasks', params: { id: pid, create: '1' } } as never);
   }, [router, pid]);
 
-  const section = (name: string, items: readonly Task[]) => (
-    <View style={{ gap: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Text style={[type.h2, { color: c.text }]}>{name}</Text>
-        <Text style={[type.caption, type.numeric, { color: c.sub }]}>{items.length}</Text>
-      </View>
+  // Omni: кожна черга — суцільна bento-картка: icon-chip + назва, лічильник
+  // у pill праворуч; задачі — ті самі компактні картки всередині.
+  const section = (name: string, items: readonly Task[], icon: IconSymbolName = 'checklist', key?: string) => (
+    <BentoCard
+      key={key ?? name}
+      title={name}
+      icon={icon}
+      accent="lavender"
+      headerRight={
+        <View style={{ minWidth: 28, height: 24, paddingHorizontal: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: tk.surface.subtle }}>
+          <Text style={[type.caption, type.numeric, { color: c.sub, fontFamily: fontFamily.semibold }]}>{items.length}</Text>
+        </View>
+      }
+      style={{ gap: 8 }}>
       {items.slice(0, 5).map(t => (
         <TaskCompactCard
           hideProject
@@ -208,7 +217,7 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
         </ActionBar>
       )}
       {!items.length && <Text style={{ color: c.sub, fontSize: 13 }}>{tr.twNoTasks}</Text>}
-    </View>
+    </BentoCard>
   );
 
   const homePage = prefs?.homePage ?? (isLead(role) ? 'overview' : 'my-work');
@@ -234,7 +243,16 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
       )}
       {!!error && <Text accessibilityRole="alert" style={{ color: tk.status.danger, fontFamily: fontFamily.medium }}>{error}</Text>}
       {(mode === 'my-work' || mode === 'overview') && <>
-        <Text style={[type.body, { color: c.text }]}>{tr.twCounts.replace('{done}', String(counts.done)).replace('{total}', String(counts.total)).replace('{pending}', String(counts.pending)).replace('{blocked}', String(counts.blocked)).replace('{overdue}', String(counts.overdue))}</Text>
+        {/* Omni: підсумок — картка з сегментним прогресом; рядок лічильників
+            лишається підписом під ним (усі п'ять чисел, як і раніше). */}
+        <BentoCard title={tr.twTeamProgress} icon="chart.bar.fill" accent="lavender">
+          <SegmentedProgress
+            value={counts.total ? counts.done / counts.total : 0}
+            showValue
+            accessibilityLabel={`${tr.twTeamProgress}: ${counts.done}/${counts.total}`}
+          />
+          <Text style={[type.body, type.numeric, { color: c.sub, fontSize: 13, marginTop: 10 }]}>{tr.twCounts.replace('{done}', String(counts.done)).replace('{total}', String(counts.total)).replace('{pending}', String(counts.pending)).replace('{blocked}', String(counts.blocked)).replace('{overdue}', String(counts.overdue))}</Text>
+        </BentoCard>
         {isLead(role) && tasks.length === 0 && !inviteSkipped && (
           <View style={{ gap: 10 }}>
             <Text style={[type.body, { color: c.text }]}>{tr.twInviteHint}</Text>
@@ -245,13 +263,13 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
           </View>
         )}
         {/* Планшет: чотири черги «моєї роботи» — сіткою 2×2, а не стрічкою на чотири екрани. */}
-        <ResponsiveGrid minItemWidth={300} maxColumns={2} gap={18}>
-          {section(tr.twQueueReviews, mine.reviews)}
-          {section(tr.twQueueBlockers, mine.blockers)}
-          {section(tr.twQueueAssigned, mine.assigned)}
-          {section(tr.twQueueAvailable, mine.available)}
-        </ResponsiveGrid>
-        {mode === 'overview' && section(tr.twAllActive, tasks.filter(t => !isComplete(t)))}
+        <BentoGrid columns={{ compact: 1, medium: 2, expanded: 2 }}>
+          {section(tr.twQueueReviews, mine.reviews, 'eye', 'reviews')}
+          {section(tr.twQueueBlockers, mine.blockers, 'exclamationmark.circle', 'blockers')}
+          {section(tr.twQueueAssigned, mine.assigned, 'person.fill', 'assigned')}
+          {section(tr.twQueueAvailable, mine.available, 'tray', 'available')}
+        </BentoGrid>
+        {mode === 'overview' && section(tr.twAllActive, tasks.filter(t => !isComplete(t)), 'list.bullet')}
         {mode === 'overview' && <>
           <ActionBar>
             <ActionButton
@@ -344,6 +362,14 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
       project={project}
       isDark={isDark}
       title={label}
+      // Omni KPI «Моєї роботи»: мої завдання · на моїй перевірці · прострочені.
+      kpis={mode === 'my-work' ? (
+        <>
+          <KpiCounter value={mine.assigned.length} label={tr.twQueueAssigned} />
+          <KpiCounter value={mine.reviews.length} label={tr.twQueueReviews} />
+          <KpiCounter value={counts.overdue} label={tr.projectOverdueTasks} valueColor={counts.overdue > 0 ? tk.status.danger : undefined} />
+        </>
+      ) : undefined}
       actions={taskMode ? (
         <>
           <ProjectSyncIndicator projectId={pid} accent={c.accent} subColor={c.sub} dimColor={c.dim} />
@@ -393,7 +419,7 @@ function CapacityRow({ row: w, actual, onSave, colors }: { actual: ReturnType<ty
   const { tr } = useI18n();
   const [value, setValue] = useState(w.weeklyHours == null ? '' : String(w.weeklyHours));
   return (
-    <View style={{ gap: 8, backgroundColor: glassOf(tk).surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, padding: 20, borderRadius: radius.cardCompact }}>
+    <View style={{ gap: 8, backgroundColor: tk.surface.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, padding: 20, borderRadius: radius.cardCompact }}>
       <Text style={[type.h2, { color: textColor }]}>{w.name}</Text>
       <Text style={[type.body, type.numeric, { color: textColor }]}>{tr.twActiveCount.replace('{n}', String(actual.activeCount))}</Text>
       <Text style={[type.body, type.numeric, { color: textColor }]}>{tr.twAvgTime.replace('{avg}', actual.averageMinutes === null ? tr.noData : tr.twMinutesShort.replace('{n}', String(Math.round(actual.averageMinutes)))).replace('{n}', String(actual.sampleCount))}</Text>

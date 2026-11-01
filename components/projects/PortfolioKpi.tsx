@@ -23,8 +23,8 @@ import type { PortfolioKpi as PortfolioKpiData } from '@/utils/projectStatsMetri
 import { Footnotes, WeekBars, type AnalyticsPalette } from './ProjectAnalytics';
 import { fontFamily, radius, theme, type } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
-import { glassOf, glassRim, dsTheme } from '@/components/shared/dsTheme';
-import { AccentDot } from '@/components/shared/GlassBits';
+import { glassOf } from '@/components/shared/dsTheme';
+import { BentoCard } from '@/components/ds/Bento';
 
 /** Локальний ключ згортання. Не синкається й не бекапиться — це вибір пристрою. */
 export const PORTFOLIO_COLLAPSED_KEY = 'projects_portfolio_collapsed';
@@ -90,7 +90,9 @@ export function PortfolioKpi({ kpi, palette }: { kpi: PortfolioKpiData; palette:
       accessibilityLabel={`${tile.value} ${tile.label}`}
       style={[
         st.tile,
-        { backgroundColor: palette.dim, ...glassRim(t, 'subtle') },
+        // Omni: вкладені плитки — суцільна subtle-підкладка на білій картці
+        // (скляна subtle на суцільній картці не видна).
+        { backgroundColor: t.surface.subtle },
         tablet ? { flexBasis: '31%', flexGrow: 1 } : { width: phoneTileWidth },
       ]}>
       {/* KPI — тонкі великі цифри; алерт — coral-тік ліворуч від числа. */}
@@ -103,21 +105,22 @@ export function PortfolioKpi({ kpi, palette }: { kpi: PortfolioKpiData; palette:
   );
 
   return (
-    <View style={[st.wrap, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
-      <TouchableOpacity
-        onPress={toggle}
-        accessibilityRole="button"
-        accessibilityLabel={collapsed ? tr.portfolioExpand : tr.portfolioCollapse}
-        accessibilityState={{ expanded: !collapsed }}
-        hitSlop={{ top: 8, bottom: 8 }}
-        style={st.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-          <AccentDot isDark={t === dsTheme(true)} accent="lavender" />
-          <Text style={[st.title, { color: palette.text }]}>{tr.portfolioKpi}</Text>
-        </View>
-        <IconSymbol name={collapsed ? 'chevron.down' : 'chevron.up'} size={14} color={palette.sub} />
-      </TouchableOpacity>
-
+    <BentoCard
+      title={tr.portfolioKpi}
+      icon="square.grid.2x2"
+      accent="lavender"
+      style={{ marginBottom: 16 }}
+      headerRight={
+        <TouchableOpacity
+          onPress={toggle}
+          accessibilityRole="button"
+          accessibilityLabel={collapsed ? tr.portfolioExpand : tr.portfolioCollapse}
+          accessibilityState={{ expanded: !collapsed }}
+          hitSlop={4}
+          style={[st.toggle, { backgroundColor: t.surface.subtle }]}>
+          <IconSymbol name={collapsed ? 'chevron.down' : 'chevron.up'} size={14} color={palette.text} />
+        </TouchableOpacity>
+      }>
       {collapsed ? null : (
         <>
           {tablet ? (
@@ -155,7 +158,7 @@ export function PortfolioKpi({ kpi, palette }: { kpi: PortfolioKpiData; palette:
           />
         </>
       )}
-    </View>
+    </BentoCard>
   );
 }
 
@@ -166,9 +169,7 @@ function formatAverage(value: number): string {
 }
 
 const st = StyleSheet.create({
-  wrap:       { borderRadius: radius.cardCompact, padding: 20, marginBottom: 16 },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, minHeight: 28 },
-  title:      { fontSize: 16, fontFamily: fontFamily.semibold },
+  toggle:     { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   tile:       { borderRadius: radius.nested, paddingHorizontal: 16, paddingVertical: 14 },
   tileValue:  { flexShrink: 1, fontSize: 32, lineHeight: 36, fontFamily: fontFamily.light, letterSpacing: -0.64, fontVariant: ['tabular-nums'] },

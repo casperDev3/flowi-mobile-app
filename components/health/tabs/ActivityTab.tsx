@@ -25,7 +25,7 @@ import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { ACCENT, ACCENT_STEPS, ModalKey } from '@/utils/healthTheme';
-import { getHealthDSColors } from '@/components/health/palette';
+import { getHealthCardColors } from '@/components/health/palette';
 import { dsTokens } from '@/hooks/use-ds';
 import { stepsToKm } from '@/utils/healthUtils';
 import { fontFamily } from '@/constants/theme';
@@ -42,7 +42,7 @@ export function ActivityTab({ h }: HealthTabProps) {
   const router = useRouter();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const c = getHealthDSColors(isDark);
+  const c = getHealthCardColors(isDark);
   const k = dsTokens(isDark);
 
   const { today, goals, heightCm, cal } = h;
@@ -75,7 +75,7 @@ export function ActivityTab({ h }: HealthTabProps) {
     {
       key: 'steps',
       node: (
-        <HealthCard c={c} title={tr.steps} right={<HealthAddButton onPress={() => setModal('steps')} label={tr.add} />}>
+        <HealthCard c={c} title={tr.steps} icon="figure.walk" right={<HealthAddButton onPress={() => setModal('steps')} label={tr.add} />}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
             <View style={{ flex: 1, marginRight: 10 }}>
               <Text style={{ color: c.text, fontSize: 44, lineHeight: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.88 }}>{today.steps.toLocaleString(locale)}</Text>
@@ -119,7 +119,7 @@ export function ActivityTab({ h }: HealthTabProps) {
     {
       key: 'burned',
       node: (
-        <HealthCard c={c} title={tr.burned}>
+        <HealthCard c={c} title={tr.burned} icon="flame.fill">
           {/* cal.burned, а не today.calOut: у спалене входять ще й калорії
               тренувань Flowi за цей день (без подвоєння з Apple Health —
               див. burnedForDay). Рядок нижче показує внесок тренувань, щоб
@@ -149,7 +149,7 @@ export function ActivityTab({ h }: HealthTabProps) {
       node: (
         <TouchableOpacity onPress={() => router.push('/workouts')} activeOpacity={0.85}
           accessibilityRole="button" accessibilityLabel={tr.workoutsLabel}>
-          <HealthCard c={c} title={tr.workoutsLabel}>
+          <HealthCard c={c} title={tr.workoutsLabel} icon="dumbbell.fill">
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
                 <IconSymbol name="dumbbell.fill" size={18} color={ACCENT} />

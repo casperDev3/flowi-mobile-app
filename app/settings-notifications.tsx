@@ -27,9 +27,9 @@ import { dsTokens, useDS } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 import { useUiModules } from '@/store/ui-preferences';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
 import { MeshBackground } from '@/components/ds';
-import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
+import { glassOf } from '@/components/shared/dsTheme';
 
 // DS v2: глибока лаванда (акцент tasks, 5.25:1 з білим) замість легасі #7C3AED
 const MEETING_LEAD_OPTIONS = [5, 10, 15, 30, 60];
@@ -50,8 +50,10 @@ export default function NotificationSettingsScreen() {
     border: k.border.hairline,
     text:   k.text.primary,
     sub:    k.text.secondary,
-    dim:    glassOf(k).surfaceSubtle,
-    card:   glassOf(k).surface,
+    // Omni (DS v2.2): картки суцільні (surface.card) з м'якою тінню,
+    // вкладене — surface.subtle; без скла й рамок.
+    dim:    k.surface.subtle,
+    card:   k.surface.card,
     accent: glassOf(k).accent.lavender.ink,
 
   }), [k]);
@@ -105,7 +107,7 @@ export default function NotificationSettingsScreen() {
 
         {!doc ? (
           unavailable ? (
-            <View style={[st.card, st.notice, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+            <View style={[st.card, st.notice, { backgroundColor: c.card }, shadow[isDark ? 'dark' : 'light'].card]}>
               <IconSymbol name={prefs.status === 'offline' ? 'wifi.slash' : 'info.circle'} size={18} color={c.sub} />
               <Text style={{ color: c.sub, fontSize: 13, flex: 1, lineHeight: 18 }}>
                 {prefs.status === 'offline' ? tr.ncSettingsOffline : prefs.status === 'unavailable' ? tr.ncUnavailable : tr.ncLoadFailed}
@@ -116,7 +118,7 @@ export default function NotificationSettingsScreen() {
           )
         ) : (
           <>
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+            <View style={[st.card, { backgroundColor: c.card }, shadow[isDark ? 'dark' : 'light'].card]}>
               <ToggleRow
                 icon="bell.badge"
                 iconColor={k.accent.amber}
@@ -164,7 +166,7 @@ export default function NotificationSettingsScreen() {
               onChangeTime={(edge, value) => save({ quiet_hours: { [edge]: value } })}
             />
 
-            <Text style={[st.section, { color: c.sub }]}>{tr.ncMatrixTitle.toUpperCase()}</Text>
+            <Text style={[st.section, { color: c.text }]} accessibilityRole="header">{tr.ncMatrixTitle}</Text>
             <PreferencesMatrix
               doc={doc}
               channels={channels}
@@ -176,7 +178,7 @@ export default function NotificationSettingsScreen() {
 
             {!disabledModules.includes('meetings') ? (
               <>
-                <Text style={[st.section, { color: c.sub }]}>{tr.ncMeetingLead.toUpperCase()}</Text>
+                <Text style={[st.section, { color: c.text }]} accessibilityRole="header">{tr.ncMeetingLead}</Text>
                 <View style={st.chips}>
                   {MEETING_LEAD_OPTIONS.map(minutes => {
                     const active = doc.meeting_lead_minutes === minutes;
@@ -245,12 +247,13 @@ function ToggleRow({ icon, iconColor, title, subtitle, value, disabled, onChange
 
 const st = StyleSheet.create({
   intro:     { fontSize: 13, lineHeight: 18, marginTop: 6, marginBottom: 14 },
-  card:      { borderRadius: 24, overflow: 'hidden', marginBottom: 12 },
+  card:      { borderRadius: 24, marginBottom: 12 },
   notice:    { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 20 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
   iconBox:   { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   divider:   { height: StyleSheet.hairlineWidth, marginLeft: 64 },
-  section:   { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginTop: 12, marginBottom: 8, marginLeft: 2 },
+  // Omni: заголовок групи — 16/600 (як назва bento-картки), без капсу.
+  section:   { fontSize: 16, lineHeight: 22, fontFamily: fontFamily.semibold, marginTop: 16, marginBottom: 10, marginLeft: 2 },
   chips:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   chip:      { minHeight: 40, paddingHorizontal: 16, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
 });

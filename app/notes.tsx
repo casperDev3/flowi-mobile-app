@@ -1,7 +1,8 @@
 import React from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { NotesWorkspace } from '@/components/notes/NotesWorkspace';
-import { ScreenHeader } from '@/components/shared/ScreenHeader';
+// Omni (DS v2.2): AppHeader — це ScreenHeader (інсет, «Назад») + дзвіник і аватар.
+import { AppHeader } from '@/components/shared/AppHeader';
 import { useDS } from '@/hooks/use-ds';
 import { useI18n } from '@/store/i18n';
 import { GlassScreen } from '@/components/ds';
@@ -15,10 +16,9 @@ export default function NotesScreen() {
   // DS v2.1: фон — mesh (скло нотаток заломлює плями), акцент — amber (notes).
   const color = t.text.primary;
   return <GlassScreen module="notes">
-    <ScreenHeader
+    <AppHeader
       title={tr.notes}
-      color={color}
-      back={{ onPress: () => router.back(), label: tr.back }}
+      back={{ onPress: () => router.back(), label: tr.back, color }}
     />
     <NotesWorkspace
       isDark={isDark}

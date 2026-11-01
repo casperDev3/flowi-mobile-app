@@ -11,8 +11,7 @@ import { addDays, type MenuDetail } from '@/store/menu-api';
 import type { MenuBitsApi } from './MenuBits';
 import { dateLabel, weekKindLabel } from './model';
 import type { MenuColors } from './theme';
-import { fontFamily } from '@/constants/theme';
-import { glassRimFor } from '@/components/shared/dsTheme';
+import { fontFamily, shadow } from '@/constants/theme';
 
 export function WeekStatusCard({
   menu,
@@ -48,7 +47,7 @@ export function WeekStatusCard({
   return (
     <View
       style={{
-        backgroundColor: c.card, ...glassRimFor(c.card, 'card'),
+        backgroundColor: c.card, ...shadow[c.isDark ? 'dark' : 'light'].card,
         borderRadius: Atlas.radius.xlarge,
         padding: 16,
         gap: 12,

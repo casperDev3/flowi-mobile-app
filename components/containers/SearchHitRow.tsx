@@ -45,8 +45,8 @@ export const SearchHitRow = React.memo(function SearchHitRow({ match, search, pl
   return (
     <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(container.id)} accessibilityRole="button"
       accessibilityLabel={`${container.name}${placeLabel ? `, ${placeLabel}` : ''}`} accessibilityState={{ selected }}>
-      {/* Картка DS: біла поверхня без рамки; вибір — 2px рамкою кольору коробки. */}
-      <View style={{ borderRadius: radius.nested, backgroundColor: (c.gl.card.backgroundColor as string), borderWidth: 2,
+      {/* Omni (DS v2.2): суцільна картка surface.card без рамки; вибір — 2px рамкою кольору коробки. */}
+      <View style={{ borderRadius: radius.nested, backgroundColor: c.t.surface.card, borderWidth: 2,
         borderColor: selected ? color : 'transparent', padding: 14, overflow: 'hidden' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />

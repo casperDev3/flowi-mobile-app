@@ -32,10 +32,9 @@ import {
 } from '@/utils/taskUtils';
 import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { useBreakpointValue } from '@/hooks/use-responsive';
-import { fontFamily, radius } from '@/constants/theme';
+import { fontFamily, radius, shadow } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { MeshBackground } from '@/components/ds';
-import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
+import { KpiCounter, MeshBackground, PageHeader } from '@/components/ds';
 import { AccentIcon } from '@/components/shared/GlassBits';
 
 type Status = 'active' | 'done';
@@ -93,13 +92,14 @@ interface ArchiveCardProps {
  * перемальовування всіх рядків на кожен tap по фільтру помітне оком.
  */
 const ArchiveCard = React.memo(function ArchiveCard({
-  task, c, restoreLabel, deleteLabel, onRestore, onDelete,
+  task, isDark, c, restoreLabel, deleteLabel, onRestore, onDelete,
 }: ArchiveCardProps) {
   // Задача без (валідного) пріоритету — без бейджа, а не TypeError.
   const prioLevel = normalizePriority(task);
   return (
-    // DS v2: непрозора картка surface.card, без рамки й бічної смуги.
-    <View style={[ar.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+    // Omni (DS v2.2): суцільна картка surface.card з м'якою тінню, без рамки,
+    // скла й бічної смуги.
+    <View style={[ar.card, { backgroundColor: c.card }, shadow[isDark ? 'dark' : 'light'].card]}>
       <View style={{ flex: 1 }}>
         {/* Title row */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 7 }}>
@@ -266,6 +266,7 @@ export default function ArchiveScreen() {
   }, [mutateTasks, tr]);
 
   const filtersApplied = filterPriorities.length > 0;
+  const withSubtasks = useMemo(() => done.filter(t => t.subtasks.length > 0).length, [done]);
 
   const clearAll = useCallback(() => {
     if (done.length === 0) return;
@@ -302,14 +303,15 @@ export default function ArchiveScreen() {
     return {
       bg1:     t.bg.canvas,
       bg2:     t.bg.canvas,
-      card:    glassOf(t).surface,
+      // Omni: суцільні картки; вкладене (бейджі, кнопки) — surface.subtle.
+      card:    t.surface.card,
       border:  t.border.hairline,
       text:    t.text.primary,
       sub:     t.text.secondary,
       accent:  t.status.success,
       success: t.status.success,
       danger:  t.status.danger,
-      dim:     glassOf(t).surfaceSubtle,
+      dim:     t.surface.subtle,
     };
   }, [isDark]);
 
@@ -363,9 +365,6 @@ export default function ArchiveScreen() {
           }}
           actions={done.length > 0 ? (
             <>
-              <View style={[ar.countBadge, { backgroundColor: tk.accent.lime }]}>
-                <Text style={{ color: tk.text.onAccent, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{done.length}</Text>
-              </View>
               <HeaderButton
                 onPress={clearAll}
                 accessibilityLabel={tr.clearArchive}
@@ -373,8 +372,21 @@ export default function ArchiveScreen() {
                 <IconSymbol name="trash" size={14} color={c.danger} />
               </HeaderButton>
             </>
-          ) : undefined}
-        />
+          ) : undefined}>
+          {/* Omni: KPI сторінки — скільки виконаних завдань у вибірці (після
+              фільтра пріоритету) і скільки з них мали підзавдання. */}
+          {done.length > 0 ? (
+            <PageHeader
+              bleed={20}
+              kpis={
+                <>
+                  <KpiCounter value={done.length} label={tr.allCompleted} />
+                  {withSubtasks > 0 ? <KpiCounter value={withSubtasks} label={tr.subtasks} /> : null}
+                </>
+              }
+            />
+          ) : null}
+        </ScreenHeader>
 
         {/* Filter by priority — у тій самій колонці, що й картки нижче. */}
         <View style={[contentWidth, { paddingHorizontal: 20, marginBottom: 8 }]}>
@@ -397,6 +409,8 @@ export default function ArchiveScreen() {
               key={opt.key}
               onPress={() => setSort(opt.key)}
               // DS v2: сортування — pill-чипи, активний — action.primary.
+              accessibilityRole="button"
+              accessibilityState={{ selected: sort === opt.key }}
               style={[ar.chip, { backgroundColor: sort === opt.key ? tk.action.primary : c.card }]}>
               <IconSymbol name={opt.icon as any} size={11} color={sort === opt.key ? tk.text.onAction : c.sub} />
               <Text style={{ color: sort === opt.key ? tk.text.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 4 }}>
@@ -439,10 +453,9 @@ function ArchiveSeparator() {
 
 const ar = StyleSheet.create({
   gridCell:   { flex: 1, minWidth: 0, maxWidth: '100%' },
-  countBadge: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
   chip:       { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, minHeight: 36, paddingHorizontal: 14, paddingVertical: 6 },
   emptyIcon:  { width: 80, height: 80, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  card:       { borderRadius: radius.nested, padding: 16, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  card:       { borderRadius: radius.nested, padding: 16, flexDirection: 'row', alignItems: 'center' },
   badge:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
   iconBtn:    { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

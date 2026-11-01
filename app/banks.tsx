@@ -32,7 +32,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ScreenHeader } from '@/components/shared/ScreenHeader';
+// Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
+import { AppHeader } from '@/components/shared/AppHeader';
 
 import { LoadErrorNotice } from '@/components/finance/LoadErrorNotice';
 import { PressableScale } from '@/components/shared/PressableScale';
@@ -61,7 +62,9 @@ import {
   type Transaction,
 } from '@/utils/financeUtils';
 import { haptic } from '@/utils/haptics';
-import { GlassBackdrop, GlassSurface, MeshBackground } from '@/components/ds';
+import {
+  BentoCard, GlassBackdrop, KpiCounter, MeshBackground, SegmentedProgress,
+} from '@/components/ds';
 
 const JAR_ICONS: IconSymbolName[] = [
   'star.fill', 'house.fill', 'car.fill', 'airplane',
@@ -457,6 +460,16 @@ export default function BanksScreen() {
   // Тип операції — лише гліфом/крапкою; суми — text.primary, кнопка — pill action.primary.
   const signColor = depositSign === '+' ? c.green : c.red;
 
+  const totalPct = summary.length === 1 && summary[0].goal > 0
+    ? Math.min(100, Math.round((summary[0].saved / summary[0].goal) * 100))
+    : null;
+  const jarKpis = savings.length > 0 ? (
+    <>
+      <KpiCounter value={savings.length} label={tr.piggyBanks} />
+      {totalPct !== null ? <KpiCounter value={`${totalPct}%`} label="від загальної мети" /> : null}
+    </>
+  ) : undefined;
+
   return (
     <View style={{ flex: 1 }}>
       <MeshBackground />
@@ -466,9 +479,11 @@ export default function BanksScreen() {
 
         {/* «Скарбнички» є пунктом сайдбара, тож на планшеті стрілку «Назад»
             ScreenHeader ховає сам. */}
-        <ScreenHeader
+        {/* Omni (DS v2.2): AppHeader + KPI — скільки цілей і (одна валюта)
+            наскільки виконано загальну мету. */}
+        <AppHeader
           title={tr.piggyBanks}
-          color={c.text}
+          kpis={jarKpis}
           paddingBottom={14}
           back={{
             onPress: () => router.back(),
@@ -497,7 +512,7 @@ export default function BanksScreen() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             savings.length > 0 ? (
-              <GlassSurface radius={radius.cardCompact} tint="lime" style={[s.summaryCard, { marginBottom: 16 }]}>
+              <BentoCard compact title={tr.savings} icon="banknote" accent="lime" style={{ marginBottom: 16 }}>
                 {summary.map((row, i) => {
                   const pct = row.goal > 0 ? Math.min(100, Math.round((row.saved / row.goal) * 100)) : 0;
                   return (
@@ -518,9 +533,8 @@ export default function BanksScreen() {
                       </View>
                       {row.goal > 0 && (
                         <>
-                          <View style={[s.progressBg, { height: 8, backgroundColor: c.dim }]}>
-                            <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: c.limeFill }]} />
-                          </View>
+                          {/* Omni: сегментний прогрес фірмовим градієнтом. */}
+                          <SegmentedProgress value={pct / 100} accessibilityLabel={`${pct}% від загальної мети`} />
                           <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginTop: 7 }}>
                             {pct}% від загальної мети
                           </Text>
@@ -529,7 +543,7 @@ export default function BanksScreen() {
                     </View>
                   );
                 })}
-              </GlassSurface>
+              </BentoCard>
             ) : null
           }
           ListEmptyComponent={
@@ -919,7 +933,8 @@ const JarCard = React.memo(function JarCard({
   const pct = goal > 0 ? Math.min(100, Math.max(0, (balance / goal) * 100)) : 0;
   const done = goal > 0 && pct >= 100;
   return (
-    <View style={[s.jarCard, width !== undefined && { width }, { ...c.gl.card }, shadow[isDark ? 'dark' : 'light'].card]}>
+    // Omni (DS v2.2): суцільна картка вмісту (не скло); вкладені кнопки — surface.subtle.
+    <View style={[s.jarCard, width !== undefined && { width }, { backgroundColor: c.t.surface.card }, shadow[isDark ? 'dark' : 'light'].card]}>
       {/* Top row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
         <View style={[s.jarIcon, { backgroundColor: color + (isDark ? '2E' : '1F') }]}>
@@ -942,7 +957,7 @@ const JarCard = React.memo(function JarCard({
           accessibilityRole="button"
           accessibilityLabel={`${editLabel}: ${account.name}`}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={[s.editBtn, { backgroundColor: c.dim }]}>
+          style={[s.editBtn, { backgroundColor: c.t.surface.subtle }]}>
           <IconSymbol name="pencil" size={13} color={c.text} />
         </TouchableOpacity>
       </View>
@@ -957,15 +972,14 @@ const JarCard = React.memo(function JarCard({
 
       {/* Progress */}
       {goal > 0 && (
-        <View style={[s.progressBg, { marginBottom: 14, backgroundColor: c.dim }]}>
-          <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: c.amber }]} />
-        </View>
+        <SegmentedProgress value={pct / 100} height={8} accessibilityLabel={`${account.name}: ${Math.round(pct)}%`} style={{ marginBottom: 14 }} />
       )}
 
       {/* Deposit button */}
       <TouchableOpacity
         onPress={() => onDeposit(account)}
-        style={[s.depositBtn, { ...c.gl.subtle }]}>
+        accessibilityRole="button"
+        style={[s.depositBtn, { backgroundColor: c.t.surface.subtle }]}>
         <IconSymbol name="plus.circle.fill" size={15} color={c.t.action.secondaryText} />
         <Text style={{ color: c.t.action.secondaryText, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 6 }}>{depositLabel}</Text>
         <View style={{ flex: 1 }} />
@@ -980,7 +994,6 @@ const JarCard = React.memo(function JarCard({
 });
 
 const s = StyleSheet.create({
-  summaryCard:  { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact },
   summaryLabel: { ...dsType.caption, fontFamily: fontFamily.medium, marginBottom: 4 },
   // Підсумки — display-цифри DS (тонкі, табличні).
   summaryAmount:{ ...dsType.displaySm, fontSize: 32, lineHeight: 36 },
@@ -993,8 +1006,6 @@ const s = StyleSheet.create({
   savedAmt:     { fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, letterSpacing: -0.56, fontVariant: ['tabular-nums'] },
   goalAmt:      { fontSize: 14, fontFamily: fontFamily.regular, paddingBottom: 3, fontVariant: ['tabular-nums'] },
   pctLabel:     { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
-  progressBg:   { height: 8, borderRadius: radius.pill, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: radius.pill },
   depositBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, minHeight: touchTarget, paddingHorizontal: 16 },
   fab:          { position: 'absolute', right: 20, bottom: FAB_BOTTOM, width: 56, height: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', shadowColor: '#111113', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 6 },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

@@ -5,21 +5,23 @@
  * скарбнички (`kind='savings'`) з ціллю, вхід до легасі-«Скарбничок».
  *
  * Період і ракурс на баланс не впливають (§3.2): баланс — факт про рахунок.
+ *
+ * Omni (DS v2.2): дії — pill-ряд угорі; оборот періоду й валюти — BentoCard у
+ * BentoGrid (1 колонка телефон, 2–3 планшет); ціль скарбнички — сегментний
+ * прогрес. Рядки — на суцільній картці, кнопки всередині — surface.subtle.
  */
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { EmptyState, GlassSurface } from '@/components/ds';
-import { fontFamily, radius, space, type as dsType } from '@/constants/theme';
+import { BentoCard, BentoGrid, EmptyState, SegmentedProgress } from '@/components/ds';
+import { fontFamily, radius, type as dsType } from '@/constants/theme';
 import { WIDE_CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
 import { useDS } from '@/hooks/use-ds';
 import type { Translations } from '@/store/translations';
 import type { Account, AccountKind } from '@/utils/accounts';
 import type { FinanceOverview } from '@/utils/financeOverview';
 import type { FinColors } from './financeLabels';
-import { useGlassStyles } from '@/components/finance/finPalette';
 
 export function AccountsTab({
   accounts, overview, money, kindLabel, c, tr, isWide, bottomInset,
@@ -44,8 +46,7 @@ export function AccountsTab({
    */
   header?: React.ReactNode;
 }) {
-  const { t, g } = useDS();
-  const gs = useGlassStyles();
+  const { t } = useDS();
   const [showArchived, setShowArchived] = useState(false);
   const byCurrency = useMemo(() => {
     const map = new Map<string, Account[]>();
@@ -78,9 +79,13 @@ export function AccountsTab({
             <Text style={{ color: balance < 0 ? t.status.danger : t.text.primary, fontSize: 16, fontFamily: fontFamily.medium, ...dsType.numeric }}>{signed(balance, code)}</Text>
           </View>
           {goal ? (
-            <View style={[st.bar, { ...gs.subtle }]}>
-              <View style={{ width: `${Math.min(100, Math.max(0, (balance / goal) * 100))}%`, height: '100%', backgroundColor: g.accent.lime.fill, borderRadius: radius.pill }} />
-            </View>
+            <SegmentedProgress
+              value={balance / goal}
+              height={6}
+              showValue
+              accessibilityLabel={`${a.name}: ${Math.round(Math.min(1, Math.max(0, balance / goal)) * 100)}%`}
+              style={{ marginTop: 8 }}
+            />
           ) : null}
         </TouchableOpacity>
         <TouchableOpacity
@@ -95,13 +100,17 @@ export function AccountsTab({
   };
 
   const cards = byCurrency.map(([code, list]) => (
-    <GlassSurface key={code} radius={radius.cardCompact} style={st.card}>
-      {/* Підсумок валюти — display-число картки (тонке, табличне). */}
-      <Text style={[st.cardTitle, { color: t.text.secondary }]}>{tr.finOnAccounts.replace('{currency}', code)}</Text>
+    <BentoCard
+      key={code}
+      compact
+      title={tr.finOnAccounts.replace('{currency}', code)}
+      icon="creditcard.fill"
+      accent="lime">
+      {/* Підсумок валюти — великі тонкі табличні цифри (Omni KPI). */}
       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}
-        style={{ ...dsType.displaySm, color: t.text.primary, marginTop: 6, marginBottom: 10 }}>{signed(overview.totalByCurrency[code] ?? 0, code)}</Text>
+        style={{ ...dsType.displaySm, fontFamily: fontFamily.light, color: t.text.primary, marginBottom: 10 }}>{signed(overview.totalByCurrency[code] ?? 0, code)}</Text>
       {list.map(row)}
-    </GlassSurface>
+    </BentoCard>
   ));
 
   return (
@@ -124,26 +133,28 @@ export function AccountsTab({
         <TouchableOpacity
           onPress={onOpenBanks}
           accessibilityRole="button"
-          style={[st.action, { ...gs.card }]}>
+          style={[st.action, { backgroundColor: t.surface.card, borderWidth: StyleSheet.hairlineWidth, borderColor: t.border.hairline }]}>
           <IconSymbol name="building.columns.fill" size={14} color={t.action.secondaryText} />
           <Text style={{ ...dsType.label, color: t.action.secondaryText }}>{tr.finOpenBanks}</Text>
         </TouchableOpacity>
       </View>
 
-      {header ? <View style={{ marginBottom: 12 }}>{header}</View> : null}
-
       {byCurrency.length === 0 ? (
-        <View style={{ paddingVertical: 24 }}>
-          <EmptyState icon="banknote" title={tr.noAccounts} caption={tr.noAccountsHint} />
-        </View>
-      ) : isWide ? (
-        // Колонок стільки, скільки влазить карток валют не вужчих за 300pt:
-        // портрет планшета — 2, ландшафт — 3. Неповний ряд не розтягує
-        // одиноку картку на всю ширину (ResponsiveGrid добиває порожніми).
-        <ResponsiveGrid minItemWidth={300} maxColumns={3}>
-          {cards.map((card, i) => <React.Fragment key={i}>{card}</React.Fragment>)}
-        </ResponsiveGrid>
-      ) : cards}
+        <>
+          {header ? <View style={{ marginBottom: 12 }}>{header}</View> : null}
+          <View style={{ paddingVertical: 24 }}>
+            <EmptyState icon="banknote" title={tr.noAccounts} caption={tr.noAccountsHint} />
+          </View>
+        </>
+      ) : (
+        // Колонок стільки, скільки влазить карток не вужчих за 280pt
+        // (BentoGrid): телефон — 1, портрет планшета — 2, ландшафт — 3.
+        // Оборот періоду — першою карткою на всю ширину ряду.
+        <BentoGrid style={{ marginBottom: 12 }}>
+          {header ? <GridCell key="flow" span="full">{header}</GridCell> : null}
+          {cards}
+        </BentoGrid>
+      )}
 
       {archived.length > 0 ? (
         <>
@@ -156,7 +167,7 @@ export function AccountsTab({
             <Text style={{ color: t.text.secondary, fontSize: 13, fontFamily: fontFamily.semibold, ...dsType.numeric }}>{tr.finArchivedAccounts} ({archived.length})</Text>
           </TouchableOpacity>
           {showArchived ? (
-            <View style={[st.card, { ...gs.card }]}>{archived.map(row)}</View>
+            <BentoCard compact>{archived.map(row)}</BentoCard>
           ) : null}
         </>
       ) : null}
@@ -164,13 +175,15 @@ export function AccountsTab({
   );
 }
 
+/** Клітинка BentoGrid для готового вузла: сітка читає `span` з пропсів дитини. */
+function GridCell({ children }: { span?: number | 'full'; children: React.ReactNode }) {
+  return <>{children}</>;
+}
+
 const WIDE_COLUMN = { width: '100%', maxWidth: WIDE_CONTENT_MAX_WIDTH, alignSelf: 'center' } as const;
 
 const st = StyleSheet.create({
-  card: { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: space.cardGapCompact },
-  cardTitle: { ...dsType.caption, fontFamily: fontFamily.medium },
   row: { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 8 },
-  bar: { height: 6, borderRadius: radius.pill, marginTop: 8, overflow: 'hidden' },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   action: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 20, borderRadius: radius.pill },
 });

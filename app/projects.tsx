@@ -75,9 +75,9 @@ import { useAuth } from '@/store/auth';
 import { ApiError } from '@/store/api';
 import { removeProjectMember } from '@/store/project-team';
 import { useProjectRoles } from '@/hooks/use-project-roles';
-import { fontFamily, radius, theme, type } from '@/constants/theme';
+import { fontFamily, radius, shadow, theme, type } from '@/constants/theme';
 import { dsTokens, useDS } from '@/hooks/use-ds';
-import { MeshBackground } from '@/components/ds';
+import { BentoCard, KpiCounter, MeshBackground, PageHeader, SectionTabs, SegmentedProgress } from '@/components/ds';
 import { glassOf, glassRim, glassRimFor } from '@/components/shared/dsTheme';
 import { AccentIcon } from '@/components/shared/GlassBits';
 
@@ -198,7 +198,7 @@ function ListChip({ label, count, selected, onPress, accent, sub, dim, border }:
         flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36,
         // DS v2: pill-чип; вибраний — action.primary + text.onAction.
         paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.pill,
-        backgroundColor: selected ? t.action.primary : glassOf(t).surface,
+        backgroundColor: selected ? t.action.primary : t.surface.card,
       }}>
       <Text style={{ color: selected ? t.text.onAction : t.text.primary, fontFamily: fontFamily.semibold, fontSize: 13 }}>{label}</Text>
       {count === undefined ? null : (
@@ -217,7 +217,7 @@ type CardTr = Pick<Translations,
   | 'projectTasks' | 'edit' | 'delete' | 'projectMembersLeave'
   | 'projectInProgress' | 'projectUnassigned' | 'projectBacklog' | 'projectFunnelA11y' | 'projectFlagA11y'
   | 'sprintCurrent' | 'sprintDaysLeft' | 'sprintLastDay' | 'sprintOverdueDays' | 'sprintUndated'
-  | 'sprintProgressA11y' | 'sprintClose'>;
+  | 'sprintProgressA11y' | 'sprintClose' | 'projectSortProgress'>;
 
 interface CounterItem { key: string; text: string; a11y: string; color?: string; bold?: boolean }
 
@@ -334,7 +334,9 @@ export const ProjectCard = React.memo(function ProjectCard({
       {/* DS v2: картка surface.card без рамки. На широкому екрані деталь
           стоїть поруч, і вибрану картку видно з рамки action.primary. */}
       {/* DS v2.1: скло з обідком; вибрана — рамка action.primary. */}
-      <View style={[st.card, { backgroundColor: glassOf(t).surface }, selected ? { borderColor: t.action.primary } : glassRim(t, 'card'), glassOf(t).shadow]}>
+      {/* Omni (DS v2.2): суцільна картка вмісту (як картка канбану Omni) —
+          surface.card + м'яка тінь, без скла й обідка. */}
+      <View style={[st.card, { backgroundColor: t.surface.card, borderColor: selected ? t.action.primary : 'transparent' }, shadow[isDark ? 'dark' : 'light'].card]}>
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={[st.colorBadge, { backgroundColor: project.color + '25' }]}>
@@ -389,7 +391,7 @@ export const ProjectCard = React.memo(function ProjectCard({
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: 10 }}>
             {project.deadline ? (
               <View
-                style={st.metaChip}
+                style={[st.metaChip, { backgroundColor: t.surface.subtle }]}
                 accessibilityLabel={`${tr.projectDeadline}: ${shortDate(project.deadline, locale)}`}>
                 <IconSymbol name="flag" size={11} color={stats.projectOverdue ? overdueColor : subColor} />
                 {/* Червоним лише коли ВЛАСНИЙ термін минув при незакритій
@@ -402,7 +404,7 @@ export const ProjectCard = React.memo(function ProjectCard({
             ) : null}
             {stats.upcomingDeadline ? (
               <View
-                style={st.metaChip}
+                style={[st.metaChip, { backgroundColor: t.surface.subtle }]}
                 accessibilityLabel={`${tr.projectNearest}: ${shortDate(stats.upcomingDeadline, locale)}`}>
                 <IconSymbol name="calendar" size={11} color={subColor} />
                 <Text style={{ color: subColor, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>
@@ -415,13 +417,15 @@ export const ProjectCard = React.memo(function ProjectCard({
 
         {stats.total > 0 && (
           <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
-              {/* DS v2: прогрес — amber; відсоток — тонкі табличні цифри. */}
-              <View style={[st.progressBg, { flex: 1, backgroundColor: glassOf(t).surfaceSubtle }]}>
-                <View style={[st.progressFill, { width: `${pct}%`, backgroundColor: glassOf(t).accent.lavender.fill }]} />
-              </View>
-              <Text style={{ color: textColor, fontSize: 20, fontFamily: fontFamily.light, letterSpacing: -0.4, fontVariant: ['tabular-nums'] }}>{pct}<Text style={{ color: subColor, fontSize: 12, fontFamily: fontFamily.regular }}>%</Text></Text>
-            </View>
+            {/* Omni: сегментний прогрес (≈15 сегментів у фірмовому градієнті)
+                з відсотком праворуч. */}
+            <SegmentedProgress
+              value={pct / 100}
+              label={tr.projectSortProgress}
+              showValue
+              accessibilityLabel={`${project.name}: ${pct}%`}
+              style={{ marginTop: 14 }}
+            />
 
             {/* Ряд 4 (воронка) і ряд 5 (ознаки відкритих) — різні бази, тож
                 різна вага шрифту й відступ між ними. */}
@@ -435,19 +439,15 @@ export const ProjectCard = React.memo(function ProjectCard({
                   <Text style={{ color: textColor, fontFamily: fontFamily.semibold }}>{sprintCard.name}</Text>
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <View
-                    accessible
-                    accessibilityRole="progressbar"
-                    // Друга шкала на картці — зі своїм підписом, інакше дві
-                    // шкали неможливо розрізнити на слух.
+                  {/* Друга шкала на картці — зі своїм підписом, інакше дві
+                      шкали неможливо розрізнити на слух. */}
+                  <SegmentedProgress
+                    value={sprintCard.pct / 100}
+                    segments={10}
+                    height={8}
                     accessibilityLabel={fill(tr.sprintProgressA11y, { name: sprintCard.name, done: sprintCard.done, total: sprintCard.total })}
-                    accessibilityValue={{ min: 0, max: 100, now: sprintCard.pct }}
-                    style={[st.progressBg, { flex: 1, backgroundColor: glassOf(t).surfaceSubtle }]}>
-                    <View style={[st.progressFill, {
-                      width: `${sprintCard.pct}%`,
-                      backgroundColor: sprintCard.overdue ? glassOf(t).accent.coral.fill : glassOf(t).accent.amber.fill,
-                    }]} />
-                  </View>
+                    style={{ flex: 1 }}
+                  />
                   <Text style={{ color: sprintCard.overdue ? textColor : subColor, fontSize: 12, fontVariant: ['tabular-nums'], fontFamily: sprintCard.overdue ? fontFamily.semibold : fontFamily.regular }}>
                     {sprintCard.done}/{sprintCard.total}{' · '}
                     {sprintCard.overdue
@@ -987,7 +987,7 @@ export default function ProjectsScreen() {
         лишається саме рішення про стрілку: useHeaderLead ховає її на
         планшеті, де «Проєкти» відкриваються прямо з сайдбара.
       */}
-      <View style={{ marginTop: 14, marginBottom: 28, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ marginTop: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
         {lead === 'back' ? (
           <TouchableOpacity
             onPress={() => router.back()}
@@ -998,41 +998,51 @@ export default function ProjectsScreen() {
             <IconSymbol name="chevron.left" size={17} color={c.text} />
           </TouchableOpacity>
         ) : null}
-        <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: lead === 'back' ? 12 : 0 }]}>{tr.projects}</Text>
+        <Text accessibilityRole="header" style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: lead === 'back' ? 12 : 0 }]}>{tr.projects}</Text>
+        {/* Omni: головна дія — чорна pill; на планшеті з підписом. */}
         <TouchableOpacity
           onPress={openAdd}
           accessibilityRole="button"
           accessibilityLabel={tr.newProject}
-          style={[st.headerBtn, { backgroundColor: tk.action.primary }]}>
+          style={[isWide ? st.headerPill : st.headerBtn, { backgroundColor: tk.action.primary }]}>
           <IconSymbol name="plus" size={17} color={tk.text.onAction} />
+          {isWide ? <Text style={{ color: tk.text.onAction, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.newProject}</Text> : null}
         </TouchableOpacity>
       </View>
 
-      {/* Живі / Архів. З'являється лише коли архів не порожній —
-          інакше це кнопка, яка нікуди не веде. */}
+      {/* Omni KPI — великі тонкі числа по видимому набору (той самий kpi,
+          що й у «Портфелі»): проєкти · прогрес · прострочені задачі. */}
+      {kpi.projects > 0 ? (
+        <PageHeader
+          bleed={isWide ? 0 : 20}
+          style={{ marginBottom: 18 }}
+          kpis={
+            <>
+              <KpiCounter value={kpi.projects} label={tr.portfolioProjects} />
+              <KpiCounter value={`${kpi.pct}%`} label={tr.projectSortProgress} delta={`${kpi.done}/${kpi.total} ${tr.projectDone}`} />
+              <KpiCounter
+                value={kpi.overdue}
+                label={tr.projectOverdueTasks}
+                valueColor={kpi.overdue > 0 ? tk.status.danger : undefined}
+              />
+            </>
+          }
+        />
+      ) : null}
+
+      {/* Живі / Архів — Omni pill-вкладки. З'являються лише коли архів не
+          порожній — інакше це вкладка, яка нікуди не веде. */}
       {archivedProjects.length > 0 && (
-        <View style={{ flexDirection: 'row', gap: 7, marginBottom: 18 }}>
-          {([
-            { key: false, label: tr.filterActive, count: liveProjects.length },
-            { key: true, label: tr.archive, count: archivedProjects.length },
-          ] as const).map(opt => (
-            <TouchableOpacity
-              key={String(opt.key)}
-              onPress={() => setShowArchived(opt.key)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: showArchived === opt.key }}
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: 6,
-                minHeight: 36, paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill,
-                backgroundColor: showArchived === opt.key ? tk.action.primary : glassOf(tk).surface,
-              }}>
-              <Text style={{ color: showArchived === opt.key ? tk.text.onAction : c.text, fontFamily: fontFamily.semibold, fontSize: 13 }}>
-                {opt.label}
-              </Text>
-              <Text style={{ color: showArchived === opt.key ? tk.text.onAction : c.sub, opacity: showArchived === opt.key ? 0.75 : 1, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'] }}>{opt.count}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <SectionTabs
+          tabs={[
+            { key: 'live', label: tr.filterActive, icon: 'folder', count: liveProjects.length },
+            { key: 'archive', label: tr.archive, icon: 'archivebox', count: archivedProjects.length },
+          ]}
+          value={showArchived ? 'archive' : 'live'}
+          onChange={key => setShowArchived(key === 'archive')}
+          bleed={isWide ? 0 : 20}
+          style={{ marginBottom: 14 }}
+        />
       )}
 
       {/* Сортування й фільтр статусу — лише коли в зрізі є що сортувати. */}
@@ -1098,7 +1108,7 @@ export default function ProjectsScreen() {
       borderColor={c.border}
       textColor={c.text}
       subColor={c.sub}
-      surfaceColor={c.sheet}
+      surfaceColor={tk.surface.card}
       accentColor={c.accent}
       canManage={isProjectOwner(item.project.id)}
       onPress={selectProject}
@@ -1111,19 +1121,20 @@ export default function ProjectsScreen() {
   // Порожній зріз через фільтр — це не «проєктів немає»: інша підказка й
   // кнопка скинути фільтр, а не «створити проєкт».
   const filteredOut = scopedStats.length > 0 && visibleStats.length === 0;
+  // Omni: порожній стан — на суцільній картці, а не просто текстом на тлі.
   const listEmpty = filteredOut ? (
-    <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+    <BentoCard style={{ alignItems: 'center', paddingVertical: 40 }}>
       <Text style={[type.h2, { color: c.text, textAlign: 'center' }]}>{tr.projectListFilterNoMatch}</Text>
       <TouchableOpacity
         onPress={() => updateListPrefs({ ...listPrefs, statuses: [] })}
         accessibilityRole="button"
         accessibilityLabel={tr.projectListFilterReset}
-        style={{ marginTop: 16, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, ...glassRim(tk, 'subtle') }}>
+        style={{ marginTop: 16, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: tk.surface.subtle }}>
         <Text style={{ color: tk.action.secondaryText, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.projectListFilterReset}</Text>
       </TouchableOpacity>
-    </View>
+    </BentoCard>
   ) : (
-    <View style={{ alignItems: 'center', paddingVertical: 64 }}>
+    <BentoCard style={{ alignItems: 'center', paddingVertical: 48 }}>
       <AccentIcon isDark={isDark} icon="folder" accent="lavender" size="lg" style={st.emptyIcon} />
       <Text style={[type.h2, { color: c.text, marginTop: 18 }]}>{tr.noProjects}</Text>
       <Text style={[type.body, { color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center' }]}>
@@ -1137,7 +1148,7 @@ export default function ProjectsScreen() {
         <IconSymbol name="plus" size={15} color={tk.text.onAction} />
         <Text style={{ color: tk.text.onAction, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.newProject}</Text>
       </TouchableOpacity>
-    </View>
+    </BentoCard>
   );
 
   const listFooter = (
@@ -1331,12 +1342,14 @@ export default function ProjectsScreen() {
 // наради/статуси списком просто на цьому екрані) прибрано — вхід у проєкт
 // тепер завжди веде в окремий простір `app/project/[id]/*` (§3 плану).
 const st = StyleSheet.create({
-  metaChip:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // Omni: футер-чипи картки (дата терміну, найближча задача) — тихі pill.
+  metaChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 28, paddingHorizontal: 10, borderRadius: radius.pill },
 
   pageTitle:   { ...type.h1 },
   headerBtn:   { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  headerPill:  { minHeight: 44, paddingHorizontal: 18, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6 },
   emptyIcon:   { width: 72, height: 72, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  card:        { borderRadius: radius.cardCompact, borderWidth: 1.5, padding: 20 },
+  card:        { borderRadius: radius.card, borderWidth: 1.5, padding: 20 },
   colorBadge:  { width: 42, height: 42, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   colorDot:    { width: 18, height: 18, borderRadius: 9 },
   progressBg:  { height: 6, borderRadius: radius.pill, overflow: 'hidden' },

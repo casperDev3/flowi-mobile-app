@@ -27,7 +27,7 @@ import {
   type AnomalyReport,
 } from '@/utils/timeAnomalies';
 import type { TimeRecord } from '@/utils/timeEntries';
-import { GlassSurface } from '@/components/ds';
+import { BentoCard } from '@/components/ds';
 
 export interface AnomalyPanelProps {
   reports: AnomalyReport<TimeRecord>[];
@@ -67,18 +67,15 @@ export function AnomalyPanel({
   const hidden = reports.length - visible.length;
 
   return (
-    // Алерт DS v2: біла картка, корал — лише тіком-іконкою й крапками причин.
-    <GlassSurface radius={radius.cardCompact} style={s.card}>
-      <View style={s.headRow}>
-        <View style={[s.headIcon, { backgroundColor: c.t.accent.coral + '1F' }]}>
-          <IconSymbol name="exclamationmark.triangle.fill" size={14} color={c.t.accent.coral} />
-        </View>
-        <Text style={[s.headTitle, { color: c.text }]}>
-          {tr.anomalyCheckTitle
-            .replace('{count}', String(reports.length))
-            .replace('{noun}', recordsNoun(reports.length, tr, lang))}
-        </Text>
-      </View>
+    // Omni (DS v2.2): суцільна bento-картка з шапкою «icon-chip + назва»;
+    // корал — лише icon-chip і крапки причин, текст — text.primary.
+    <BentoCard
+      compact
+      icon="exclamationmark.triangle.fill"
+      accent="coral"
+      title={tr.anomalyCheckTitle
+        .replace('{count}', String(reports.length))
+        .replace('{noun}', recordsNoun(reports.length, tr, lang))}>
 
       {visible.map(({ entry, kinds, typicalSeconds }) => {
         const trim = trimmedSeconds(entry);
@@ -93,7 +90,7 @@ export function AnomalyPanel({
             </Text>
             <View style={s.kindRow}>
               {kinds.map(kind => (
-                <View key={kind} style={[s.kindPill, { backgroundColor: c.dim }]}>
+                <View key={kind} style={[s.kindPill, { backgroundColor: c.t.surface.subtle }]}>
                   <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.t.accent.coral, marginRight: 5 }} />
                   <Text style={[s.kindText, { color: c.text }]}>{anomalyLabel(kind, tr)}</Text>
                 </View>
@@ -145,7 +142,7 @@ export function AnomalyPanel({
           </Text>
         </TouchableOpacity>
       )}
-    </GlassSurface>
+    </BentoCard>
   );
 }
 

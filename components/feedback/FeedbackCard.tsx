@@ -1,5 +1,5 @@
 import { Atlas } from '@/constants/atlas';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
 /**
  * components/feedback/FeedbackCard.tsx — рядок списку «Ідеї та баги».
  *
@@ -10,7 +10,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
+import { dsTheme } from '@/components/shared/dsTheme';
 import type { Translations } from '@/store/translations';
 
 import { DONE_COLOR, KIND_COLOR, STATE_COLOR, moduleLabel, platformsLabel, stateLabel, weightLabel, weightStyle } from './labels';
@@ -47,7 +47,8 @@ export const FeedbackCard = React.memo(function FeedbackCard({
       onPress={() => onOpen(entry)}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${entry.kind === 'bug' ? tr.fbTypeBug : tr.fbTypeIdea}: ${entry.item.title}. ${stateLabel(tr, state.key)}`}>
+      accessibilityLabel={`${entry.kind === 'bug' ? tr.fbTypeBug : tr.fbTypeIdea}: ${entry.item.title}. ${stateLabel(tr, state.key)}`}
+      style={{ borderRadius: Atlas.radius.xlarge, ...shadow[isDark ? 'dark' : 'light'].card }}>
       <View
         style={[
           st.card,
@@ -56,7 +57,9 @@ export const FeedbackCard = React.memo(function FeedbackCard({
             borderColor: selected ? t.focus.ring : 'transparent',
             borderWidth: 2,
             opacity: done ? 0.72 : 1,
-          }, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+            // Omni (DS v2.2): суцільна bento-картка (surface.card), не скло.
+            backgroundColor: t.surface.card,
+          }]}>
         <View style={st.row}>
           <TouchableOpacity
             onPress={() => onToggleDone(entry)}
@@ -79,12 +82,12 @@ export const FeedbackCard = React.memo(function FeedbackCard({
                 <Text style={[st.badgeText, { color: ws.color }]}>{weightLabel(tr, entry.kind, weight)}</Text>
               </View>
               {entry.item.module ? (
-                <View style={[st.badge, { backgroundColor: glassOf(t).surfaceSubtle }]}>
+                <View style={[st.badge, { backgroundColor: t.surface.subtle }]}>
                   <Text style={[st.badgeText, { color: colors.sub }]}>{moduleLabel(tr, entry.item.module)}</Text>
                 </View>
               ) : null}
               {entry.item.platforms?.length ? (
-                <View style={[st.badge, { backgroundColor: glassOf(t).surfaceSubtle }]}>
+                <View style={[st.badge, { backgroundColor: t.surface.subtle }]}>
                   <Text style={[st.badgeText, { color: colors.sub }]} numberOfLines={1}>{platformsLabel(tr, entry.item.platforms)}</Text>
                 </View>
               ) : null}

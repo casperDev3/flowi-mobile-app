@@ -46,9 +46,8 @@ import {
 } from '@/store/workspace';
 import { haptic } from '@/utils/haptics';
 import type { Translations } from '@/store/translations';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
 import { MeshBackground } from '@/components/ds';
-import { glassRimFor } from '@/components/shared/dsTheme';
 
 type ScreenState = 'idle' | 'checking' | 'error' | 'success';
 
@@ -246,7 +245,7 @@ export default function WorkspaceScreen() {
             <Text style={[st.title, { color: c.text }]}>{tr.workspaceScreenTitle}</Text>
             <Text style={[st.subtitle, { color: c.sub }]}>{tr.workspaceSubtitle}</Text>
 
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }, error && isBlocking(error) ? { borderWidth: 1, borderColor: k.status.danger } : null]}>
+            <View style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }, error && isBlocking(error) ? { borderWidth: 1, borderColor: k.status.danger } : null]}>
               <View style={st.fieldWrap}>
                 <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.workspaceAddressLabel}</Text>
                 <TextInput
@@ -278,7 +277,7 @@ export default function WorkspaceScreen() {
             )}
 
             {state === 'success' && success && (
-              <View style={[st.successCard, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+              <View style={[st.successCard, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}>
                 <View style={[st.colorDot, { backgroundColor: success.info.color || c.accent }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={[st.workspaceName, { color: c.text }]} numberOfLines={1}>

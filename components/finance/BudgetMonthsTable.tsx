@@ -6,10 +6,10 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { fontFamily, radius, space, type as dsType } from '@/constants/theme';
+import { fontFamily, type as dsType } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 import type { BudgetMonthRow } from '@/utils/budgetMonths';
-import { GlassSurface } from '@/components/ds';
+import { BentoCard } from '@/components/ds';
 
 interface Colors {
   text: string;
@@ -36,9 +36,9 @@ export function BudgetMonthsTable({ rows, monthsShort, fmt, c, title, hint, empt
   const months = rows[0]?.cells.map(cell => cell.month) ?? [];
   const monthLabel = (m: string) => `${monthsShort[Number(m.slice(5, 7)) - 1] ?? m.slice(5, 7)} ${m.slice(2, 4)}`;
   return (
-    <GlassSurface radius={radius.cardCompact} style={st.card}>
-      <Text style={{ ...dsType.h2, color: t.text.primary }}>{title}</Text>
-      <Text style={{ ...dsType.caption, color: t.text.secondary, marginTop: 2, marginBottom: 12 }}>{hint}</Text>
+    // Omni (DS v2.2): суцільна BentoCard — «icon-chip + назва», підказка — підзаголовком.
+    <BentoCard compact title={title} icon="calendar" accent="lime" style={st.card}>
+      <Text style={{ ...dsType.caption, color: t.text.secondary, marginBottom: 12 }}>{hint}</Text>
       {rows.length === 0 ? (
         <Text style={{ ...dsType.body, color: t.text.secondary }}>{empty}</Text>
       ) : (
@@ -72,12 +72,12 @@ export function BudgetMonthsTable({ rows, monthsShort, fmt, c, title, hint, empt
           </View>
         </ScrollView>
       )}
-    </GlassSurface>
+    </BentoCard>
   );
 }
 
 const st = StyleSheet.create({
-  card: { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: 16 },
+  card: { marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center' },
   nameCell: { width: 110, fontSize: 13, paddingRight: 6 },
   cell: { width: CELL_W, fontSize: 11, textAlign: 'right', paddingVertical: 4, fontVariant: ['tabular-nums'] },

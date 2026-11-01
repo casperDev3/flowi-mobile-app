@@ -22,7 +22,6 @@ import { MeetingCard } from './MeetingCard';
 import type { CalendarColors } from './palette';
 import { fontFamily, radius } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassRimFor } from '@/components/shared/dsTheme';
 
 export interface CalendarSearchProps {
   query: string;
@@ -80,7 +79,7 @@ export function CalendarSearch({
           onPress={() => onTaskPress(item.task)}
           accessibilityRole="button"
           accessibilityLabel={`${tr.calA11yTask}: ${item.task.title}${item.done ? `, ${tr.done}` : ''}`}
-          style={[st.row, { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), opacity: item.done ? 0.55 : 1 }]}>
+          style={[st.row, { backgroundColor: c.card, opacity: item.done ? 0.55 : 1 }]}>
           <IconSymbol name={item.done ? 'checkmark.circle.fill' : 'circle'} size={18} color={item.done ? dsTokens(isDark).status.success : item.color} />
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium, textDecorationLine: item.done ? 'line-through' : 'none' }} numberOfLines={2}>
@@ -98,7 +97,7 @@ export function CalendarSearch({
   return (
     <View style={{ flex: 1 }}>
       <View style={st.barRow}>
-        <View style={[st.inputBox, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+        <View style={[st.inputBox, { backgroundColor: c.card }]}>
           <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
           <TextInput
             testID="calendar-search-input"

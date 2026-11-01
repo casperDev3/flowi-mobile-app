@@ -118,9 +118,10 @@ export const ds = {
     };
   },
   /** Поле вводу: скло subtle з обідком, мінімум 44pt. */
-  input(t: DSTheme, isDark = t.bg.canvas === theme.dark.bg.canvas): ViewStyle & TextStyle {
+  input(t: DSTheme, isDark = t.bg.canvas === theme.dark.bg.canvas): TextStyle {
     return {
-      ...ds.glass(isDark, 'subtle'),
+      // Скло — ViewStyle; для поля вводу ті самі поля сумісні з TextStyle.
+      ...(ds.glass(isDark, 'subtle') as TextStyle),
       borderRadius: radius.control,
       minHeight: touchTarget,
       paddingHorizontal: space[4],

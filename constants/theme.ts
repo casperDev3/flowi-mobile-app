@@ -86,6 +86,27 @@ const light = {
     aiOrb: ['#7B5CFF', '#FF7AC6', '#FFB86B'] as const,
     /** Тло AI-блоків. */
     aiSurface: ['#EDE6FF', '#F6F1FF'] as const,
+    /**
+     * Omni: фірмовий градієнт (фіолет → бурштин) — ЛИШЕ підсвітка даних:
+     * активний стовпець, сегментний прогрес, повзунок таймлайну, AI-сфера.
+     * Вертикальний (згори фіолет) для стовпців, горизонтальний — для прогресу.
+     */
+    signature: ['#7F0BE8', '#F4AA2D'] as const,
+    /** Omni: м'яка лавандово-рожева змивка AI-карток (BentoCard variant="ai"). */
+    aiCard: ['#EFE4FF', '#FBE6F4'] as const,
+  },
+  /**
+   * Omni: «темна» виділена картка (одна на сторінку максимум — напр. найближча
+   * зустріч). Світла тема — чорнильна #11141B, темна — піднята #2C2C2E.
+   * Текст: primary ≥ 15:1, secondary ≥ 7:1 в обох темах; CTA — біла pill.
+   */
+  featured: {
+    bg: '#11141B',
+    text: '#FFFFFF',
+    textSecondary: 'rgba(255,255,255,0.72)',
+    action: '#FFFFFF',
+    actionText: '#11141B',
+    hairline: 'rgba(255,255,255,0.12)',
   },
 };
 
@@ -155,6 +176,17 @@ const dark: DSTheme = {
     iridescentGlow: 'rgba(184,164,248,0.15)',
     aiOrb: ['#7B5CFF', '#FF7AC6', '#FFB86B'],
     aiSurface: ['rgba(123,92,255,0.25)', 'rgba(184,164,248,0.12)'],
+    // Трохи світліші кінці — щоб градієнт не «тонув» на темному canvas.
+    signature: ['#9B3BFF', '#F7B84A'],
+    aiCard: ['rgba(127,11,232,0.30)', 'rgba(244,170,45,0.12)'],
+  },
+  featured: {
+    bg: '#2C2C2E',
+    text: '#F4F4F5',
+    textSecondary: '#C7C7CC',
+    action: '#F4F4F5',
+    actionText: '#111113',
+    hairline: 'rgba(255,255,255,0.10)',
   },
 };
 

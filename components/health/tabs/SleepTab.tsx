@@ -31,7 +31,7 @@ import { useI18n } from '@/store/i18n';
 import {
   ACCENT_MOOD, ACCENT_PULSE, ACCENT_SLEEP, ModalKey, fmtSleep,
 } from '@/utils/healthTheme';
-import { getHealthDSColors } from '@/components/health/palette';
+import { getHealthCardColors } from '@/components/health/palette';
 import { dsTokens } from '@/hooks/use-ds';
 import { fontFamily } from '@/constants/theme';
 
@@ -40,7 +40,7 @@ export function SleepTab({ h }: HealthTabProps) {
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
-  const c = getHealthDSColors(isDark);
+  const c = getHealthCardColors(isDark);
   const k = dsTokens(isDark);
 
   const { today, goals } = h;
@@ -77,7 +77,7 @@ export function SleepTab({ h }: HealthTabProps) {
     {
       key: 'sleep',
       node: (
-        <HealthCard c={c} title={tr.sleep} right={<HealthAddButton onPress={() => setModal('sleep')} label={tr.add} />}>
+        <HealthCard c={c} title={tr.sleep} icon="moon.fill" right={<HealthAddButton onPress={() => setModal('sleep')} label={tr.add} />}>
           {sleep ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -119,7 +119,7 @@ export function SleepTab({ h }: HealthTabProps) {
     items.push({
       key: 'quality',
       node: (
-        <HealthCard c={c} title={tr.hautoSleepQuality}>
+        <HealthCard c={c} title={tr.hautoSleepQuality} icon="sparkles">
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
             <Text style={{ color: c.text, fontSize: 44, lineHeight: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.88 }}>{quality.score}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4, flex: 1 }}>/ 100</Text>
@@ -157,7 +157,7 @@ export function SleepTab({ h }: HealthTabProps) {
   items.push({
     key: 'pulse-rest',
     node: (
-      <HealthCard c={c} title={tr.hautoPulseRest}>
+      <HealthCard c={c} title={tr.hautoPulseRest} icon="waveform.path.ecg">
         <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
           <Text style={{ color: c.text, fontSize: 44, lineHeight: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.88 }}>{today.pulseRest ?? '—'}</Text>
           <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>{tr.hautoBpm}</Text>

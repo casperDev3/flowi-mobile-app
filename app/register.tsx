@@ -25,9 +25,8 @@ import { useI18n } from '@/store/i18n';
 import { throttleMessage } from '@/store/auth-throttle';
 import { previewInvite, type InvitePreview } from '@/store/project-team';
 import { haptic } from '@/utils/haptics';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
 import { MeshBackground } from '@/components/ds';
-import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
 
 // ─── Простий валідатор формату email ─────────────────────────────────────────
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -83,7 +82,6 @@ export default function RegisterScreen() {
   const c = {
     ...getScreenColors('auth', isDark),
     // Картка форми — суцільна поверхня DS v2.
-    card: glassOf(k).surface,
     red: k.status.danger,
   };
 
@@ -234,7 +232,7 @@ export default function RegisterScreen() {
             )}
 
             <View
-              style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}
+              style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}
             >
               {/* Name */}
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>

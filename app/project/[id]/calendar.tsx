@@ -34,6 +34,7 @@ import { calendarColors, type CalendarColors } from '@/components/calendar/palet
 import { TimeGrid } from '@/components/calendar/TimeGrid';
 import { WeekStrip } from '@/components/calendar/WeekStrip';
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
+import { KpiCounter } from '@/components/ds';
 import { ProjectTaskSheet } from '@/components/projects/ProjectTaskSheet';
 import { useProjectRecords } from '@/components/projects/useProjectRecords';
 import { MeetingFormSheet, type MeetingFormData } from '@/components/shared/MeetingFormSheet';
@@ -53,7 +54,6 @@ import type { Sprint } from '@/utils/sprintUtils';
 import { isTaskDoneByType, type TaskStatusColumn } from '@/utils/taskStatuses';
 import type { Task } from '@/utils/taskUtils';
 import { radius } from '@/constants/theme';
-import { glassRimFor } from '@/components/shared/dsTheme';
 
 interface CreateTarget { day: string; time?: string }
 
@@ -133,6 +133,20 @@ export default function ProjectCalendar() {
     [anchor],
   );
   const title = useMemo(() => periodTitle(view, anchor, tr), [view, anchor, tr]);
+
+  // Omni KPI — з тих самих кошиків, що малює сітка (як в особистому календарі).
+  const periodStats = useMemo(() => {
+    const month = keyToDate(anchor).getMonth();
+    const days = view === 'month' ? range.days.filter(day => keyToDate(day).getMonth() === month) : range.days;
+    let periodMeetings = 0;
+    let periodTasks = 0;
+    for (const day of days) {
+      periodMeetings += meetingsByDay[day]?.length ?? 0;
+      periodTasks += tasksByDay[day]?.length ?? 0;
+    }
+    const today = (meetingsByDay[todayKey]?.length ?? 0) + (tasksByDay[todayKey]?.length ?? 0);
+    return { periodMeetings, periodTasks, today };
+  }, [view, anchor, range, meetingsByDay, tasksByDay, todayKey]);
   const dayTitle = useCallback((day: string) => {
     if (day === todayKey) return tr.today;
     const d = keyToDate(day);
@@ -260,7 +274,7 @@ export default function ProjectCalendar() {
     content = (
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
         {/* DS v2: сітка місяця — у білій картці на canvas. */}
-        <View style={{ backgroundColor: c.card, ...glassRimFor(c.card, 'card'), borderRadius: radius.cardCompact, padding: 12 }}>
+        <View style={{ backgroundColor: c.card, borderRadius: radius.cardCompact, padding: 12 }}>
           <MonthGrid
             rows={monthRows}
             month={anchorDate.getMonth()}
@@ -297,7 +311,7 @@ export default function ProjectCalendar() {
     );
   } else {
     content = (
-      <View style={{ flex: 1, marginHorizontal: 16, marginBottom: 12, backgroundColor: c.card, ...glassRimFor(c.card, 'card'), borderRadius: radius.cardCompact, overflow: 'hidden', paddingTop: 8, paddingRight: 4 }}>
+      <View style={{ flex: 1, marginHorizontal: 16, marginBottom: 12, backgroundColor: c.card, borderRadius: radius.cardCompact, overflow: 'hidden', paddingTop: 8, paddingRight: 4 }}>
         <TimeGrid
           days={range.days}
           todayKey={todayKey}
@@ -325,6 +339,13 @@ export default function ProjectCalendar() {
       project={project}
       isDark={isDark}
       title={tr.calendar}
+      kpis={
+        <>
+          <KpiCounter value={periodStats.today} label={tr.today} onPress={() => setAnchor(todayKey)} accessibilityLabel={`${tr.today}: ${periodStats.today}`} />
+          <KpiCounter value={periodStats.periodMeetings} label={tr.calSectionMeetings} />
+          <KpiCounter value={periodStats.periodTasks} label={tr.tasks} />
+        </>
+      }
       actions={
         <>
           <HeaderButton

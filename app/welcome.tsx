@@ -9,9 +9,8 @@ import { dsTokens } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 import { loadWorkspaceConfig } from '@/store/workspace';
-import { fontFamily } from '@/constants/theme';
+import { fontFamily, shadow } from '@/constants/theme';
 import { MeshBackground } from '@/components/ds';
-import { glassRimFor, glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export default function WelcomeScreen() {
   const cs = useColorScheme();
@@ -54,7 +53,7 @@ export default function WelcomeScreen() {
           </View>
 
           {/* Buttons block */}
-          <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+          <View style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}>
             <TouchableOpacity
               style={[st.primaryBtn, { backgroundColor: k.action.primary }]}
               activeOpacity={0.82}
@@ -66,7 +65,7 @@ export default function WelcomeScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[st.secondaryBtn, { backgroundColor: glassOf(k).surfaceSubtle, ...glassRim(k, 'subtle') }]}
+              style={[st.secondaryBtn, { backgroundColor: k.surface.subtle }]}
               activeOpacity={0.82}
               onPress={() => router.push('/register')}
               accessibilityRole="button"

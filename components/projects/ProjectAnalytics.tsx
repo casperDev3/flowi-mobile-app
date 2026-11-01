@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '@/store/i18n';
 import { formatDuration } from '@/utils/durationFormat';
@@ -15,9 +15,8 @@ import {
   type WeekPoint,
 } from '@/utils/projectCharts';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
+import { OmniPanel, OmniPillTabs, OmniTwoColumns, OmniWeekBars } from './OmniPaletteKit';
 import { fontFamily, radius } from '@/constants/theme';
-import { dsTokensForText } from '@/components/tasks/dsTokensForText';
-import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 /** Зелений — той самий, яким усюди в застосунку позначено завершене. */
 
@@ -55,7 +54,6 @@ export function ProjectAnalytics({
   palette: AnalyticsPalette;
 }) {
   const { tr } = useI18n();
-  const t = dsTokensForText(palette.text);
   // '' — усі проєкти списку. Порожній рядок, а не null: значення слугує ще й
   // ключем чипа, і сентинель довелося б конвертувати в обидва боки.
   const [selected, setSelected] = useState('');
@@ -99,31 +97,20 @@ export function ProjectAnalytics({
       <Text style={[st.heading, { color: palette.text }]}>{tr.projectAnalytics}</Text>
       <Text style={[st.note, { color: palette.sub, marginTop: 4 }]}>{tr.projectAnalyticsHint}</Text>
 
-      {/* Селектор проєкту — чипи, а не випадайка: список короткий, а окрема
-          модалка заради вибору одного значення тут коштувала б більше, ніж
-          рядок, що скролиться. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 7, paddingVertical: 12 }}>
-        {[{ id: '', name: `${tr.all} (${projects.length})` }, ...projects].map(option => {
-          const active = option.id === selected;
-          return (
-            <TouchableOpacity
-              key={option.id || 'all'}
-              onPress={() => setSelected(option.id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              // DS v2: чип-pill, активний — action.primary.
-              style={[st.chip, { backgroundColor: active ? t.action.primary : glassOf(t).surface }]}>
-              <Text style={{ color: active ? t.text.onAction : palette.text, fontSize: 13, fontFamily: fontFamily.semibold }}>
-                {option.name}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {/* Селектор проєкту — Omni pill-вкладки (той самий стан `selected`):
+          список короткий, окрема модалка заради одного значення коштувала б
+          більше, ніж рядок, що скролиться. */}
+      <OmniPillTabs
+        tabs={[{ key: ALL_KEY, label: `${tr.all} (${projects.length})` }, ...projects.map(project => ({ key: project.id, label: project.name }))]}
+        value={selected || ALL_KEY}
+        onChange={key => setSelected(key === ALL_KEY ? '' : key)}
+        palette={palette}
+        accessibilityLabel={tr.projectAnalytics}
+        style={{ marginTop: 12, marginBottom: 14 }}
+      />
 
+      {/* Omni bento: панелі — суцільні картки; на планшеті по дві в ряд. */}
+      <OmniTwoColumns>
       <Panel title={tr.chartColumns} hint={`${focusLabel} · ${tr.projectTasks}: ${focusTasks.length}`} palette={palette}>
         {/* Порядок смуг — порядок дошки, тож ряд читається як воронка.
             Колір кожної смуги — колір її колонки на канбані. */}
@@ -189,9 +176,13 @@ export function ProjectAnalytics({
           palette={palette}
         />
       </Panel>
+      </OmniTwoColumns>
     </View>
   );
 }
+
+/** Ключ вкладки «Усі» — порожній рядок не годиться React-ключем. */
+const ALL_KEY = '__all__';
 
 function Panel({
   title, hint, palette, children,
@@ -200,14 +191,14 @@ function Panel({
   hint: string;
   palette: AnalyticsPalette;
   children: React.ReactNode;
+  /** BentoGrid читає проп `span` дитини; панель завжди одна колонка. */
+  span?: number;
 }) {
-  const t = dsTokensForText(palette.text);
+  // Omni: шапка картки «icon-chip + назва», підказка — підзаголовком.
   return (
-    <View style={[st.panel, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
-      <Text style={[st.panelTitle, { color: palette.text }]}>{title}</Text>
-      <Text style={[st.note, { color: palette.sub, marginBottom: 12, marginTop: 2 }]}>{hint}</Text>
+    <OmniPanel title={title} subtitle={hint} palette={palette}>
       {children}
-    </View>
+    </OmniPanel>
   );
 }
 
@@ -290,47 +281,22 @@ export function WeekBars({
   label: string;
   palette: AnalyticsPalette;
 }) {
-  const t = dsTokensForText(palette.text);
-  const height = 70;
-  const peak = Math.max(1, ...weeks.map(week => week.count));
   const spoken = weeks
     .map(week => `${weekLabel(week.weekStart, months)}: ${week.count}`)
     .join(', ');
-
+  // Omni (DS v2.2): штриховані стовпці, поточний тиждень — фірмовий градієнт
+  // (OmniWeekBars). `color` лишається в сигнатурі для
+  // сумісності викликів, але колір активного стовпця тепер — підсвітка даних.
+  // (HatchedBars із components/ds тут недоступний — useDS → AsyncStorage у
+  // тестах; див. OmniPaletteKit.)
+  void color;
   return (
     <View accessible accessibilityRole="image" accessibilityLabel={`${label}. ${spoken}`}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', height, gap: 3 }}>
-        {weeks.map(week => (
-          <View key={week.weekStart} style={{ flex: 1, height, justifyContent: 'flex-end' }}>
-            <View
-              style={{
-                // Порожній тиждень лишається видимою рискою, а не зникає:
-                // провал у ряді — це і є відповідь «нічого не закрили».
-                height: week.count ? Math.max(4, (week.count / peak) * height) : 2,
-                // DS v2: поточний тиждень — lime (активний стовпець), решта — `color`.
-                borderRadius: 4,
-                backgroundColor: week.count ? (week.current ? t.accent.lime : color) : palette.border,
-              }}
-            />
-          </View>
-        ))}
-      </View>
-      <View style={{ flexDirection: 'row', gap: 3, marginTop: 5 }}>
-        {weeks.map(week => (
-          <Text
-            key={week.weekStart}
-            numberOfLines={1}
-            style={{
-              flex: 1, textAlign: 'center', fontSize: 9, fontVariant: ['tabular-nums'],
-              // Поточний тиждень позначено підписом, а не окремим кольором
-              // стовпчика: колір тут уже зайнятий змістом графіка.
-              fontFamily: week.current ? fontFamily.semibold : fontFamily.semibold,
-              color: week.current ? palette.text : palette.sub,
-            }}>
-            {weekLabel(week.weekStart, months)}
-          </Text>
-        ))}
-      </View>
+      <OmniWeekBars
+        data={weeks.map(week => ({ key: week.weekStart, label: weekLabel(week.weekStart, months), value: week.count, strong: week.current }))}
+        activeIndex={weeks.findIndex(week => week.current)}
+        palette={palette}
+      />
     </View>
   );
 }

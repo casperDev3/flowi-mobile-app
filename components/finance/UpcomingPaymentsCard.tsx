@@ -30,8 +30,7 @@ import {
   type Subscription,
   type UpcomingPayment,
 } from '@/utils/subscriptions';
-import { useGlassStyles } from '@/components/finance/finPalette';
-import { GlassSurface } from '@/components/ds';
+import { BentoCard } from '@/components/ds';
 
 
 export interface UpcomingPaymentsData {
@@ -87,7 +86,6 @@ export function UpcomingPaymentsCard({
 }) {
   const router = useRouter();
   const t = dsTokens(isDark);
-  const gs = useGlassStyles();
   const RED = t.status.danger;
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const { currencies } = data;
@@ -138,7 +136,7 @@ export function UpcomingPaymentsCard({
           accessibilityRole="button"
           accessibilityLabel={`${tr.subPayNow}: ${sub.name}`}
           hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-          style={[st.renewBtn, { backgroundColor: isOverdue ? t.action.primary : (gs.subtle.backgroundColor as string) }]}>
+          style={[st.renewBtn, { backgroundColor: isOverdue ? t.action.primary : t.surface.subtle }]}>
           <Text style={{ color: isOverdue ? t.text.onAction : t.action.secondaryText, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.subPayNow}</Text>
         </TouchableOpacity>
       </TouchableOpacity>
@@ -155,37 +153,42 @@ export function UpcomingPaymentsCard({
   );
   const split = overdue.length > 0 && soon.length > 0;
 
+  // Omni (DS v2.2): суцільна BentoCard — «icon-chip + назва», праворуч
+  // pill-посилання на «Підписки»; рядки розділені волосиною.
   return (
     <View style={[{ marginBottom: 12 }, style]}>
-      <View style={st.headRow}>
-        <Text style={[st.title, { color: t.text.primary }]}>
-          {todayOnly ? tr.finTodayDue : overdue.length && !soon.length ? tr.subOverdue : tr.subUpcoming}
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.push('/subscriptions')}
-          accessibilityRole="link"
-          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
-          <Text style={{ color: t.text.secondary, fontSize: 13, fontFamily: fontFamily.medium }}>{tr.navSubscriptions}</Text>
-        </TouchableOpacity>
-      </View>
-      <GlassSurface radius={radius.cardCompact} style={st.card}>
+      <BentoCard
+        compact
+        title={todayOnly ? tr.finTodayDue : overdue.length && !soon.length ? tr.subOverdue : tr.subUpcoming}
+        icon="calendar"
+        accent={overdue.length ? 'coral' : 'lime'}
+        headerRight={
+          <TouchableOpacity
+            onPress={() => router.push('/subscriptions')}
+            accessibilityRole="link"
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            style={[st.link, { backgroundColor: t.surface.subtle }]}>
+            <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.medium }}>{tr.navSubscriptions}</Text>
+            <IconSymbol name="chevron.right" size={10} color={t.text.secondary} />
+          </TouchableOpacity>
+        }
+        style={st.card}>
         {split ? sectionLabel(`${tr.subOverdue} · ${overdue.length}`, RED, true) : null}
         {overdue.map((item, idx) => renderRow(item, split ? idx + 1 : idx))}
         {split ? sectionLabel(tr.subUpcomingWithin.replace('{n}', String(withinDays)), t.text.secondary, false) : null}
         {soon.map((item, idx) => renderRow(item, split ? idx + 1 : idx))}
-      </GlassSurface>
+      </BentoCard>
     </View>
   );
 }
 
 const st = StyleSheet.create({
-  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  title:   { ...dsType.h2 },
   badge:   { borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 2 },
-  card:    { borderRadius: radius.cardCompact, paddingVertical: 4 },
-  row:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 56 },
+  card:    { paddingBottom: 8 },
+  link:    { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32, paddingHorizontal: 12, borderRadius: radius.pill },
+  row:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 56 },
   iconBox: { width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   renewBtn: { borderRadius: radius.pill, minHeight: 32, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 5 },
-  sectionHead: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 },
+  sectionHead: { paddingTop: 10, paddingBottom: 2 },
   sectionText: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, textTransform: 'uppercase' },
 });

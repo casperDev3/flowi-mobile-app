@@ -33,8 +33,7 @@ import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryCo
 import { useI18n } from '@/store/i18n';
 import { isModuleEnabled, useUiModules } from '@/store/ui-preferences';
 import { fontFamily } from '@/constants/theme';
-import { MeshBackground } from '@/components/ds';
-import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
+import { BentoCard, BentoCardHeader, KpiCounter, MeshBackground, PageHeader } from '@/components/ds';
 
 
 export default function SettingsModulesScreen() {
@@ -66,9 +65,17 @@ export default function SettingsModulesScreen() {
     border: k.border.hairline,
     text:   k.text.primary,
     sub:    k.text.secondary,
-    dim:    glassOf(k).surfaceSubtle,
-    card:   glassOf(k).surface,
+    // Omni (DS v2.2): суцільні картки й вкладене surface.subtle (без скла).
+    dim:    k.surface.subtle,
+    card:   k.surface.card,
   }), [k]);
+
+  // KPI: скільки модулів із перемикачем зараз увімкнено — з того самого
+  // маніфесту, що й список нижче.
+  const moduleCounts = useMemo(() => {
+    const all = sections.flatMap(section => section.items);
+    return { on: all.filter(item => isModuleEnabled(disabledModules, item.module)).length, total: all.length };
+  }, [sections, disabledModules]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -91,8 +98,12 @@ export default function SettingsModulesScreen() {
             { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
             { label: tr.modulesTitle },
           ]}
-          crumbColor={c.sub}
-        />
+          crumbColor={c.sub}>
+          <PageHeader
+            bleed={20}
+            kpis={<KpiCounter value={`${moduleCounts.on}/${moduleCounts.total}`} label={tr.modulesTitle} />}
+          />
+        </ScreenHeader>
       </View>
 
       <ScrollView
@@ -107,11 +118,12 @@ export default function SettingsModulesScreen() {
           items={sections.map((section): MasonryEntry => ({
           key: String(section.titleKey),
           node: (
-          <View>
-            <Text style={[st.sectionLabel, { color: c.sub }]}>
-              {String(tr[section.titleKey]).toUpperCase()}
-            </Text>
-            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+          // Omni: група модулів — bento-картка, назва групи — її шапка.
+          <BentoCard padded={false} style={st.card}>
+            <View style={st.cardHead}>
+              <BentoCardHeader title={String(tr[section.titleKey])} />
+            </View>
+            <View>
               {section.items.map((item, index) => {
                 const enabled = isModuleEnabled(disabledModules, item.module);
                 const label = String(tr[item.labelKey]);
@@ -140,7 +152,7 @@ export default function SettingsModulesScreen() {
                 );
               })}
             </View>
-          </View>
+          </BentoCard>
         ),
           }))}
         />
@@ -153,8 +165,8 @@ export default function SettingsModulesScreen() {
 
 const st = StyleSheet.create({
   intro:        { fontSize: 13, lineHeight: 19, marginTop: 4, marginBottom: 4 },
-  sectionLabel: { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginBottom: 8, marginTop: 20, marginLeft: 4 },
-  card:         { borderRadius: 24, overflow: 'hidden' },
+  card:         { marginTop: 16 },
+  cardHead:     { paddingHorizontal: 16, paddingTop: 14, marginBottom: -4 },
   row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 12 },
   iconBox:      { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   rowLabel:     { fontSize: 14, fontFamily: fontFamily.medium },

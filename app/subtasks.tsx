@@ -28,8 +28,8 @@ import { normalizePriority, type LegacyPriority, type TaskPriority } from '@/uti
 import { useContentWidth } from '@/hooks/use-content-width';
 import { fontFamily, radius, theme } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { MeshBackground } from '@/components/ds';
-import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
+import { BentoCard, MeshBackground, SegmentedProgress } from '@/components/ds';
+import { glassOf, dsGlass } from '@/components/shared/dsTheme';
 
 type Status = 'active' | 'done';
 interface SubTask { id: string; title: string; done: boolean; }
@@ -53,6 +53,8 @@ interface SubRowProps {
   /** Копіювати назву підзавдання в буфер. */
   onCopy: (sub: SubTask) => void;
   copyLabel: string;
+  /** Підпис кнопки видалення для VoiceOver («Видалити: <назва>»). */
+  deleteLabel: string;
 }
 
 /**
@@ -65,13 +67,17 @@ const SUCCESS = theme.light.status.success;
 const SubSeparator = () => <View style={{ height: 8 }} />;
 
 const SubRow = React.memo(function SubRow({
-  sub, textColor, subColor, borderColor, dimColor, onToggle, onDelete, onCopy, copyLabel,
+  sub, textColor, subColor, borderColor: _borderColor, dimColor, onToggle, onDelete, onCopy, copyLabel, deleteLabel,
 }: SubRowProps) {
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={() => onToggle(sub.id)}
-      // DS v2: рядок — картка surface.card (передається як dimColor), без рамки.
+      // Omni: рядок чек-листа — суцільна картка surface.card (dimColor), без
+      // рамки; виконане — закреслене й text.secondary.
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: sub.done }}
+      accessibilityLabel={sub.title}
       style={[st.subRow, { backgroundColor: dimColor }]}>
       <View style={[st.subCheck, { borderColor: sub.done ? SUCCESS : subColor, backgroundColor: sub.done ? SUCCESS : 'transparent' }]}>
         {sub.done && <IconSymbol name="checkmark" size={10} color="#FFFFFF" />}
@@ -93,6 +99,8 @@ const SubRow = React.memo(function SubRow({
       </TouchableOpacity>
       <TouchableOpacity
         onPress={() => onDelete(sub.id)}
+        accessibilityRole="button"
+        accessibilityLabel={`${deleteLabel}: ${sub.title}`}
         hitSlop={{ top: 10, bottom: 10, left: 8, right: 10 }}>
         <IconSymbol name="trash" size={14} color={subColor} />
       </TouchableOpacity>
@@ -197,8 +205,9 @@ export default function SubtasksScreen() {
       onDelete={deleteSubtask}
       onCopy={copySubtask}
       copyLabel={tr.copySubtask}
+      deleteLabel={tr.delete}
     />
-  ), [c, tk.surface.card, toggleSubtask, deleteSubtask, copySubtask, tr.copySubtask]);
+  ), [c, tk.surface.card, toggleSubtask, deleteSubtask, copySubtask, tr.copySubtask, tr.delete]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -245,18 +254,29 @@ export default function SubtasksScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={total > 0 ? (
-              // DS v2: KPI-картка — тонкий великий відсоток + amber-прогрес.
-              <View style={{ marginBottom: 16, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), borderRadius: radius.cardCompact, padding: 20 }}>
+              // Omni: bento-картка прогресу — тонкий великий відсоток +
+              // сегментний прогрес фірмовим градієнтом (як картка канбану).
+              <BentoCard
+                compact
+                title={tr.subtasks}
+                icon="checklist"
+                accent="lavender"
+                style={{ marginBottom: 16 }}
+                headerRight={
+                  <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{doneCount}/{total}</Text>
+                }>
                 <Text style={{ color: c.text, fontSize: 40, lineHeight: 44, letterSpacing: -0.8, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'] }}>
                   {pct}<Text style={{ color: c.sub, fontSize: 18, fontFamily: fontFamily.regular }}>% {tr.done}</Text>
                 </Text>
-                <View style={[st.progressBg, { backgroundColor: glassOf(tk).surfaceSubtle, marginTop: 12 }]}>
-                  <View style={[st.progressFill, { width: `${pct}%`, backgroundColor: tk.accent.amber }]} />
-                </View>
-              </View>
+                <SegmentedProgress
+                  value={total > 0 ? doneCount / total : 0}
+                  accessibilityLabel={`${tr.subtasks}: ${doneCount}/${total}`}
+                  style={{ marginTop: 12 }}
+                />
+              </BentoCard>
             ) : null}
             ListFooterComponent={
-              <View style={[st.addSubRow, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginTop: sortedSubs.length > 0 ? 8 : 0 }]}>
+              <View style={[st.addSubRow, { backgroundColor: tk.surface.card, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, borderStyle: 'dashed', marginTop: sortedSubs.length > 0 ? 8 : 0 }]}>
                 <IconSymbol name="plus" size={15} color={c.sub} />
                 <TextInput
                   placeholder="Додати підзавдання..."
@@ -268,7 +288,7 @@ export default function SubtasksScreen() {
                   style={{ color: c.text, flex: 1, marginLeft: 10, fontSize: 14, fontFamily: fontFamily.regular, paddingVertical: 0 }}
                 />
                 {newSubtask.trim() ? (
-                  <TouchableOpacity onPress={addSubtask}>
+                  <TouchableOpacity onPress={addSubtask} accessibilityRole="button" accessibilityLabel={tr.add} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <IconSymbol name="checkmark.circle.fill" size={22} color={c.text} />
                   </TouchableOpacity>
                 ) : null}

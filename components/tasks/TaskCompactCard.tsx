@@ -22,9 +22,9 @@ import { useI18n } from '@/store/i18n';
 import { findSprint, sprintBadgeLabel, type Sprint } from '@/utils/sprintUtils';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { isOverdue, normalizePriority, type Task } from '@/utils/taskUtils';
-import { fontFamily, radius } from '@/constants/theme';
+import { SegmentedProgress } from '@/components/ds/SegmentedProgress';
+import { fontFamily, radius, shadow } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
@@ -141,8 +141,11 @@ function TaskCompactCardInner<T extends Task>({
        * нижче, у якого є onAccessibilityTap.
        */
       accessible={false}>
-      {/* DS v2: непрозора картка surface.card, без блюру й рамки. */}
-      <View style={[st.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+      {/* Omni (DS v2.2): суцільна біла картка surface.card з м'якою тінню,
+          без рамки й блюру — як картка канбану в референсі. Вкладені чипи —
+          пастельні (тінт кольору статусу/проєкту), а не скло: скляна
+          підкладка на білій картці не видна. */}
+      <View style={[st.card, { backgroundColor: t.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}>
         {/* Ціль дотику чекбокса — справжні 44×44, а не 18 + hitSlop: hitSlop
             не виходить за межі картки (у неї відступ 12/9), тож фактично
             лишалось ~36. Колонка 44pt на всю висоту картки, сам квадратик —
@@ -190,7 +193,7 @@ function TaskCompactCardInner<T extends Task>({
             importantForAccessibility="no-hide-descendants">
             <View
               style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: glassOf(t).surfaceSubtle }}>
+              <View style={[st.tag, { backgroundColor: statusColumn.color + '1F' }]}>
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColumn.color, marginRight: 5 }} />
                 <Text numberOfLines={1} style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.medium }}>
                   {statusColumn.name}
@@ -198,7 +201,7 @@ function TaskCompactCardInner<T extends Task>({
               </View>
 
               {proj && badgeLabel && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: glassOf(t).surfaceSubtle }}>
+                <View style={[st.tag, { backgroundColor: proj.color + '1F' }]}>
                   <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color, marginRight: 5 }} />
                   {/* maxWidth більший за колишні 110: у бейдж тепер уміщається
                       ще й назва спринта, і на 110 від неї лишалося три літери. */}
@@ -247,6 +250,20 @@ function TaskCompactCardInner<T extends Task>({
               </View>
             )}
           </View>
+
+          {/* Omni: сегментний прогрес підзавдань (градієнт підпису). Лише
+              поки завдання не закрите — на виконаному він нічого не каже.
+              Число вже озвучене в a11ySummary, тож смужка від VoiceOver
+              схована. */}
+          {task.subtasks.length > 0 && !isDone && (
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ marginTop: 4 }}>
+              <SegmentedProgress
+                value={doneSubtasks / task.subtasks.length}
+                segments={Math.min(12, Math.max(4, task.subtasks.length))}
+                height={6}
+              />
+            </View>
+          )}
         </View>
 
         {/* Старе місце бейджа — правий верхній кут (картки простору проєкту). */}
@@ -276,7 +293,9 @@ const st = StyleSheet.create({
   // minHeight 44 — мінімальна ціль дотику (Apple HIG). Було ~38: рядок цілком
   // клікабельний, тож він мусить відповідати нормі, а не лише чекбокс у ньому.
   // Ліворуч без відступу: його займає 44-пунктова колонка чекбокса.
-  card: { minHeight: 44, borderRadius: radius.nested, paddingLeft: 0, paddingRight: 14, paddingVertical: 12, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-start' },
+  // Без overflow:'hidden' — він обрізав би м'яку тінь картки на iOS.
+  card: { minHeight: 44, borderRadius: radius.nested, paddingLeft: 0, paddingRight: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'flex-start' },
+  tag: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
   // Колонка чекбокса: 44 завширшки, на всю висоту картки (мінімум 44 —
   // відʼємні відступи «з'їдають» вертикальні 9pt картки).
   checkHit: { width: 44, minHeight: 44, marginVertical: -12, alignSelf: 'stretch', alignItems: 'center', paddingTop: 13 },

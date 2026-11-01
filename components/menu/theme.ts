@@ -46,14 +46,16 @@ export function makeMenuColors(isDark: boolean): MenuColors {
     isDark,
     bg1: t.bg.canvas,
     bg2: t.bg.canvas,
-    // DS v2.1: скло над mesh; акцент «Меню» — success (glass.moduleAccent.menu).
-    card: glassOf(t).surface,
+    // Omni (DS v2.2): вміст — на суцільних bento-картках (скло лишається шапці й
+    // аркушам); акцент «Меню» — success (glass.moduleAccent.menu).
+    card: t.surface.card,
     border: t.border.hairline,
     text: t.text.primary,
     sub: t.text.secondary,
     faint: t.text.muted,
-    dim: glassOf(t).surfaceSubtle,
-    chip: glassOf(t).surfaceSubtle,
+    // Суцільний subtle: скляний subtle на білій картці не видно.
+    dim: t.surface.subtle,
+    chip: t.surface.subtle,
     sheet: glassOf(t).sheet,
     accent: glassOf(t).accent.success.ink,
     primary: t.action.primary,

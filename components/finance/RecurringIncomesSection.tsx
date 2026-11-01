@@ -41,7 +41,7 @@ import {
 import { uuidV4 } from '@/utils/uuid';
 import type { FinColors } from './financeLabels';
 import { useFinPalette } from './finPalette';
-import { GlassBackdrop } from '@/components/ds';
+import { BentoCard, GlassBackdrop } from '@/components/ds';
 
 type RawItem = { id: string } & Record<string, unknown>;
 
@@ -240,11 +240,13 @@ export function RecurringIncomesSection({ tr, lang, isDark, projectId }: {
     }
   }, [receive, receiveValid, receiveAmount, receiveAccount, trackWrite, load, reportError, tr]);
 
-  const rowOf = (item: RecurringIncome) => {
+  // Omni (DS v2.2): рядки — усередині суцільної BentoCard, між ними волосина;
+  // кнопка «Отримано» — surface.subtle (скляний subtle на білій картці зникав).
+  const rowOf = (item: RecurringIncome, idx: number) => {
     const status = recurringIncomeStatus(item, today);
     const overdue = status === 'overdue';
     return (
-      <View key={item.id} style={[st.row, { ...c.gl.card }]}>
+      <View key={item.id} style={[st.row, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
         <TouchableOpacity
           onPress={() => { setFormError(false); setForm({ editing: item, draft: draftOf(item) }); }}
           accessibilityRole="button"
@@ -269,7 +271,7 @@ export function RecurringIncomesSection({ tr, lang, isDark, projectId }: {
             onPress={() => openReceive(item)}
             accessibilityRole="button"
             accessibilityLabel={`${tr.finRiReceived}: ${item.name}`}
-            style={[st.receiveBtn, { ...c.gl.subtle }]}>
+            style={[st.receiveBtn, { backgroundColor: c.t.surface.subtle }]}>
             <IconSymbol name="checkmark" size={12} color={c.t.status.success} />
             <Text style={{ color: c.t.action.secondaryText, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.finRiReceived}</Text>
           </TouchableOpacity>
@@ -286,25 +288,29 @@ export function RecurringIncomesSection({ tr, lang, isDark, projectId }: {
 
   return (
     <View style={{ marginTop: 22 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={[st.section, { color: c.text, flex: 1 }]}>{tr.finRecurringIncomes}</Text>
-        <TouchableOpacity
-          onPress={() => { setFormError(false); setForm({ editing: null, draft: emptyDraft(today, primary, projectId) }); }}
-          accessibilityRole="button"
-          accessibilityLabel={tr.finRiNew}
-          style={[st.addIcon, { backgroundColor: c.action }]}>
-          <IconSymbol name="plus" size={17} color={c.onAction} />
-        </TouchableOpacity>
-      </View>
+      <BentoCard
+        compact
+        title={tr.finRecurringIncomes}
+        icon="arrow.down.circle"
+        accent="success"
+        headerRight={
+          <TouchableOpacity
+            onPress={() => { setFormError(false); setForm({ editing: null, draft: emptyDraft(today, primary, projectId) }); }}
+            accessibilityRole="button"
+            accessibilityLabel={tr.finRiNew}
+            style={[st.addIcon, { backgroundColor: c.action }]}>
+            <IconSymbol name="plus" size={17} color={c.onAction} />
+          </TouchableOpacity>
+        }>
       {totals.length > 0 ? (
-        <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginBottom: 8 }}>
+        <Text style={{ color: c.text, fontSize: 22, lineHeight: 28, fontFamily: fontFamily.light, ...dsType.numeric, marginBottom: 8 }}>
           {formatTotalsLine(totals, 'monthly', tr.subPerMonth, currencies, locale)}
         </Text>
       ) : null}
       {live.length === 0 && loaded ? (
-        <Text style={{ color: c.sub, fontSize: 13, marginBottom: 8 }}>{tr.finRiEmpty}</Text>
+        <Text style={{ color: c.sub, fontSize: 13, marginBottom: 4 }}>{tr.finRiEmpty}</Text>
       ) : null}
-      <View style={{ gap: 8 }}>{live.map(rowOf)}</View>
+      <View>{live.map(rowOf)}</View>
 
       {archived.length > 0 ? (
         <>
@@ -312,15 +318,16 @@ export function RecurringIncomesSection({ tr, lang, isDark, projectId }: {
             onPress={() => setShowArchive(v => !v)}
             accessibilityRole="button"
             accessibilityState={{ expanded: showArchive }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, marginTop: 6 }}>
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, marginTop: 6 }}>
             <IconSymbol name={showArchive ? 'chevron.down' : 'chevron.right'} size={12} color={c.sub} />
             <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold }}>
               {tr.subArchiveCount.replace('{count}', String(archived.length))}
             </Text>
           </TouchableOpacity>
-          {showArchive ? <View style={{ gap: 8 }}>{archived.map(rowOf)}</View> : null}
+          {showArchive ? <View>{archived.map(rowOf)}</View> : null}
         </>
       ) : null}
+      </BentoCard>
 
       {/* Форма доходу */}
       <SheetModal visible={!!form} onClose={() => setForm(null)}>
@@ -547,7 +554,7 @@ const st = StyleSheet.create({
   section: { ...dsType.h2 },
   // «Додати» — кругла pill-кнопка головної дії (action.primary задає тло в розмітці).
   addIcon: { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.nested, paddingHorizontal: 14, paddingVertical: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   icon: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   receiveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 12, borderRadius: radius.pill },
   sheet: { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: space.cardPadding, paddingBottom: 36 },

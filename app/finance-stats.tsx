@@ -17,7 +17,7 @@ import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { finPalette } from '@/components/finance/finPalette';
 import { fontFamily, radius, shadow, space, type as dsType } from '@/constants/theme';
-import { ds, dsTokens, useDS } from '@/hooks/use-ds';
+import { dsTokens, useDS } from '@/hooks/use-ds';
 import { CategoryRow, categoryRowsToMap } from '@/store/migrations';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
@@ -30,7 +30,10 @@ import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { wideModalStyles } from '@/components/finance/wideModal';
 import { CONTENT_MAX_WIDTH, WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { defaultCategories, type CategoryDef } from '@/utils/financeCategories';
-import { GlassBackdrop, GlassSurface, MeshBackground } from '@/components/ds';
+import {
+  BentoCard, GlassBackdrop, HatchedBars, KpiCounter, MeshBackground, PageHeader, SectionTabs,
+} from '@/components/ds';
+import { type GlassAccent } from '@/constants/theme';
 
 /**
  * Категорію мають лише дохід і витрата, тож розріз «за категоріями» знає саме
@@ -90,8 +93,12 @@ function makeColors(isDark: boolean, reduceTransparency = false) {
   return {
     ...p,
     red: p.t.accent.coral,
+    // Omni (DS v2.2): вміст — на суцільних BentoCard, тож доріжки смужок —
+    // суцільний subtle (скляний на білій картці зникав).
+    dim: p.t.surface.subtle,
     // Дірка бублика — непрозора (ховає сектори), у тон скла над mesh.
-    hole: reduceTransparency ? p.g.solid.card : isDark ? '#16161A' : '#F9F8FA',
+    // Omni: бублик лежить на суцільній BentoCard — дірка кольору картки.
+    hole: p.t.surface.card,
   };
 }
 
@@ -264,6 +271,7 @@ export default function FinanceStatsScreen() {
   const [customCurrencies, setCustomCurrencies] = useState<Currency[]>([]);
   const [period, setPeriod] = useState<Period>('month');
   const [catTab, setCatTab] = useState<CatType>('expense');
+  const [weekdaySel, setWeekdaySel] = useState<number | null>(null);
 
   // Custom date range
   const [showCal, setShowCal]       = useState(false);
@@ -540,16 +548,8 @@ export default function FinanceStatsScreen() {
   const columnInner = Math.min(screenWidth, twoCol ? WIDE_CONTENT_MAX_WIDTH : CONTENT_MAX_WIDTH) - 40;
   const SPARK_W = Math.max(0, (twoCol ? (columnInner - 16) / 2 : columnInner) - 36);
 
-  const summaryCards = [
-    { label: 'Доходи',       value: fmt(income),      color: c.green },
-    { label: 'Витрати',      value: fmt(expense),     color: c.red },
-    { label: 'Баланс',       value: fmt(balance),     color: balance >= 0 ? c.green : c.red },
-    { label: 'Заощадження',  value: `${savingsPct}%`, color: c.amber },
-  ];
-  // На широкому екрані всі чотири підсумки вміщаються в один ряд.
-  const summaryRows = isWide
-    ? [summaryCards]
-    : [summaryCards.slice(0, 2), summaryCards.slice(2)];
+  // Вибраний тапом день тижня (HatchedBars); без вибору — найвитратніший.
+  const weekdayPeak = weekdayStats.reduce((best, d, i) => (d.total > (weekdayStats[best]?.total ?? 0) ? i : best), 0);
 
   return (
     <View style={{ flex: 1 }}>
@@ -587,8 +587,28 @@ export default function FinanceStatsScreen() {
               }}>
               <IconSymbol name="calendar" size={17} color={hasCustomRange ? c.onAction : c.text} />
             </HeaderButton>
-          }
-        />
+          }>
+          {/* Omni: KPI періоду — великі тонкі числа (колишній ряд із чотирьох
+              карток-підсумків). Норма заощаджень — дельтою над балансом. */}
+          {loaded && txs.length > 0 ? (
+            <PageHeader
+              bleed={20}
+              kpis={
+                <>
+                  <KpiCounter value={fmt(income)} label="Доходи" />
+                  <KpiCounter value={fmt(expense)} label="Витрати" />
+                  <KpiCounter
+                    value={fmt(balance)}
+                    label="Баланс"
+                    valueColor={balance < 0 ? c.t.status.danger : undefined}
+                    delta={`Заощадження ${savingsPct}%`}
+                    deltaTone={balance >= 0 ? 'up' : 'down'}
+                  />
+                </>
+              }
+            />
+          ) : null}
+        </ScreenHeader>
 
         <ScrollView
           contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
@@ -613,8 +633,8 @@ export default function FinanceStatsScreen() {
             /* Порожня статистика — глухий кут: графіки нулів не пояснюють,
                що робити далі, тому веде одразу до створення транзакції. */
             <View style={{ alignItems: 'center', paddingVertical: 64 }}>
-              <View style={[s.emptyIcon, { ...c.gl.card }]}>
-                <IconSymbol name="chart.bar.fill" size={34} color={c.muted} />
+              <View style={[s.emptyIcon, { backgroundColor: c.limeTint }]}>
+                <IconSymbol name="chart.bar.fill" size={34} color={c.lime} />
               </View>
               <Text style={{ color: c.text, fontSize: 17, fontFamily: fontFamily.semibold, marginTop: 16 }}>
                 {tr.noTransactions}
@@ -631,39 +651,26 @@ export default function FinanceStatsScreen() {
 
           {/* ── Period selector (hidden when custom range active) ── */}
           {!hasCustomRange && (
-          <View style={[s.segRow, { ...c.gl.card, marginBottom: 18 }]}>
-            {([
-              { key: 'week',    label: 'Тиждень' },
-              { key: 'month',   label: 'Місяць'  },
-              { key: '3months', label: '3 Міс'   },
-              { key: 'year',    label: 'Рік'     },
-              { key: 'all',     label: 'Все'     },
-            ] as { key: Period; label: string }[]).map(p => (
-              <TouchableOpacity
-                key={p.key}
-                onPress={() => setPeriod(p.key)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: period === p.key }}
-                accessibilityLabel={p.label}
-                style={[s.segBtn, period === p.key && { backgroundColor: c.action }]}>
-                <Text style={[s.segLabel, { color: period === p.key ? c.onAction : c.text }]}>{p.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+            <SectionTabs<Period>
+              tabs={[
+                { key: 'week',    label: 'Тиждень' },
+                { key: 'month',   label: 'Місяць'  },
+                { key: '3months', label: '3 Міс'   },
+                { key: 'year',    label: 'Рік'     },
+                { key: 'all',     label: 'Все'     },
+              ]}
+              value={period}
+              onChange={setPeriod}
+              bleed={20}
+              style={{ marginBottom: 16 }}
+            />
           )}
 
-          {/* ── Summary row ── */}
-          {summaryRows.map((row, ri) => (
-            <View key={ri} style={{ flexDirection: 'row', gap: 8, marginBottom: ri === summaryRows.length - 1 ? 18 : 8 }}>
-              {row.map(card => (
-                <SummCard key={card.label} label={card.label} value={card.value} color={card.color} border={c.border} isDark={isDark} />
-              ))}
-            </View>
-          ))}
+          {/* ── Підсумки періоду — KPI у шапці (PageHeader) ── */}
 
           {/* ── Перекази в підсумки не входять ── */}
           {transferCount > 0 && (
-            <View style={[s.hintRow, { ...c.gl.card }]}>
+            <View style={[s.hintRow, { backgroundColor: c.t.surface.card }]}>
               <IconSymbol name="arrow.left.arrow.right" size={14} color={c.t.status.info} />
               <Text style={{ flex: 1, color: c.sub, fontSize: 12, lineHeight: 17, marginLeft: 8 }}>
                 {tr.transfersNotCounted} ({transferCount})
@@ -676,13 +683,12 @@ export default function FinanceStatsScreen() {
           {/* ── Balance trend ── */}
           {trendData.length >= 2 && (
             <>
-              <SectionTitle text="Тренд балансу" sub={c.text} />
-              <GlassSurface radius={radius.cardCompact} tint="lime" style={[s.card, { marginBottom: 18 }]}>
+              <StatCard title="Тренд балансу" icon="chart.line.uptrend.xyaxis">
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <View>
                     <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 2 }}>Поточний баланс</Text>
                     {/* KPI — display-цифри DS. */}
-                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ ...dsType.displaySm, color: c.text }}>{fmt(balance)}</Text>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ ...dsType.displaySm, fontFamily: fontFamily.light, color: c.text }}>{fmt(balance)}</Text>
                   </View>
                   {/* Бейдж значення на графіку — лайм (росте) / корал-тінт (падає). */}
                   <View style={[s.trendBadge, { backgroundColor: balance >= 0 ? c.t.accent.lime : c.red + '1F' }]}>
@@ -697,16 +703,14 @@ export default function FinanceStatsScreen() {
                   <Text style={{ color: c.sub, fontSize: 10 }}>Початок</Text>
                   <Text style={{ color: c.sub, fontSize: 10 }}>Зараз</Text>
                 </View>
-              </GlassSurface>
+              </StatCard>
             </>
           )}
 
           {/* ── Adaptive bar chart ── */}
-          <SectionTitle
-            text={period === 'week' ? 'По днях (тиждень)' : period === '3months' ? 'По місяцях (3 міс)' : period === 'year' ? 'По місяцях (рік)' : period === 'all' ? 'По місяцях' : 'Поточний місяць'}
-            sub={c.text}
-          />
-          <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
+          <StatCard
+            title={period === 'week' ? 'По днях (тиждень)' : period === '3months' ? 'По місяцях (3 міс)' : period === 'year' ? 'По місяцях (рік)' : period === 'all' ? 'По місяцях' : 'Поточний місяць'}
+            icon="chart.bar.fill">
             {flowTxs.length === 0 ? (
               <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 16 }}>Немає даних</Text>
             ) : (
@@ -740,13 +744,12 @@ export default function FinanceStatsScreen() {
                 </View>
               </>
             )}
-          </GlassSurface>
+          </StatCard>
 
           {/* ── Income vs Expense donut ── */}
           {balanceDonutData.length > 0 && (
             <>
-              <SectionTitle text="Доходи / Витрати" sub={c.text} />
-              <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
+              <StatCard title="Доходи / Витрати" icon="chart.pie.fill">
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
                   {/* Donut */}
                   <View style={{ position: 'relative' }}>
@@ -781,18 +784,18 @@ export default function FinanceStatsScreen() {
                     ))}
                   </View>
                 </View>
-              </GlassSurface>
+              </StatCard>
             </>
           )}
 
           {/* ── Quick stats ── */}
-          <SectionTitle text="Швидка статистика" sub={c.text} />
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+          <StatCard title="Швидка статистика" icon="bolt.fill" accent="amber">
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: largestTx ? 8 : 0 }}>
             <QuickStat icon="list.bullet.circle.fill" label="Транзакцій" value={String(txCount)} color={c.accent} border={c.border} isDark={isDark} />
             <QuickStat icon="calendar" label="Сер/день" value={avgDailyExp > 0 ? fmt(avgDailyExp) : '—'} color={c.red} border={c.border} isDark={isDark} />
           </View>
           {largestTx && (
-            <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
+            <View style={[s.nested, { backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
               <View style={{ width: 40, height: 40, borderRadius: radius.pill, backgroundColor: c.red + '1F', alignItems: 'center', justifyContent: 'center' }}>
                 <IconSymbol name={getCatIcon(largestTx.category, 'expense')} size={18} color={c.red} />
               </View>
@@ -802,8 +805,9 @@ export default function FinanceStatsScreen() {
                 {largestTx.note ? <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{largestTx.note}</Text> : null}
               </View>
               <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>−{fmt(largestTx.amount)}</Text>
-            </GlassSurface>
+            </View>
           )}
+          </StatCard>
 
           </View>
 
@@ -811,8 +815,7 @@ export default function FinanceStatsScreen() {
           {/* ── Витрати в розрізі рахунків ── */}
           {accountStats.length > 0 && (
             <>
-              <SectionTitle text={tr.accounts} sub={c.text} />
-              <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
+              <StatCard title={tr.accounts} icon="creditcard.fill">
                 <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
                   {tr.expenses}
                 </Text>
@@ -836,56 +839,45 @@ export default function FinanceStatsScreen() {
                     </View>
                   </View>
                 ))}
-              </GlassSurface>
+              </StatCard>
             </>
           )}
 
           {/* ── Day-of-week spending ── */}
           {expenseTxs.length > 0 && (
             <>
-              <SectionTitle text="Витрати по днях тижня" sub={c.text} />
-              <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
-                {weekdayStats.map((day, i) => (
-                  <View key={i} style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }, i > 0 && { marginTop: 10 }]}>
-                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, width: 26 }}>{day.label}</Text>
-                    <View style={{ flex: 1, height: 6, backgroundColor: c.dim, borderRadius: 3, overflow: 'hidden' }}>
-                      <View style={{ height: '100%', width: `${day.pct * 100}%`, backgroundColor: day.pct > 0.75 ? c.red : c.amber, borderRadius: radius.pill }} />
-                    </View>
-                    <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, width: 56, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
-                      {day.total > 0 ? fmt(day.total) : '—'}
-                    </Text>
-                  </View>
-                ))}
-              </GlassSurface>
+              {/* Omni: штриховані стовпці, найвитратніший день (або вибраний
+                  тапом) — фірмовим градієнтом із pill-підказкою суми. */}
+              <StatCard title="Витрати по днях тижня" icon="calendar" accent="coral">
+                <HatchedBars
+                  data={weekdayStats.map(day => ({ label: day.label, value: day.total, display: day.total > 0 ? fmt(day.total) : '—' }))}
+                  activeIndex={weekdaySel ?? weekdayPeak}
+                  onSelect={setWeekdaySel}
+                  height={110}
+                  accessibilityLabel="Витрати по днях тижня"
+                />
+              </StatCard>
             </>
           )}
 
           {/* ── Category breakdown ── */}
-          <SectionTitle text="За категоріями" sub={c.text} />
-          <View style={[s.segRow, { ...c.gl.card, marginBottom: 14 }]}>
-            {(['expense', 'income'] as CatType[]).map(t => (
-              <TouchableOpacity
-                key={t}
-                onPress={() => setCatTab(t)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: catTab === t }}
-                accessibilityLabel={t === 'expense' ? tr.expenses : tr.incomes}
-                style={[s.segBtn, catTab === t && { backgroundColor: c.action }]}>
-                <Text style={[s.segLabel, { color: catTab === t ? c.onAction : c.text }]}>
-                  {t === 'expense' ? 'Витрати' : 'Доходи'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <StatCard title="За категоріями" icon="chart.pie.fill" accent="lavender">
+          <SectionTabs<CatType>
+            tabs={[
+              { key: 'expense', label: 'Витрати' },
+              { key: 'income',  label: 'Доходи' },
+            ]}
+            value={catTab}
+            onChange={setCatTab}
+            style={{ marginBottom: 14 }}
+          />
 
           {categoryStats.length === 0 ? (
-            <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
               <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 20 }}>
                 {catTab === 'expense' ? 'Витрат немає' : 'Доходів немає'}
               </Text>
-            </GlassSurface>
           ) : (
-            <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
+            <>
               {/* Donut + legend side by side */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 18 }}>
                 <DonutChart
@@ -941,8 +933,9 @@ export default function FinanceStatsScreen() {
                   </View>
                 );
               })}
-            </GlassSurface>
+            </>
           )}
+          </StatCard>
           </View>
           </View>
 
@@ -1115,41 +1108,32 @@ export default function FinanceStatsScreen() {
 }
 
 // ─── Helper components ───────────────────────────────────────────────────────
-const SectionTitle = React.memo(function SectionTitle({ text, sub }: { text: string; sub: string }) {
-  // Заголовок секції DS (16/600); колір передає екран (text.primary).
-  // DS v2.1: крапка акценту модуля (lime fill) перед заголовком.
-  const { g } = useDS();
+/**
+ * Omni (DS v2.2): секція статистики — суцільна BentoCard із шапкою «icon-chip
+ * + назва» (колишні заголовок над карткою + скляна картка). Колонки тут —
+ * прості стовпці, тож відступ між картками — знизу.
+ */
+function StatCard({ title, icon, accent = 'lime', right, children }: {
+  title: string;
+  icon: IconSymbolName;
+  accent?: GlassAccent;
+  right?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
   return (
-    <View style={s.sectionRow}>
-      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: g.accent.lime.fill }} />
-      <Text style={[s.sectionTitle, { color: sub, marginBottom: 0 }]}>{text}</Text>
-    </View>
+    <BentoCard compact title={title} icon={icon} accent={accent} headerRight={right} style={{ marginBottom: 16 }}>
+      {children}
+    </BentoCard>
   );
-});
-
-const SummCard = React.memo(function SummCard({ label, value, color, border, isDark }: { label: string; value: string; color: string; border: string; isDark: boolean }) {
-  // DS v2: колір — лише крапкою біля підпису; число — тонке display, text.primary.
-  // DS v2.1: скляна KPI-картка (блюр на iOS).
-  const t = dsTokens(isDark);
-  void border;
-  return (
-    <GlassSurface radius={radius.nested} style={[s.summCard, { flex: 1 }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
-        <Text style={{ ...dsType.caption, color: t.text.secondary }}>{label}</Text>
-      </View>
-      <Text style={{ color: t.text.primary, fontSize: 24, lineHeight: 28, fontFamily: fontFamily.light, letterSpacing: -0.48, fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
-    </GlassSurface>
-  );
-});
+}
 
 const QuickStat = React.memo(function QuickStat({ icon, label, value, color, border, isDark }: { icon: IconSymbolName; label: string; value: string; color: string; border: string; isDark: boolean }) {
   const t = dsTokens(isDark);
   void border;
   return (
-    <GlassSurface radius={radius.nested} style={[s.summCard, { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-      {/* Icon-chip: тонований акцентом скляний кружок. */}
-      <View style={{ width: 36, height: 36, borderRadius: radius.pill, ...ds.glass(isDark, 'subtle'), alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+    <View style={[s.summCard, { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: t.surface.subtle }]}>
+      {/* Icon-chip: тонований акцентом кружок на суцільній підкладці. */}
+      <View style={{ width: 36, height: 36, borderRadius: radius.pill, backgroundColor: t.surface.card, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         <View style={[StyleSheet.absoluteFill, { backgroundColor: color + '24' }]} />
         <IconSymbol name={icon} size={15} color={color} />
       </View>
@@ -1157,7 +1141,7 @@ const QuickStat = React.memo(function QuickStat({ icon, label, value, color, bor
         <Text style={{ ...dsType.caption, color: t.text.secondary, marginBottom: 2 }}>{label}</Text>
         <Text style={{ color: t.text.primary, fontSize: 18, lineHeight: 22, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
       </View>
-    </GlassSurface>
+    </View>
   );
 });
 
@@ -1176,14 +1160,8 @@ const s = StyleSheet.create({
   // Заголовок 20pt, не спільні 32: у шапці поруч живуть лічильники
   // періоду, і більший кегль лишав би їм пів рядка.
   title:        { fontSize: 20, fontFamily: fontFamily.semibold, letterSpacing: -0.3 },
-  // Сегменти DS: біла pill-доріжка, активний — pill action.primary.
-  segRow:       { flexDirection: 'row', borderRadius: radius.pill, padding: 3 },
-  segBtn:       { flex: 1, minHeight: 36, justifyContent: 'center', borderRadius: radius.pill, alignItems: 'center' },
-  segLabel:     { fontSize: 12, fontFamily: fontFamily.semibold },
   summCard:     { borderRadius: radius.nested, padding: space[4] },
-  sectionTitle: { ...dsType.h2, marginBottom: 10 },
-  sectionRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  card:         { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: 0 },
+  nested:       { borderRadius: radius.nested, padding: space[4] },
   legendRow:    { flexDirection: 'row', gap: 16, justifyContent: 'center' },
   catIcon:      { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   trendBadge:   { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },

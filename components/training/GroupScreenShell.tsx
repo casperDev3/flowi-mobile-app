@@ -7,8 +7,10 @@ import { Stack, useRouter } from 'expo-router';
 import React from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 
+import { PageHeader } from '@/components/ds';
 import { ScreenHeader, type Crumb } from '@/components/shared/ScreenHeader';
 import { Layout } from '@/constants/tokens';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { trainingRoutes } from './routes';
 import { useI18n } from '@/store/i18n';
@@ -19,6 +21,7 @@ import type { LoadIssue } from './hooks';
 
 export function GroupScreenShell({
   c, title, groupId, groupName, actions, issue, gone, rejectedReason, onRefresh, refreshing, children, wide, scroll = true, footer,
+  kpis, subtitle,
 }: {
   c: TrainingColors;
   title: string;
@@ -36,7 +39,12 @@ export function GroupScreenShell({
   scroll?: boolean;
   /** Закріплено під прокруткою (напр. «Ваше місце» в лідерборді). */
   footer?: React.ReactNode;
+  /** Omni: KPI-лічильники під заголовком (<KpiCounter/> × 2–3). */
+  kpis?: React.ReactNode;
+  /** Однорядковий підзаголовок під H1. */
+  subtitle?: string;
 }) {
+  const { isCompact } = useResponsive();
   const router = useRouter();
   const { tr } = useI18n();
   const contentWidth = useContentWidth();
@@ -72,8 +80,13 @@ export function GroupScreenShell({
           back={{ onPress: () => (router.canGoBack() ? router.back() : router.navigate(trainingRoutes.list())), label: tr.back, color: c.text }}
           crumbs={crumbs}
           crumbColor={c.sub}
-          actions={actions}
-        />
+          actions={actions}>
+          {/* Крихти «Групи → Група» лишаються за ScreenHeader (AppHeader їх не має);
+              Omni-шар — підзаголовок і KPI під H1. */}
+          {(kpis || subtitle) ? (
+            <PageHeader subtitle={subtitle} kpis={kpis} bleed={isCompact ? 20 : 0} />
+          ) : null}
+        </ScreenHeader>
       </View>
       {scroll ? (
         <ScrollView

@@ -13,7 +13,6 @@ import { useI18n } from '@/store/i18n';
 import type { MenuTab } from './model';
 import type { MenuColors } from './theme';
 import { fontFamily } from '@/constants/theme';
-import { glassRimFor } from '@/components/shared/dsTheme';
 
 const LABELS: Record<MenuTab, string> = {
   menu: 'Меню',
@@ -48,7 +47,6 @@ export function MenuTabBar({
       accessibilityLabel={tr.menu.tabsLabel}
       style={[
         st.bar,
-        { backgroundColor: c.card, ...glassRimFor(c.card, 'card') },
         stretch ? { alignSelf: 'stretch' } : { alignSelf: 'flex-start' },
       ]}>
       {tabs.map((tab) => {
@@ -63,7 +61,7 @@ export function MenuTabBar({
             accessibilityState={{ selected: on }}
             accessibilityLabel={label}
             hitSlop={SEG_HIT}
-            style={[st.seg, stretch && st.segStretch, on && { backgroundColor: c.primary }]}>
+            style={[st.seg, stretch && st.segStretch, { backgroundColor: on ? c.primary : c.card }]}>
             <Text numberOfLines={1} style={{ color: on ? c.onPrimary : c.sub, fontSize: 13, fontFamily: fontFamily.semibold }}>
               {LABELS[tab]}
             </Text>
@@ -80,7 +78,8 @@ export function MenuTabBar({
 }
 
 const st = StyleSheet.create({
-  bar: { flexDirection: 'row', borderRadius: 999, padding: 4, gap: 2 },
+  // Omni SectionTabs: окремі pill (активна — чорна), без скляної смуги-підкладки.
+  bar: { flexDirection: 'row', borderRadius: 999, paddingVertical: 3, gap: 6 },
   seg: {
     flexDirection: 'row',
     minHeight: 40,

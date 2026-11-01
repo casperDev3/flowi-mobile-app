@@ -46,6 +46,7 @@ export function MetricTrend({ entries, type, agg, color, goal, format, c, tr, ti
     <HealthCard
       c={c}
       title={title ?? tr.dynamics}
+      icon="chart.line.uptrend.xyaxis"
       right={<Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.light, letterSpacing: -0.44, fontVariant: ['tabular-nums'] }}>{hasAny ? format(headline) : '—'}</Text>}>
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 10 }}>
         <View style={{ flex: 1 }}><PeriodSelector period={period} onChange={setPeriod} color={ACCENT} c={c} tr={tr} /></View>

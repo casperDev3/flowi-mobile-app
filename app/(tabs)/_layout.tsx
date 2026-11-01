@@ -7,10 +7,11 @@ import {HapticTab} from '@/components/haptic-tab';
 import {ModuleGate} from '@/components/shared/ModuleGate';
 import {NotificationBadge} from '@/components/notifications/NotificationBadge';
 import {ActiveTimersBar} from '@/components/time/ActiveTimersBar';
-import {IconSymbol, type IconSymbolName} from '@/components/ui/icon-symbol';
+import {type IconSymbolName} from '@/components/ui/icon-symbol';
 import {GlassBackdrop} from '@/components/ds/Glass';
+import {GlassTabIcon} from '@/components/shared/GlassTabBar';
 import {useDS} from '@/hooks/use-ds';
-import {fontFamily, moduleAccent, radius, type GlassAccent} from '@/constants/theme';
+import {fontFamily, moduleAccent, type GlassAccent} from '@/constants/theme';
 import {useI18n} from '@/store/i18n';
 import {useResponsive} from '@/hooks/use-responsive';
 import {
@@ -62,36 +63,23 @@ function tabLabel(label: string) {
 }
 
 /**
- * Іконка таба DS v2.1 (Liquid Glass): активна вкладка — скляна pill,
- * тонована акцентом МОДУЛЯ (glass.accent[x].tint) з іконкою accent.ink
- * (≥ 3:1 на склі в обох темах) і м'яким світінням акценту (iOS); неактивна —
- * іконка text.secondary. @react-navigation малює іконку двічі (focused/не
- * focused) і перехрещує прозорістю — pill з'являється плавно. Pill ширший за
- * контейнер іконки (31pt) і виходить за нього по боках — це навмисно: висота
- * (28) вкладається рівно в контейнер, тож розкладка панелі не змінюється.
- * «Зменшити прозорість» → суцільна заливка акценту (solid) з onSolid.
+ * Іконка таба — Omni (DS v2.2): активна вкладка — суцільна чорна pill
+ * action.primary (у темній — біла) з іконкою text.onAction, той самий знак
+ * «ви тут», що й у сайдбарі та SectionTabs. Рецепт — GlassTabIcon
+ * (components/shared/GlassTabBar.tsx), спільний із панеллю простору проєкту.
+ * Pill 52×28 вкладається в контейнер іконки по висоті — розкладка панелі не
+ * змінюється. @react-navigation малює іконку двічі (focused/ні) і перехрещує
+ * прозорістю — pill з'являється плавно.
  */
 function TabIcon({name, color, focused, badge, accent}: {name: IconSymbolName; color: string; focused: boolean; badge?: boolean; accent: GlassAccent}) {
-    const {g, isDark, reduceTransparency} = useDS();
-    const a = g.accent[accent];
     return (
-        <View
-            style={[
-                st.iconPill,
-                focused && (reduceTransparency
-                    ? {backgroundColor: a.solid}
-                    : {
-                        backgroundColor: a.tint,
-                        borderWidth: StyleSheet.hairlineWidth,
-                        borderColor: g.rim,
-                        ...(Platform.OS === 'ios'
-                            ? {shadowColor: a.glow, shadowOpacity: isDark ? 0.6 : 0.4, shadowRadius: 10, shadowOffset: {width: 0, height: 2}}
-                            : null),
-                    }),
-            ]}>
-            <IconSymbol size={22} name={name} color={focused ? (reduceTransparency ? a.onSolid : a.ink) : color}/>
-            {badge ? <NotificationBadge variant="dot" style={{position: 'absolute', top: 1, right: 12}}/> : null}
-        </View>
+        <GlassTabIcon
+            name={name}
+            color={color}
+            focused={focused}
+            accent={accent}
+            badge={badge ? <NotificationBadge variant="dot" style={{position: 'absolute', top: 1, right: 12}}/> : null}
+        />
     );
 }
 
@@ -251,12 +239,3 @@ export default function TabLayout() {
     );
 }
 
-const st = StyleSheet.create({
-    iconPill: {
-        width: 52,
-        height: 28,
-        borderRadius: radius.pill,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-});

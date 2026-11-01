@@ -3,8 +3,8 @@ import {IconAction} from '@/components/shared/ActionBar';
 import {useResponsive} from '@/hooks/use-responsive';
 import {useI18n} from '@/store/i18n';
 import {projectAppearance,appearanceTokens,type ProjectAppearance} from '@/utils/projectAppearance';
-import {useTheme} from '@/store/theme-context';
 import {dsTokens} from '@/hooks/use-ds';
+import {useAuth} from '@/store/auth';
 /**
  * components/projects/ProjectScreenShell.tsx — спільна обв'язка розділу
  * простору проєкту.
@@ -22,15 +22,18 @@ import {dsTokens} from '@/hooks/use-ds';
  */
 import * as ExpoRouter from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { Pressable, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 import { ProjectSwitcherSheet, ProjectSwitcherTrigger } from '@/components/projects/ProjectSwitcherSheet';
 import { ScreenHeader, type Crumb, type ScreenBack } from '@/components/shared/ScreenHeader';
 import { goProjectsList, projectRoute, projectSectionFromPathname } from '@/constants/projectNav';
 import type { Project } from '@/app/projects';
-import { MeshBackground } from '@/components/ds';
-import { glassOf } from '@/components/shared/dsTheme';
+import { Avatar, MeshBackground, PageHeader } from '@/components/ds';
+import { AccountSheet } from '@/components/shared/AccountSheet';
+import { HEADER_BUTTON_HIT_SLOP } from '@/components/shared/ScreenHeader';
+import { fontFamily } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
  * `usePathname`/`useRouter`, що переживають відсутність маршрутизатора — та
@@ -58,13 +61,14 @@ export function projectShellColors(isDark: boolean, accent: string, appearance?:
     border: t.border.hairline,
     text: t.text.primary,
     sub: t.text.secondary,
-    dim: glassOf(t).surfaceSubtle,
+    dim: t.surface.subtle,
     accent,
   };
 }
 
 export function ProjectScreenShell({
   project, isDark, title, actions, children, headerChildren, back, crumbs, hideSpaceExit,
+  subtitle, kpis, tabs,
 }: {
   project: Project | null;
   isDark: boolean;
@@ -90,8 +94,25 @@ export function ProjectScreenShell({
    * як дубль однієї дії.
    */
   hideSpaceExit?: boolean;
+  /**
+   * Omni (DS v2.2): однорядковий підзаголовок під H1 розділу (опис проєкту,
+   * «N задач · M прострочено»…).
+   */
+  subtitle?: string;
+  /**
+   * Omni: 1–3 <KpiCounter/> з даних, що вже є на екрані. Телефон — стрічка з
+   * горизонтальною прокруткою під заголовком; планшет — ряд під заголовком.
+   */
+  kpis?: React.ReactNode;
+  /** Omni: <SectionTabs/> підвидів розділу (Список · Дошка…) — під KPI. */
+  tabs?: React.ReactNode;
 }) {
-  const {setTheme}=useTheme();
+  const { user } = useAuth();
+  const [account, setAccount] = useState(false);
+  const insets = useSafeAreaInsets();
+  // Поля ScreenHeader (20 + бічний інсет): стрічка KPI їде від краю до краю.
+  const sidePad = 20 + Math.max(insets.left, insets.right);
+
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const accent = project?.color ?? '#7C3AED';
   const c = projectShellColors(isDark, accent,project?.appearance);
@@ -99,6 +120,7 @@ export function ProjectScreenShell({
   const router = useRouterSafe();
   const { tr } = useI18n();
   const { isWide } = useResponsive();
+  const displayName = user ? (user.name || user.email) : tr.settingsHub.profileGuest;
 
   /**
    * Крихти «Проєкт → Учасники» для екранів ГЛИБШЕ за розділ.
@@ -148,17 +170,33 @@ export function ProjectScreenShell({
           color={c.accent}
           actions={
             // Дії розділу + сповіщення + тема — один рядок зі сталим проміжком;
-            // іконки — спільні IconAction 44×44 (а не гліф ☀/☾ текстом).
+            // іконки — спільні IconAction 44×44; праворуч — аватар (Omni).
             <View style={st.actions}>
               {actions}
               <IconAction icon="bell" label={tr.notifications} color={c.text} onPress={() => router.push?.('/notifications' as never)} colors={c} />
-              <IconAction
-                icon={isDark ? 'sun.max' : 'moon'}
-                label={isDark ? tr.projectThemeToLight : tr.projectThemeToDark}
-                color={c.text}
-                onPress={() => setTheme(isDark ? 'light' : 'dark')}
-                colors={c}
-              />
+              {/* Omni: аватар → меню акаунта (Керування акаунтом · Сповіщення ·
+                  Налаштування · тема Системна/Світла/Темна). Перемикач теми, що
+                  стояв тут окремою кнопкою, живе в цьому ж меню. */}
+              <Pressable
+                onPress={() => setAccount(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`${tr.accountManage}: ${displayName}`}
+                hitSlop={HEADER_BUTTON_HIT_SLOP}
+                style={({ pressed }) => [st.avatarBtn, { opacity: pressed ? 0.7 : 1 }]}>
+                {user ? (
+                  <Avatar person={{ id: user.id, name: displayName }} size={36} ringColor="transparent" />
+                ) : (
+                  <View style={[st.guest, { backgroundColor: c.dim }]}>
+                    <IconSymbol name="person.fill" size={16} color={c.sub} />
+                  </View>
+                )}
+                {isWide ? (
+                  <>
+                    <Text numberOfLines={1} style={[st.accountName, { color: c.text }]}>{displayName}</Text>
+                    <IconSymbol name="chevron.down" size={11} color={c.sub} />
+                  </>
+                ) : null}
+              </Pressable>
             </View>
           }
           back={back}
@@ -185,7 +223,14 @@ export function ProjectScreenShell({
               />
             </View>
           ) : undefined}>
-          {headerChildren}
+          {(subtitle || kpis || tabs || headerChildren) ? (
+            <View style={{ gap: 14 }}>
+              {subtitle ? <Text numberOfLines={2} style={[st.subtitle, { color: c.sub }]}>{subtitle}</Text> : null}
+              {kpis ? <PageHeader kpis={kpis} bleed={isWide ? 0 : sidePad} /> : null}
+              {tabs}
+              {headerChildren}
+            </View>
+          ) : null}
         </ScreenHeader>
         {children}
       </View>
@@ -198,6 +243,7 @@ export function ProjectScreenShell({
           accent={accent}
         />
       ) : null}
+      <AccountSheet visible={account} onClose={() => setAccount(false)} />
     </View></ProjectPaletteContext.Provider>
   );
 }
@@ -206,5 +252,9 @@ const st = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   eyebrow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // Ціль 40 + hitSlop 4 = 48 — шеврон стоїть не впритул до краю шапки (A11Y-08).
+  avatarBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, marginLeft: 4, maxWidth: 200 },
+  guest:   { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  accountName: { fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 },
+  subtitle: { fontSize: 14, lineHeight: 20, fontFamily: fontFamily.regular },
   exit:    { minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center', marginLeft: -10 },
 });

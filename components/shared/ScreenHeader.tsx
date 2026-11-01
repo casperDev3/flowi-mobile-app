@@ -217,6 +217,16 @@ export interface ScreenHeaderProps {
   paddingBottom?: number;
   /** Не всюди 32pt: на «Сьогодні» заголовок 26pt. */
   titleStyle?: StyleProp<TextStyle>;
+  /**
+   * Omni (DS v2.2): кнопка ПЕРЕД заголовком — «меню» (шухляда сайдбара) на
+   * телефоні. Стоїть після «Назад», у тій самій лівій групі. Див. AppHeader.
+   */
+  leading?: React.ReactNode;
+  /**
+   * Omni (DS v2.2): рядок інструментів НАД заголовком (планшет: пошук · таймер ·
+   * дзвіник · акаунт). Під верхнім інсетом, над крихтами. Див. AppHeader.
+   */
+  toolbar?: React.ReactNode;
 }
 
 export function ScreenHeader({
@@ -230,6 +240,8 @@ export function ScreenHeader({
   back,
   crumbs,
   crumbColor,
+  leading,
+  toolbar,
 }: ScreenHeaderProps) {
   const topInset = useTopInset();
   const insets = useSafeAreaInsets();
@@ -243,6 +255,7 @@ export function ScreenHeader({
 
   return (
     <View style={{ paddingTop: topInset + 14, paddingHorizontal: sidePad, paddingBottom }}>
+      {toolbar ? <View style={styles.toolbar}>{toolbar}</View> : null}
       {lead === 'crumbs' && crumbs ? (
         <Breadcrumbs crumbs={crumbs} color={crumbColor ?? color} />
       ) : null}
@@ -261,6 +274,7 @@ export function ScreenHeader({
               <IconSymbol name="chevron.left" size={17} color={back.color ?? color} />
             </HeaderButton>
           ) : null}
+          {leading}
           {/*
            * flexShrink:1 замість flex:1 — коробка заголовка віддає місце
            * кнопкам, а не забирає його. space-between на рядку тримає кнопки
@@ -271,6 +285,10 @@ export function ScreenHeader({
             <Text
               style={[styles.pageTitle, titleStyle, { color }]}
               numberOfLines={1}
+              // Omni: справа до 4 кнопок (☰/дії/🔔/аватар) — довгий заголовок
+              // («Неділя, 1 листопада») спершу зменшується, а вже потім «…».
+              adjustsFontSizeToFit
+              minimumFontScale={0.72}
               maxFontSizeMultiplier={TITLE_MAX_FONT_SCALE}>
               {title}
             </Text>
@@ -343,6 +361,9 @@ const styles = StyleSheet.create({
   },
   below: {
     marginTop: 8,
+  },
+  toolbar: {
+    marginBottom: 14,
   },
   neutralGlass: {
     backgroundColor: 'rgba(127,127,135,0.14)',

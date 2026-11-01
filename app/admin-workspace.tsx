@@ -23,7 +23,9 @@ import {
   View,
 } from 'react-native';
 
-import { ScreenHeader } from '@/components/shared/ScreenHeader';
+// Omni (DS v2.2): AppHeader = ScreenHeader (інсет, «Назад») + 🔔 і аватар + KPI.
+import { AppHeader } from '@/components/shared/AppHeader';
+import { BentoCard, BentoGrid, KpiCounter } from '@/components/ds';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -243,15 +245,22 @@ export default function AdminWorkspaceScreen() {
           topInset — той самий back-button-у-actions патерн, що й
           app/project/[id]/members.tsx). */}
       <View style={{ flex: 1 }}>
-        <ScreenHeader
+        <AppHeader
           title={tr.adminWorkspaceTitle}
-          color={c.text}
+          subtitle={workspace?.name}
           back={{
             onPress: () => router.back(),
             label: tr.back,
             color: c.text,
             style: { backgroundColor: c.card, borderColor: 'transparent' },
           }}
+          kpis={!loading && !loadError && workspace ? (
+            <>
+              <KpiCounter value={workspace.user_count} label={tr.adminUsersSection} />
+              <KpiCounter value={requests.length} label={tr.adminRequestsSection}
+                valueColor={requests.length > 0 ? k.status.warning : undefined} />
+            </>
+          ) : undefined}
         />
 
         {loading ? (
@@ -275,9 +284,11 @@ export default function AdminWorkspaceScreen() {
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}
           >
+            {/* Omni: розділи — bento-картки з шапкою «icon-chip + назва». */}
+            <BentoGrid columns={{ compact: 1, medium: 1, expanded: 1 }}>
             {/* Налаштування workspace */}
-            <Text style={[st.sectionLabel, { color: c.sub }]}>{tr.adminSettingsSection.toUpperCase()}</Text>
-            <View style={[st.card, { backgroundColor: c.card }]}>
+            <BentoCard title={tr.adminSettingsSection} icon="slider.horizontal.3" accent="amber">
+            <View style={[st.card, { backgroundColor: c.dim }]}>
               <View style={st.row}>
                 <Text style={[st.rowLabel, { color: c.text, flex: 1 }]}>{tr.adminRegistrationModeLabel}</Text>
                 <Text style={[st.rowSub, { color: c.sub, marginRight: 8 }]}>
@@ -290,12 +301,14 @@ export default function AdminWorkspaceScreen() {
                 />
               </View>
             </View>
+            </BentoCard>
 
             {/* Заявки на реєстрацію */}
-            <Text style={[st.sectionLabel, { color: c.sub, marginTop: 20 }]}>
-              {tr.adminRequestsSection.toUpperCase()} {requests.length > 0 ? `(${requests.length})` : ''}
-            </Text>
-            <View style={[st.card, { backgroundColor: c.card }]}>
+            <BentoCard title={tr.adminRequestsSection} icon="person.badge.plus" accent="info"
+              headerRight={requests.length > 0 ? (
+                <Text style={[st.count, { color: c.sub }]}>{requests.length}</Text>
+              ) : undefined}>
+            <View style={[st.card, { backgroundColor: c.dim }]}>
               {requests.length === 0 ? (
                 <Text style={[st.emptyText, { color: c.sub }]}>{tr.adminNoRequests}</Text>
               ) : requests.map((req, i) => (
@@ -330,15 +343,17 @@ export default function AdminWorkspaceScreen() {
                     onChangeText={v => setRejectReasons(prev => ({ ...prev, [req.id]: v }))}
                     placeholder={tr.adminRejectReasonPrompt}
                     placeholderTextColor={k.text.muted}
-                    style={[st.reasonInput, { color: c.text, backgroundColor: c.dim }]}
+                    style={[st.reasonInput, { color: c.text, backgroundColor: c.card }]}
                   />
                 </View>
               ))}
             </View>
+            </BentoCard>
 
             {/* Користувачі */}
-            <Text style={[st.sectionLabel, { color: c.sub, marginTop: 20 }]}>{tr.adminUsersSection.toUpperCase()}</Text>
-            <View style={[st.card, { backgroundColor: c.card }]}>
+            <BentoCard title={tr.adminUsersSection} icon="person.2.fill" accent="lavender"
+              headerRight={<Text style={[st.count, { color: c.sub }]}>{users.length}</Text>}>
+            <View style={[st.card, { backgroundColor: c.dim }]}>
               {users.map((row, i) => (
                 <View key={row.id} style={[st.userRow, i > 0 && { borderTopWidth: 1, borderTopColor: c.border }]}>
                   <View style={{ flex: 1 }}>
@@ -352,7 +367,7 @@ export default function AdminWorkspaceScreen() {
                   <TouchableOpacity
                     onPress={() => handleToggleAdmin(row)}
                     disabled={busyId === row.id || row.id === Number(user?.id)}
-                    style={[st.actionBtn, { backgroundColor: c.dim, opacity: row.id === Number(user?.id) ? 0.4 : 1 }]}
+                    style={[st.actionBtn, { backgroundColor: c.card, opacity: row.id === Number(user?.id) ? 0.4 : 1 }]}
                   >
                     <Text style={[st.actionBtnText, { color: c.text }]}>
                       {row.is_admin ? tr.adminRevokeAdmin : tr.adminMakeAdmin}
@@ -370,6 +385,8 @@ export default function AdminWorkspaceScreen() {
                 </View>
               ))}
             </View>
+            </BentoCard>
+            </BentoGrid>
           </ScrollView>
         )}
       </View>
@@ -392,8 +409,9 @@ function describeAdminError(e: unknown, tr: Translations): string {
 }
 
 const st = StyleSheet.create({
-  sectionLabel: { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginLeft: 2, marginBottom: 8 },
-  card: { borderRadius: Atlas.radius.xlarge, overflow: 'hidden', marginBottom: 4 },
+  count: { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
+  // Вкладена група рядків усередині bento-картки (surface.subtle).
+  card: { borderRadius: Atlas.radius.large, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
   rowLabel: { fontSize: 14, fontFamily: fontFamily.semibold },
   rowSub: { fontSize: 12, marginTop: 2 },

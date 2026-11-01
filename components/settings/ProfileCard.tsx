@@ -13,9 +13,8 @@ import type { AuthUser } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 
 import { profileInitials, profileTitle } from './model';
-import { fontFamily } from '@/constants/theme';
-import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
-import { AccentIcon, AccentWash } from '@/components/shared/GlassBits';
+import { fontFamily, shadow } from '@/constants/theme';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 
 export interface ProfileCardColors {
   text: string;
@@ -25,34 +24,38 @@ export interface ProfileCardColors {
 }
 
 export function ProfileCard({
-  user, online, isDark, colors, onManage, onLogin, onRegister,
+  user, online, isDark, onManage, onLogin, onRegister,
 }: {
   /** null — гість (не увійшов). */
   user: AuthUser | null;
   online: boolean;
   isDark: boolean;
+  /** Палітра екрана; з Omni (темна картка) не використовується — лишилась для сумісності викликів. */
   colors: ProfileCardColors;
   onManage: () => void;
   onLogin: () => void;
   onRegister: () => void;
 }) {
   const { tr } = useI18n();
-  const c = colors;
-  // DS v2: картка — surface.card; дії — pill action.primary / secondary; аватар — action.primary.
+  // Omni (DS v2.2): профіль — ЄДИНА «темна» виділена картка Налаштувань
+  // (t.featured: #11141B / #2C2C2E), текст білий (≥ 15:1 / ≥ 7:1), головна
+  // дія — біла pill, другорядна — напівпрозора біла.
   const t = dsTheme(isDark);
+  const f = t.featured;
+  const card = [st.card, { backgroundColor: f.bg }, shadow[isDark ? 'dark' : 'light'].popover];
   const statusColor = online ? t.status.success : t.text.muted;
   const statusLabel = online ? tr.modeOnline : tr.modeOffline;
 
   if (!user) {
     return (
-      <View style={[st.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
-        {/* DS v2.1: картка профілю — KPI «Налаштувань»: легка змивка lavender. */}
-        <AccentWash isDark={isDark} accent="lavender" strength={0.7} />
+      <View style={card}>
         <View style={st.head}>
-          <AccentIcon isDark={isDark} icon="person.fill" accent="lavender" size="lg" style={st.avatar} />
+          <View style={[st.avatar, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
+            <IconSymbol name="person.fill" size={24} color={f.text} />
+          </View>
           <View style={st.info}>
-            <Text style={[st.title, { color: c.text }]} numberOfLines={1}>{tr.settingsHub.profileGuest}</Text>
-            <Text style={[st.sub, { color: c.sub }]} numberOfLines={2}>{tr.syncGuestHint}</Text>
+            <Text style={[st.title, { color: f.text }]} numberOfLines={1}>{tr.settingsHub.profileGuest}</Text>
+            <Text style={[st.sub, { color: f.textSecondary }]} numberOfLines={2}>{tr.syncGuestHint}</Text>
           </View>
         </View>
         <View style={st.actions}>
@@ -60,15 +63,15 @@ export function ProfileCard({
             onPress={onLogin}
             accessibilityRole="button"
             accessibilityLabel={tr.authLogin}
-            style={[st.btn, { backgroundColor: t.action.primary }]}>
-            <Text style={[st.btnText, { color: t.text.onAction }]} numberOfLines={1}>{tr.authLogin}</Text>
+            style={[st.btn, { backgroundColor: f.action }]}>
+            <Text style={[st.btnText, { color: f.actionText }]} numberOfLines={1}>{tr.authLogin}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={onRegister}
             accessibilityRole="button"
             accessibilityLabel={tr.authRegister}
-            style={[st.btn, { backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
-            <Text style={[st.btnText, { color: t.action.secondaryText }]} numberOfLines={1}>{tr.authRegister}</Text>
+            style={[st.btn, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
+            <Text style={[st.btnText, { color: f.text }]} numberOfLines={1}>{tr.authRegister}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -84,27 +87,29 @@ export function ProfileCard({
       accessibilityRole="button"
       accessibilityLabel={`${title}, ${statusLabel}`}
       accessibilityHint={tr.accountManage}>
-      <View style={[st.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
-        <AccentWash isDark={isDark} accent="lavender" strength={0.7} />
+      <View style={card}>
         <View style={st.head}>
           <View>
             <View style={[st.avatar, { backgroundColor: glassOf(t).accent.lavender.solid }]}>
               <Text style={[st.initials, { color: glassOf(t).accent.lavender.onSolid }]}>{profileInitials(user.name, user.email)}</Text>
             </View>
             <View
-              style={[st.dot, { backgroundColor: statusColor, borderColor: glassOf(t).sheet }]}
+              style={[st.dot, { backgroundColor: statusColor, borderColor: f.bg }]}
               accessible={false}
             />
           </View>
           <View style={st.info}>
-            <Text style={[st.title, { color: c.text }]} numberOfLines={1}>{title}</Text>
-            {showEmail && <Text style={[st.sub, { color: c.sub }]} numberOfLines={1}>{user.email}</Text>}
+            <Text style={[st.title, { color: f.text }]} numberOfLines={1}>{title}</Text>
+            {showEmail && <Text style={[st.sub, { color: f.textSecondary }]} numberOfLines={1}>{user.email}</Text>}
             <View style={st.statusRow}>
               <View style={[st.statusDot, { backgroundColor: statusColor }]} />
-              <Text style={[st.statusText, { color: c.sub }]} numberOfLines={1}>{statusLabel}</Text>
+              <Text style={[st.statusText, { color: f.textSecondary }]} numberOfLines={1}>{statusLabel}</Text>
             </View>
           </View>
-          <IconSymbol name="chevron.right" size={16} color={c.sub} />
+          {/* Omni: кругла ↗-кнопка «картка веде далі» (декор — уся картка кнопка). */}
+          <View style={[st.arrow, { backgroundColor: 'rgba(255,255,255,0.12)' }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <IconSymbol name="arrow.up.right" size={15} color={f.text} />
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -112,7 +117,8 @@ export function ProfileCard({
 }
 
 const st = StyleSheet.create({
-  card:      { borderRadius: Atlas.radius.xxlarge, overflow: 'hidden', padding: 20 },
+  card:      { borderRadius: Atlas.radius.xxlarge, padding: 20 },
+  arrow:     { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   head:      { flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatar:    { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   initials:  { fontSize: 20, fontFamily: fontFamily.medium },

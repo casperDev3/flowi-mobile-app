@@ -109,7 +109,7 @@ export function MenuEditorModal({
   return (
     <Modal
       visible={!!editor}
-      animationType="slide"
+      animationType="fade"
       presentationStyle={wide ? 'formSheet' : 'fullScreen'}
       onRequestClose={() => void ed.close()}>
       <View style={{ flex: 1, backgroundColor: c.bg1, paddingBottom: insets.bottom }}>

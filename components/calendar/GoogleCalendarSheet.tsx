@@ -37,7 +37,7 @@ export function GoogleCalendarSheet({ visible, onClose, gcal, isDark, c }: {
   const { clientId, clientInput, setClientInput, token, importing, lastSync, importCount } = gcal;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable accessible={false} style={[st.overlay, { backgroundColor: t.surface.overlay }]} onPress={onClose}>
         <Pressable accessible={false} onPress={e => e.stopPropagation()} style={st.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
           <View style={[st.sheet, sheetSurface, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>

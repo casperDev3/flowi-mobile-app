@@ -308,7 +308,7 @@ export function MeetingFormSheet({
   const canSave = fTitle.trim().length > 0 && fDate.length > 0;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <Pressable accessible={false} style={[s.overlay, { backgroundColor: t.surface.overlay }]} onPress={onClose}>
           <Pressable onPress={e => e.stopPropagation()} style={s.wrapper} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">

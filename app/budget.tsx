@@ -230,7 +230,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
     [isExpanded, readingWidth],
   );
   // Аркуші ліміту/категорії — діалогом посеред екрана на планшеті.
-  const wm = wideModalStyles(isWide, 'slide');
+  const wm = wideModalStyles(isWide);
   const sheetSurface = useSheetSurface();
   const { isDark, reduceTransparency } = useDS();
   const { tr, lang } = useI18n();

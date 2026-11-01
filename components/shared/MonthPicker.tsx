@@ -87,7 +87,7 @@ export function MonthPicker({
       <Modal
         visible={open}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setOpen(false)}>
         <Pressable accessible={false}
           style={{ flex: 1, backgroundColor: t.surface.overlay, justifyContent: 'flex-end' }}

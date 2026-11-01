@@ -153,7 +153,7 @@ export function ActiveTimersBar({ bottom = TAB_BAR_HEIGHT }: { bottom?: number }
         </View>
       </View>
 
-      <Modal visible={sheetOpen} transparent animationType="slide" onRequestClose={() => setSheetOpen(false)}>
+      <Modal visible={sheetOpen} transparent animationType="fade" onRequestClose={() => setSheetOpen(false)}>
         <Pressable style={[st.backdrop, { backgroundColor: t.surface.overlay }]} onPress={() => setSheetOpen(false)} accessibilityRole="button" accessibilityLabel={tr.close} />
         <View style={[st.sheet, { ...gs.strong, paddingBottom: insets.bottom + 16 }]}>
           <OverlayMaterial isDark={isDark} radius={{ borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card }} />

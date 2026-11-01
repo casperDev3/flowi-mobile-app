@@ -6,20 +6,16 @@ import { wideModalStyles } from '@/components/finance/wideModal';
 import { Layout } from '@/constants/tokens';
 
 describe('wideModalStyles', () => {
-  it('phone: bottom sheet column, overlay untouched, keeps requested animation', () => {
-    const wm = wideModalStyles(false, 'slide');
+  it('phone: bottom sheet column, overlay untouched, fade (no slide)', () => {
+    const wm = wideModalStyles(false);
     expect(wm.overlay).toEqual({});
     expect(wm.column).toMatchObject({ width: '100%', flexShrink: 1 });
     expect(wm.column.maxWidth).toBeUndefined();
-    expect(wm.animation).toBe('slide');
-  });
-
-  it('phone default animation is fade', () => {
-    expect(wideModalStyles(false).animation).toBe('fade');
+    expect(wm.animation).toBe('fade');
   });
 
   it('wide: centred dialog capped at Layout.dialogMaxWidth, no phone paddings, fade', () => {
-    const wm = wideModalStyles(true, 'slide');
+    const wm = wideModalStyles(true);
     expect(wm.overlay).toMatchObject({ justifyContent: 'center' });
     expect(wm.column).toMatchObject({
       width: '100%',

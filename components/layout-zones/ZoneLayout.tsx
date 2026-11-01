@@ -36,11 +36,12 @@
  */
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { FadeIn, SlideInRight } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useDSTheme } from '@/components/shared/useDSTheme';
+import { popupFadeIn } from '@/constants/motion';
 import { fontFamily, radius, space, zone } from '@/constants/theme';
 import { useMotion } from '@/hooks/use-motion';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
@@ -204,7 +205,7 @@ export function ZoneLayout({
       ) : null}
       {w.showDynamic ? (
         <Animated.View
-          entering={motion.entering(SlideInRight.duration(200))}
+          entering={motion.entering(popupFadeIn())}
           accessibilityLabel={dynamicLabel ?? s.detailsPanel}
           style={[
             st.dynamic,

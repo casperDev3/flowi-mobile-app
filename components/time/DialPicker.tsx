@@ -80,7 +80,7 @@ export function DialPicker({
   );
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={[st.backdrop, { backgroundColor: t.surface.overlay }]} onPress={onClose} accessibilityRole="button" />
 
       <View

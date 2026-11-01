@@ -28,13 +28,16 @@ export interface WideModalStyles {
   overlay: ViewStyle;
   /** Колонка аркуша: телефон — на всю ширину; широке — діалог Layout.dialogMaxWidth. */
   column: ViewStyle;
-  /** «Виїзд знизу» для діалогу посеред екрана виглядає чужим — лише проявлення. */
-  animation: 'fade' | 'slide';
+  /**
+   * Лише проявлення — і на телефоні, і на широкому вікні: усі спливаючі шари
+   * застосунку з'являються/зникають fade (без «виїзду знизу»).
+   */
+  animation: 'fade';
 }
 
-export function wideModalStyles(isWide: boolean, phoneAnimation: 'fade' | 'slide' = 'fade'): WideModalStyles {
+export function wideModalStyles(isWide: boolean): WideModalStyles {
   if (!isWide) {
-    return { overlay: {}, column: sheetColumnStyle(false), animation: phoneAnimation };
+    return { overlay: {}, column: sheetColumnStyle(false), animation: 'fade' };
   }
   return {
     overlay: { justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32 },

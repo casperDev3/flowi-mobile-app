@@ -159,7 +159,7 @@ function ExerciseModal({
   } as const;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: c.bg1 }}>
         <MeshBackground />
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -281,7 +281,7 @@ function ProgramModal({
   } as const;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: c.bg1 }}>
         <MeshBackground />
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -444,7 +444,7 @@ function StatsModal({
   })).filter(x => x.count > 0).sort((a, b) => b.count - a.count);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: c.bg1 }}>
         <MeshBackground />
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>

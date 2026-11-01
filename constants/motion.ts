@@ -4,7 +4,7 @@
  * Централізовані motion-токени для всього додатку.
  * Використовуй через useMotion() (hook) або Motion.* (константи).
  */
-import { Easing, FadeInDown } from 'react-native-reanimated';
+import { Easing, FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 
 /**
  * Тривалості підібрані під ЩОДЕННЕ користування, а не під перше враження.
@@ -42,7 +42,35 @@ export const Motion = {
   riseDistance: 8,
   /** Крок затримки між елементами списку; стагер — максимум на 6 перших. */
   stagger: 40,
+  /**
+   * Поява/зникнення СПЛИВАЮЧИХ шарів (аркуші, діалоги, меню, поповери,
+   * панелі-оверлеї): лише проявлення прозорістю, без виїзду/масштабу/пружини.
+   * Рух пальцем (тягнення аркуша) лишається рухом — це стосується тільки
+   * автоматичних переходів відкриття/закриття.
+   */
+  popup: {
+    enter: 200,
+    exit:  150,
+  },
 } as const;
+
+/** withTiming-конфіг проявлення спливаючого шару (opacity 0 → 1). */
+export const popupEnterTiming = { duration: Motion.popup.enter, easing: Motion.easing.out };
+/** withTiming-конфіг зникнення спливаючого шару (opacity 1 → 0). */
+export const popupExitTiming = { duration: Motion.popup.exit, easing: Motion.easing.out };
+
+/**
+ * Layout-анімації reanimated для спливаючих шарів. Обгортайте в
+ * motion.entering(), щоб «Зменшити рух» робив появу миттєвою:
+ *
+ *   entering={motion.entering(popupFadeIn())} exiting={motion.entering(popupFadeOut())}
+ */
+export function popupFadeIn(duration: number = Motion.popup.enter) {
+  return FadeIn.duration(duration).easing(Motion.easing.out);
+}
+export function popupFadeOut(duration: number = Motion.popup.exit) {
+  return FadeOut.duration(duration).easing(Motion.easing.out);
+}
 
 /**
  * Єдина вхідна анімація екрана: коротке проявлення з підйомом на 8 px.

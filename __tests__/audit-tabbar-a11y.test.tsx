@@ -8,7 +8,7 @@
  *    на пристрої: WCAG 2.x відносна яскравість проти ЗМІРЯНОГО тла панелі.
  *  · A11Y-08 — стрілки місяця в CalendarGrid були 36×36 без hitSlop.
  *  · A11Y-10 — Skeleton крутив Animated.loop попри «Зменшення руху»,
- *    UndoToast возив тост на 20pt.
+ *    UndoToast возив тост на 20pt (тепер тост лише проявляється).
  *  · L1 / NAT-07 — мертва смуга 10pt угорі панелі та підпис таба, що не
  *    реагує на Dynamic Type.
  *
@@ -275,11 +275,10 @@ describe('A11Y-10: Reduce Motion', () => {
     expect(loopSpy).toHaveBeenCalled();
   });
 
-  /** Зсув тоста по вертикалі в момент показу. */
-  function toastTranslateY(tree: any): number {
+  /** Пласкований стиль тоста в момент показу. */
+  function toastStyle(tree: any): any {
     const node = tree.root.findByType(Animated.View);
-    const flat = Object.assign({}, ...[node.props.style].flat(2).filter(Boolean));
-    return flat.transform[0].translateY.__getValue();
+    return Object.assign({}, ...[node.props.style].flat(2).filter(Boolean));
   }
 
   async function renderToast() {
@@ -291,20 +290,22 @@ describe('A11Y-10: Reduce Motion', () => {
     return { tree, api: () => api };
   }
 
-  test('UndoToast: при Reduce Motion тост не їде, а лише проявляється', async () => {
+  test('UndoToast: при Reduce Motion тост не їде і з’являється миттєво', async () => {
     mockReduceMotion(true);
     const { tree, api } = await renderToast();
     await act(async () => { api().show('Завдання виконано', () => {}); });
-    // До правки стартова точка була 20pt нижче місця — тобто рух.
     // Без розмонтування (див. afterEach) 4-секундний таймер авто-приховування
     // переживе тест і впаде вже після того, як Jest прибрав середовище.
-    expect(toastTranslateY(tree)).toBe(0);
+    const flat = toastStyle(tree);
+    expect(flat.transform).toBeUndefined();
+    expect(flat.opacity.__getValue()).toBe(1);
   });
 
-  test('UndoToast: без Reduce Motion виїзд знизу лишається', async () => {
+  test('UndoToast: без Reduce Motion — лише проявлення, без виїзду знизу', async () => {
     mockReduceMotion(false);
     const { tree, api } = await renderToast();
     await act(async () => { api().show('Завдання виконано', () => {}); });
-    expect(toastTranslateY(tree)).toBe(20);
+    // Усі спливаючі шари з'являються fade: зсуву немає взагалі.
+    expect(toastStyle(tree).transform).toBeUndefined();
   });
 });

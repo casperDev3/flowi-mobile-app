@@ -67,9 +67,12 @@ export const unstable_settings = {
 
 // Нижній лист (bottom sheet) для під-екранів профілактики.
 // iOS — нативний formSheet із детентами та «грабером»; Android — модал.
+// Поява/зникнення — проявлення (crossDissolve), як і в усіх спливаючих шарах;
+// тягнення грабером/свайп униз працюють як і раніше.
 const SHEET_OPTIONS = {
   headerShown: false,
   presentation: 'formSheet' as const,
+  animation: 'fade' as const,
   sheetAllowedDetents: [0.92] as number[],
   sheetGrabberVisible: true,
   sheetCornerRadius: 24,
@@ -469,7 +472,7 @@ function RootLayoutContent() {
           <Stack.Screen name="training" options={{ headerShown: false }} />
           <Stack.Screen name="training-invite" options={{ headerShown: false }} />
           <Stack.Screen name="c/[workspaceId]/[slug]" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', animation: 'fade', title: 'Modal' }} />
         </Stack>
         {/* Заглушка вимкненого модуля для Stack-екранів (/meetings, /notes, …)
             — централізовано за маршрутом, а не в кожному екрані: див.

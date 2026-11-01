@@ -235,7 +235,7 @@ export function PickerField({
         <IconSymbol name="chevron.down" size={14} color={c.sub} />
       </TouchableOpacity>
 
-      <Modal visible={open} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setOpen(false)}>
         <Pressable
           style={[st.backdrop, { backgroundColor: t.surface.overlay }]}
           onPress={() => setOpen(false)}

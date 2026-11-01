@@ -14,18 +14,22 @@
  *   • закриття: тап по затемненню, свайп УЛІВО по панелі, системне «Назад»;
  *   • унизу — перемикач «Список / Колонки» розділу, що зараз у фокусі
  *     (useActiveZone; лише для розділів, які вміють «Колонки»).
- * accessibilityViewIsModal тримає VoiceOver усередині. Поява — ковзання
- * зліва, з «Зменшити рух» — без анімації.
+ * accessibilityViewIsModal тримає VoiceOver усередині. Поява й закриття
+ * (затемнення, ✕, «Назад») — лише проявлення/зникнення (Motion.popup); свайп
+ * рухає панель за пальцем, а після відпускання за порогом вона зникає з
+ * того місця. З «Зменшити рух» — без анімації. Перехід за пунктом меню
+ * закриває шухляду одразу (екран під нею вже змінюється).
  */
 import { usePathname } from 'expo-router';
 import React from 'react';
 import { Modal, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { FadeIn, SlideInLeft, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { OverlayScrim, OverlaySurface } from '@/components/ds/OverlaySurface';
 import { ViewModeSwitch } from '@/components/layout-zones/ViewModeSwitch';
 import { NavSidebar } from '@/components/shared/NavSidebar';
+import { popupExitTiming, popupFadeIn } from '@/constants/motion';
 import { useDS } from '@/hooks/use-ds';
 import { useMotion } from '@/hooks/use-motion';
 import { setZonePrefs, useActiveZone, useZonePrefs } from '@/hooks/use-zone-state';
@@ -62,7 +66,23 @@ export function SidebarDrawer({ visible, onClose }: { visible: boolean; onClose:
   const panelWidth = drawerWidthFor(width);
 
   const dx = useSharedValue(0);
-  React.useEffect(() => { if (visible) dx.value = 0; }, [visible, dx]);
+  /** Зникнення всієї шухляди (затемнення + панель) перед onClose. */
+  const fade = useSharedValue(1);
+  const closingRef = React.useRef(false);
+  React.useEffect(() => {
+    if (visible) { dx.value = 0; fade.value = 1; closingRef.current = false; }
+  }, [visible, dx, fade]);
+
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+  const finishClose = React.useCallback(() => onCloseRef.current(), []);
+  /** Закрити зі зникненням (Motion.popup.exit); «Зменшити рух» — одразу. */
+  const fadeClose = React.useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    if (motion.reduced) { finishClose(); return; }
+    fade.value = withTiming(0, popupExitTiming, done => { if (done) runOnJS(finishClose)(); });
+  }, [motion.reduced, fade, finishClose]);
 
   const swipe = Gesture.Pan()
     .activeOffsetX([-12, 9999])
@@ -70,12 +90,13 @@ export function SidebarDrawer({ visible, onClose }: { visible: boolean; onClose:
     .onUpdate(e => { dx.value = Math.min(0, e.translationX); })
     .onEnd(e => {
       if (-e.translationX > panelWidth * CLOSE_FRACTION || e.velocityX < -CLOSE_VELOCITY) {
-        dx.value = withTiming(-panelWidth, { duration: motion.reduced ? 0 : 160 }, done => { if (done) runOnJS(onClose)(); });
+        runOnJS(fadeClose)();
       } else {
         dx.value = withTiming(0, { duration: motion.reduced ? 0 : 160 });
       }
     });
   const panelStyle = useAnimatedStyle(() => ({ transform: [{ translateX: dx.value }] }));
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
 
   return (
     <Modal
@@ -83,14 +104,15 @@ export function SidebarDrawer({ visible, onClose }: { visible: boolean; onClose:
       transparent
       animationType="none"
       statusBarTranslucent
-      onRequestClose={onClose}>
+      onRequestClose={fadeClose}>
       <GestureHandlerRootView style={StyleSheet.absoluteFill}>
-        <Animated.View entering={motion.entering(FadeIn.duration(180))} style={StyleSheet.absoluteFill}>
-          <OverlayScrim onPress={onClose} accessibilityLabel={tr.close} />
+        <Animated.View style={[StyleSheet.absoluteFill, fadeStyle]} pointerEvents="box-none">
+        <Animated.View entering={motion.entering(popupFadeIn())} style={StyleSheet.absoluteFill}>
+          <OverlayScrim onPress={fadeClose} accessibilityLabel={tr.close} />
         </Animated.View>
         <GestureDetector gesture={swipe}>
           <Animated.View
-            entering={motion.entering(SlideInLeft.duration(220))}
+            entering={motion.entering(popupFadeIn())}
             style={[st.panelWrap, { width: panelWidth }, panelStyle]}>
             <OverlaySurface
               accessibilityViewIsModal
@@ -102,12 +124,13 @@ export function SidebarDrawer({ visible, onClose }: { visible: boolean; onClose:
                 variant="drawer"
                 width={panelWidth}
                 onNavigate={onClose}
-                onClose={onClose}
+                onClose={fadeClose}
                 footer={activeZone ? <View style={st.footer}><DrawerViewSwitch section={activeZone.section} /></View> : null}
               />
             </OverlaySurface>
           </Animated.View>
         </GestureDetector>
+        </Animated.View>
       </GestureHandlerRootView>
     </Modal>
   );

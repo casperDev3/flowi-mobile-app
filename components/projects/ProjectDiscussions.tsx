@@ -217,7 +217,7 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
           <View style={{ width: detailColumnWidthFor(width) }}>{roomPart}</View>
         </View>
       ) : <>{listPart}{roomPart}</>}
-      <Modal visible={!!draft} animationType="slide" onRequestClose={() => setDraft(null)}>
+      <Modal visible={!!draft} animationType="fade" onRequestClose={() => setDraft(null)}>
         {/* DS v2.1: повноекранна форма — на mesh, як і екрани. */}
         <View style={{ flex: 1, backgroundColor: c.bg1 }}>
         <MeshBackground />

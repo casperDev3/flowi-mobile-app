@@ -10,6 +10,9 @@
  *   • VoiceOver: ручка — кнопка «Розгорнути / Згорнути» з діями
  *     increment/decrement; accessibilityViewIsModal тримає фокус усередині.
  * «Брудне скло»: OverlaySurface + OverlayScrim. «Зменшити рух» — без пружин.
+ * Відкриття й закриття — лише проявлення/зникнення прозорістю (Motion.popup),
+ * без виїзду знизу; рух лишається тільки за пальцем (тягнення, доводка до
+ * точки зупинки після відпускання).
  *
  * Шапка й низ — липкі (поза прокруткою), як у DetailPane: вкладки й кнопки
  * «Видалити / Виконано» лишаються на місці на обох висотах.
@@ -31,7 +34,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OverlayScrim, OverlaySurface } from '@/components/ds/OverlaySurface';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useDSTheme } from '@/components/shared/useDSTheme';
-import { Motion } from '@/constants/motion';
+import { Motion, popupEnterTiming, popupExitTiming } from '@/constants/motion';
 import { radius, zone } from '@/constants/theme';
 import { useI18n } from '@/store/i18n';
 
@@ -39,7 +42,6 @@ import { useZoneStrings } from './strings';
 
 const CLOSE_DISTANCE = 120;
 const VELOCITY = 800;
-const EXIT_MS = 160;
 
 export interface BottomSheetProps {
   visible: boolean;
@@ -87,8 +89,10 @@ export function BottomSheet({
   onCloseRef.current = onClose;
 
   const sheetH = useSharedValue(peekH);
-  const ty = useSharedValue(peekH);
+  const ty = useSharedValue(0);
   const scrim = useSharedValue(0);
+  /** Прозорість аркуша — проявлення при відкритті, зникнення при закритті. */
+  const op = useSharedValue(0);
   const startH = useSharedValue(peekH);
 
   const finish = useCallback(() => {
@@ -102,12 +106,14 @@ export function BottomSheet({
     closingRef.current = true;
     if (reduced) {
       scrim.value = 0;
+      op.value = 0;
       finish();
       return;
     }
-    scrim.value = withTiming(0, { duration: EXIT_MS });
-    ty.value = withTiming(sheetH.value, { duration: EXIT_MS }, done => { if (done) runOnJS(finish)(); });
-  }, [reduced, finish, scrim, ty, sheetH]);
+    // Зникнення з того місця, де аркуш зараз (зокрема — куди його дотягли).
+    scrim.value = withTiming(0, popupExitTiming);
+    op.value = withTiming(0, popupExitTiming, done => { if (done) runOnJS(finish)(); });
+  }, [reduced, finish, scrim, op]);
 
   const snapTo = useCallback((toFull: boolean) => {
     const target = toFull ? fullH : peekH;
@@ -121,8 +127,9 @@ export function BottomSheet({
     if (visible && !mounted) {
       closingRef.current = false;
       sheetH.value = peekH;
-      ty.value = reduced ? 0 : peekH;
+      ty.value = 0;
       scrim.value = reduced ? 1 : 0;
+      op.value = reduced ? 1 : 0;
       setExpanded(false);
       setMounted(true);
     } else if (!visible && mounted && !closingRef.current) {
@@ -133,8 +140,8 @@ export function BottomSheet({
 
   useEffect(() => {
     if (!mounted || closingRef.current || reduced) return;
-    ty.value = withSpring(0, Motion.spring.gentle);
-    scrim.value = withTiming(1, { duration: Motion.duration.fast });
+    op.value = withTiming(1, popupEnterTiming);
+    scrim.value = withTiming(1, popupEnterTiming);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted]);
 
@@ -180,7 +187,7 @@ export function BottomSheet({
       runOnJS(snapTo)(toFull);
     });
 
-  const sheetStyle = useAnimatedStyle(() => ({ height: sheetH.value, transform: [{ translateY: ty.value }] }));
+  const sheetStyle = useAnimatedStyle(() => ({ height: sheetH.value, opacity: op.value, transform: [{ translateY: ty.value }] }));
   const scrimStyle = useAnimatedStyle(() => ({ opacity: scrim.value }));
 
   if (!mounted) return null;

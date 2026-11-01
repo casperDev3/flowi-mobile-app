@@ -14,12 +14,12 @@
  */
 import React, { useEffect, useState } from 'react';
 import { BackHandler, Modal, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { FadeOutDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 
 import { OverlayScrim, OverlaySurface } from '@/components/ds/OverlaySurface';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useDSTheme } from '@/components/shared/useDSTheme';
-import { riseIn } from '@/constants/motion';
+import { popupFadeIn, popupFadeOut } from '@/constants/motion';
 import { fontFamily, radius, zone } from '@/constants/theme';
 import { useMotion } from '@/hooks/use-motion';
 import { useI18n } from '@/store/i18n';
@@ -65,8 +65,8 @@ export function BulkActionBar({ count, actions, onClear, bottom = 16, style, tes
   return (
     <>
       <Animated.View
-        entering={motion.entering(riseIn(0, 180))}
-        exiting={motion.entering(FadeOutDown.duration(120))}
+        entering={motion.entering(popupFadeIn())}
+        exiting={motion.entering(popupFadeOut())}
         pointerEvents="box-none"
         style={[st.wrap, { bottom }, style]}>
         <OverlaySurface radius={radius.pill} testID={testID} style={st.bar}>

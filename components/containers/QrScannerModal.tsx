@@ -156,7 +156,7 @@ export function QrScannerModal({ visible, containers, onClose, onFound, onSearch
   })();
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose} statusBarTranslucent>
       <View style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 12 }]}>
         <View style={styles.top}>
           <Text accessibilityRole="header" style={styles.title}>{tr.ctrScan}</Text>

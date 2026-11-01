@@ -220,7 +220,7 @@ export function PropertySheet({ visible, title, onClose, children, colors: c, fo
   const { tr } = useI18n();
   const { t } = useDS();
   return (
-    <Modal visible={visible} transparent animationType={isWide ? 'fade' : 'slide'} statusBarTranslucent onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={[st.overlay, isWide && st.overlayWide]}>
           <Pressable

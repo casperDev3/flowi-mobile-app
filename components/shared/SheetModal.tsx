@@ -3,11 +3,12 @@
  *
  * Реюзабельний bottom-sheet компонент.
  *
- * Анімація: backdrop opacity withTiming(0→0.5, fast)
- *           контент translateY withSpring(bottom→0, gentle)
- * Закриття: зворотнє (exit 150 ms) → onClose після анімації
- * Свайп:    GestureDetector (Pan) на grabber-зоні зверху листа;
- *           поріг 120 px або velocity > 800 px/s → закриття.
+ * Анімація: лише проявлення — backdrop і вміст opacity 0→1
+ *           (Motion.popup.enter, ease-out), без виїзду/пружини.
+ * Закриття: зникнення opacity → 0 (Motion.popup.exit) → onClose після нього
+ * Свайп:    GestureDetector (Pan) на grabber-зоні зверху листа — палець
+ *           рухає лист; поріг 120 px або velocity > 800 px/s → закриття
+ *           (далі — те саме зникнення з місця, куди лист дотягли).
  * Reduced motion: без анімацій (миттєво).
  *
  * ШИРОКЕ ВІКНО (рішення 6): prop `presentation`
@@ -15,7 +16,7 @@
  *   'sheet'  — завжди bottom-sheet (на широкому — центрована колонка внизу)
  *   'dialog' — на широкому центрований діалог (Layout.dialogMaxWidth)
  *   'side'   — на широкому панель праворуч на всю висоту (Layout.sidePanelWidth),
- *              виїжджає збоку, свайп праворуч закриває
+ *              проявляється на місці, свайп праворуч закриває
  * На compact усі варіанти — bottom-sheet (resolveSheetPresentation).
  *
  * Props:
@@ -49,8 +50,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Motion } from '@/constants/motion';
-import { type SheetPresentation, Layout, resolveSheetPresentation } from '@/constants/tokens';
+import { Motion, popupEnterTiming, popupExitTiming } from '@/constants/motion';
+import { type SheetPresentation, resolveSheetPresentation } from '@/constants/tokens';
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { dialogColumnStyle, sheetColumnStyle, sidePanelColumnStyle } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
@@ -62,9 +63,6 @@ import { OverlayScrim } from '@/components/ds/OverlaySurface';
 
 const SWIPE_THRESHOLD = 120;   // px
 const VEL_THRESHOLD   = 800;   // px/s
-const EXIT_MS         = 150;   // ms
-/** Діалог не їде з-за краю — лише трохи підіймається, проявляючись. */
-const DIALOG_RISE     = 24;    // px
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -138,7 +136,7 @@ export function SheetModal({
   handle = 'outside',
 }: SheetModalProps) {
   const reduced = useReducedMotion() ?? false;
-  const { width, height, isWide, sizeClass } = useResponsive();
+  const { width, isWide, sizeClass } = useResponsive();
   const mode = resolveSheetPresentation(presentation, sizeClass);
   // I18N-06: ця модалка обгортає КОЖНУ шторку застосунку, тож
   // захардкоджене «Закрити» озвучувало українською й англійський інтерфейс.
@@ -153,21 +151,6 @@ export function SheetModal({
   const closeChip = mode !== 'sheet' || isWide;
 
   /**
-   * Дистанція, на яку лист їде за нижній край екрана.
-   *
-   * Живе в ref, а не просто в змінній рендеру, через ефект входу нижче:
-   * додати висоту в його deps означало б переграти spring-анімацію
-   * при кожному повороті екрана з уже відкритим листом. Ref дає свіже
-   * значення на момент виклику, не чіпаючи момент запуску анімацій.
-   */
-  const offscreenFor = (m: typeof mode) =>
-    m === 'side' ? Math.min(Layout.sidePanelWidth, width) : m === 'dialog' ? DIALOG_RISE : height;
-  const offscreenRef = useRef(offscreenFor(mode));
-  offscreenRef.current = offscreenFor(mode);
-  const modeRef = useRef(mode);
-  modeRef.current = mode;
-
-  /**
    * `mounted` — утримує Modal у DOM під час exit-анімації.
    * Встановлюється в true при відкритті, в false після exit-анімації.
    */
@@ -179,10 +162,13 @@ export function SheetModal({
   onCloseRef.current = onClose;
 
   const backdropOpacity = useSharedValue(0);
-  /** Зсув листа: по Y для sheet/dialog, по X для side. */
-  const translateY      = useSharedValue(offscreenRef.current);
-  /** Прозорість вмісту — анімується лише в діалозі; аркуш і панель завжди 1. */
-  const contentOpacity  = useSharedValue(mode === 'dialog' ? 0 : 1);
+  /**
+   * Зсув листа від пальця: по Y для sheet, по X для side. Відкриття й
+   * закриття його НЕ анімують (лише прозорість) — у спокої завжди 0.
+   */
+  const translateY      = useSharedValue(0);
+  /** Прозорість вмісту — проявлення/зникнення в усіх режимах. */
+  const contentOpacity  = useSharedValue(0);
 
   // ── Анімація закриття (стабільна — deps змінюються рідко) ─────────────────
   const triggerClose = useCallback(() => {
@@ -196,17 +182,16 @@ export function SheetModal({
 
     if (reduced) {
       backdropOpacity.value = 0;
-      translateY.value = offscreenRef.current;
+      contentOpacity.value = 0;
       done();
       return;
     }
 
-    backdropOpacity.value = withTiming(0, { duration: EXIT_MS });
-    if (modeRef.current === 'dialog') contentOpacity.value = withTiming(0, { duration: EXIT_MS });
-    translateY.value = withTiming(offscreenRef.current, { duration: EXIT_MS }, (finished) => {
+    backdropOpacity.value = withTiming(0, popupExitTiming);
+    contentOpacity.value = withTiming(0, popupExitTiming, (finished) => {
       if (finished) runOnJS(done)();
     });
-  }, [reduced, backdropOpacity, translateY, contentOpacity]);
+  }, [reduced, backdropOpacity, contentOpacity]);
 
   /**
    * Екран під аркушем втратив фокус (диплінк віджета, перехід на іншу
@@ -221,11 +206,11 @@ export function SheetModal({
       if (isClosingRef.current) return;
       isClosingRef.current = true;
       backdropOpacity.value = 0;
-      translateY.value = offscreenRef.current;
+      contentOpacity.value = 0;
       setMounted(false);
       onCloseRef.current();
     });
-  }, [navigation, mounted, backdropOpacity, translateY]);
+  }, [navigation, mounted, backdropOpacity, contentOpacity]);
 
   // ── Монтуємо при відкритті ────────────────────────────────────────────────
   useEffect(() => {
@@ -247,23 +232,22 @@ export function SheetModal({
     if (!mounted) {
       // Скидаємо для наступного відкриття
       backdropOpacity.value = 0;
-      translateY.value = offscreenRef.current;
-      contentOpacity.value = modeRef.current === 'dialog' ? 0 : 1;
+      translateY.value = 0;
+      contentOpacity.value = 0;
       return;
     }
     // Не анімуємо, якщо вже закриваємось
     if (isClosingRef.current) return;
 
+    translateY.value = 0;
     if (reduced) {
       backdropOpacity.value = 0.5;
-      translateY.value = 0;
       contentOpacity.value = 1;
     } else {
-      backdropOpacity.value = withTiming(0.5, { duration: Motion.duration.fast });
-      translateY.value = withSpring(0, Motion.spring.gentle);
-      contentOpacity.value = withTiming(1, { duration: Motion.duration.fast });
+      backdropOpacity.value = withTiming(0.5, popupEnterTiming);
+      contentOpacity.value = withTiming(1, popupEnterTiming);
     }
-    // backdropOpacity/translateY — стабільні SharedValue-об'єкти (refs)
+    // backdropOpacity/translateY/contentOpacity — стабільні SharedValue-об'єкти (refs)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, reduced]);
 
@@ -305,7 +289,7 @@ export function SheetModal({
 
   const sheetStyle = useAnimatedStyle(() => (
     horizontal
-      ? { transform: [{ translateX: translateY.value }] }
+      ? { transform: [{ translateX: translateY.value }], opacity: contentOpacity.value }
       : { transform: [{ translateY: translateY.value }], opacity: contentOpacity.value }
   ));
 

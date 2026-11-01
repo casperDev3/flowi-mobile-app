@@ -55,7 +55,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeIn, SlideInLeft } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { OverlayScrim, OverlaySurface } from '@/components/ds/OverlaySurface';
@@ -74,6 +74,7 @@ import {
 import type { NavItem } from '@/constants/nav';
 import { ActiveTimersSidebarCard } from '@/components/time/ActiveTimersSidebarCard';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { popupFadeIn } from '@/constants/motion';
 import { Layout } from '@/constants/tokens';
 import { GlassBackdrop } from '@/components/ds/Glass';
 import { fontFamily, moduleAccent, radius, type GlassAccent, type ModuleKey } from '@/constants/theme';
@@ -542,12 +543,12 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
       supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
       onRequestClose={closePeek}>
       <View style={StyleSheet.absoluteFill}>
-        <Animated.View entering={motion.entering(FadeIn.duration(160))} style={StyleSheet.absoluteFill}>
+        <Animated.View entering={motion.entering(popupFadeIn())} style={StyleSheet.absoluteFill}>
           {/* Легке затемнення без блюру: вміст лишається видно, але ясно, що
               тап сюди — «згорнути». */}
           <OverlayScrim onPress={closePeek} accessibilityLabel={tr.navSidebarCollapse} blur={false} style={st.lightScrim} />
         </Animated.View>
-        <Animated.View entering={motion.entering(SlideInLeft.duration(200))} style={[st.overlayWrap, { width: SIDEBAR_WIDTH }]}>
+        <Animated.View entering={motion.entering(popupFadeIn())} style={[st.overlayWrap, { width: SIDEBAR_WIDTH }]}>
           <OverlaySurface
             accessibilityViewIsModal
             onAccessibilityEscape={closePeek}

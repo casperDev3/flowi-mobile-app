@@ -335,6 +335,8 @@ const WORKSPACE_SWITCH_STORAGE_KEYS = [
   // Журнал ідемпотентності дій годинника / Live Activity / Android-сповіщення
   // (store/device-actions.ts APPLIED_LOG_KEY) — id дій цього акаунта.
   'device_actions_applied_v1',
+  // Черга переносу файлів нотаток між потоками — id нотаток попереднього акаунта.
+  'notes_attachment_moves_v1',
 ] as const;
 
 /**

@@ -48,7 +48,7 @@
 |------|-------------|---------|
 | `containers.tsx` | Контейнери/зберігання речей. Помаранчевий #F97316. | `containers` |
 | `archive.tsx` | Архів завдань. Зелений #10B981. | (фільтр над `tasks`) |
-| `notes.tsx` | Нотатник. Бурштин #F59E0B. | `notes` |
+| `notes.tsx` | Нотатник. Фіолетовий #A855F7 (токени `getScreenColors('notes')` → `components/notes/notesTheme.ts`). Параметри: `?create=1` (нова), `?capture=1` (швидкий запис), `?open=<id>`. Редактор без «Редагувати/Зберегти» — автозбереження; архів, переміщення, вкладення, «→ Задача/Зустріч». Зовнішній deep link `ftrackingapp:///notes?capture=1` / `?create=1` (віджети) на екран НЕ веде — `app/+native-intent.tsx` відкриває міні-аркуш поверх поточного екрана (`GlobalNoteCapture`); так само дія іконки «Нова нотатка» (`store/quick-actions.ts`). Деталь задачі (вкладка «Деталі») і зустрічі (вкладка «Нотатки», форма редагування) мають секцію «Нотатки» (`LinkedNotesSection`) з «+ Нотатка» — нова нотатка особиста, з `linkedTaskId`/`linkedMeetingId`. | `notes` |
 | `projects.tsx` | Проєкти. | `projects` |
 | `meetings.tsx` | Наради + Google Calendar + аудіо записи. | `meetings` |
 | `subtasks.tsx` | Підзавдання | (вкладено в `tasks`) |
@@ -69,7 +69,7 @@
 | Завдання / Архів | `#0C0C14 / #14121E` | `#F4F2FF / #EAE6FF` |
 | Фінанси | `#080E18 / #0F1A2E` | `#EFF5FF / #E0ECFF` |
 | Час | `#0A0C18 / #121525` | `#EEF0FF / #E2E5FF` |
-| Нотатки | `#100D08 / #1A1510` | `#FFFBF4 / #FFF3DC` |
+| Нотатки | `#120A1A / #1C1226` | `#FAF5FF / #F3E8FF` |
 | Контейнери | `#100A00 / #1A1200` | `#FFF7ED / #FFEDD5` |
 | Спільне | `#081418 / #0F1E24` | `#EFF9FC / #D8F3FA` |
 

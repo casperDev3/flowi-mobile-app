@@ -19,6 +19,7 @@ import {
   normalizeNote,
   normalizeNotes,
   parseInlineSpans,
+  parseDateTimePhrase,
   parseNoteMarkdown,
   parseTagsInput,
   selectNotes,
@@ -195,4 +196,24 @@ test('превʼю — перший змістовний рядок, чек-ли
   expect(notePreview({ body: '\n\n  Любов (Преміум):\n- іконки' })).toBe('Любов (Преміум):');
   expect(notePreview({ body: '- [x] зроблено' })).toBe('✓ зроблено');
   expect(notePreview({ body: '' })).toBe('');
+});
+
+// ─── Доробка: старі записи, Date як «зараз» ───────────────────────────────────
+
+test('старий запис без полів доробки читається без archived/attachments', () => {
+  const read = normalizeNote({ id: 5, text: 'старий веб' }, '2026-10-18T00:00:00.000Z');
+  expect(read?.archived).toBeUndefined();
+  expect(read?.attachments).toBeUndefined();
+  expect(read?.body).toBe('старий веб');
+});
+
+test('parseDateTimePhrase приймає Date так само, як рядок', () => {
+  const now = new Date(2026, 9, 18, 10, 20);
+  expect(parseDateTimePhrase('завтра о 15:00', now)).toEqual(parseDateTimePhrase('завтра о 15:00', '2026-10-18T10:20:00'));
+});
+
+test('архівна нотатка не знаходиться пошуком за замовчуванням, але є в «Архів»', () => {
+  const list = [{ id: 'a', title: 'звіт', archived: true }, { id: 'b', title: 'звіт 2' }];
+  expect(selectNotes(list, { search: 'звіт' }).map(n => n.id)).toEqual(['b']);
+  expect(selectNotes(list, { search: 'звіт', archived: 'archived' }).map(n => n.id)).toEqual(['a']);
 });

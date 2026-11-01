@@ -22,6 +22,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Text, TouchableOpacity, View } from 'react-native';
 
 import { ActionBar, ActionButton } from '@/components/shared/ActionBar';
+import { LinkedNotesSection } from '@/components/notes/LinkedNotesSection';
 import { CommentsSection } from '@/components/shared/CommentsSection';
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
 import type { RecurrenceRule } from '@/components/shared/MeetingFormSheet';
@@ -424,6 +425,8 @@ export function useProjectTaskCard({
       createdAt={task.createdAt}
       hasDeadline={!!task.deadline}
       sprintSlot={showTeam ? null : sprintSlot}
+      // Нова нотатка звідси — особиста (без projectId), лише з linkedTaskId.
+      notesSlot={<LinkedNotesSection target={{ taskId: task.id }} isDark={isDark} colors={c} beforeOpen={wide ? undefined : onClose} />}
       canExecute={canExecute}
       canPlan={canPlan}
       today={today}

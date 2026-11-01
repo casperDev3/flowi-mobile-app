@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 
 import { CommentsSection } from '@/components/shared/CommentsSection';
+import { LinkedNotesSection } from '@/components/notes/LinkedNotesSection';
+import { requestNoteCapture } from '@/store/note-capture';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useSheetSurface } from '@/hooks/use-content-width';
 import { fontFamily } from '@/constants/theme';
@@ -307,6 +309,29 @@ export function MeetingFormSheet({
   const noProjectLabel: string = tr?.noProject ?? (isUk ? 'Без проєкту' : 'No project');
   const canSave = fTitle.trim().length > 0 && fDate.length > 0;
 
+  // Чи людина вже щось змінила в наявній зустрічі (повторення не рахуємо —
+  // його правлять окремо й рідко). Потрібне «+ Нотатка»: форму доводиться
+  // закрити, і правки не мають пропасти мовчки.
+  const isDirty = !!initial && (
+    fTitle.trim() !== initial.title.trim() || fDate !== initial.date || fTime !== initial.time
+    || fDuration !== initial.durationMinutes || fLocation.trim() !== (initial.location ?? '').trim()
+    || fLink.trim() !== (initial.link ?? '').trim() || fNotes.trim() !== (initial.notes ?? '').trim()
+    || fColor !== initial.color || (fProjectId ?? '') !== (initial.projectId ?? ''));
+
+  /**
+   * «+ Нотатка» з форми: друга модалка поверх цієї на iOS не показується
+   * надійно, тож форма закривається (зі збереженням, якщо її правили), а
+   * міні-аркуш відкриває корінь (GlobalNoteCapture) уже після анімації.
+   */
+  const leaveForNote = () => {
+    if (isDirty && canSave) handleSave();
+    else onClose();
+  };
+  const addLinkedNote = (meetingId: string) => {
+    leaveForNote();
+    setTimeout(() => { requestNoteCapture({ meetingId }); }, 450);
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -477,6 +502,19 @@ export function MeetingFormSheet({
                       style={{ color: c.text, fontSize: 13, marginLeft: 8, flex: 1, padding: 0, maxHeight: 60 }} />
                   </View>
                 </View>
+
+                {/* Повʼязані нотатки — лише в наявної зустрічі (нова ще не має id). */}
+                {initial?.id ? (
+                  <View style={{ marginTop: -8, marginBottom: 10 }}>
+                    <LinkedNotesSection
+                      target={{ meetingId: initial.id }}
+                      isDark={isDark}
+                      colors={c}
+                      beforeOpen={leaveForNote}
+                      onAdd={() => addLinkedNote(initial.id!)}
+                    />
+                  </View>
+                ) : null}
 
                 {/* Project — чипи, а не PickerField: форма сама є модалкою, і
                     друга модалка поверх неї на iOS не показується надійно. */}

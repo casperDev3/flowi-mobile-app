@@ -16,6 +16,7 @@ import 'react-native-reanimated';
 
 import { startFeedbackQueue } from '@/api/feedback';
 import { DeviceSurfaces } from '@/components/shared/DeviceSurfaces';
+import { GlobalNoteCapture } from '@/components/notes/GlobalNoteCapture';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { NavSidebar } from '@/components/shared/NavSidebar';
 import { ModuleGate } from '@/components/shared/ModuleGate';
@@ -486,6 +487,9 @@ function RootLayoutContent() {
         <PushInteractions />
         <FeedbackQueueRunner />
         <PendingInviteAutoJoin />
+        {/* Швидкий запис нотатки поверх будь-якого екрана: віджети
+            (notes?capture=1 → app/+native-intent.tsx) і дія іконки «Нова нотатка». */}
+        <GlobalNoteCapture />
       </AuthGate>
     </NavigationThemeProvider>
   );

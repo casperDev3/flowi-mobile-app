@@ -1900,6 +1900,74 @@ export interface Translations {
   notesChecklist: string;
   notesEmptyBody: string;
   notesMarkdownHint: string;
+  // ─── Нотатки: доробка (швидкий запис, перетворення, архів, вкладення) ───
+  notesViewList: string;
+  notesViewGrid: string;
+  notesArchiveFilter: string;
+  notesArchive: string;
+  notesUnarchive: string;
+  notesArchived: string;
+  notesNoArchived: string;
+  notesMove: string;
+  notesMoveTitle: string;
+  notesMoveError: string;
+  notesMore: string;
+  notesToTask: string;
+  notesToMeeting: string;
+  notesExpand: string;
+  notesCaptureTitle: string;
+  notesCapturePlaceholder: string;
+  notesSaving: string;
+  notesSaved: string;
+  notesSaveFailed: string;
+  notesFormatChecklist: string;
+  notesFormatBullet: string;
+  notesFormatHeading: string;
+  notesFormatBold: string;
+  notesFormatTag: string;
+  notesFormatDone: string;
+  notesAttach: string;
+  notesAttachments: string;
+  notesAttachPhoto: string;
+  notesAttachCamera: string;
+  notesAttachFile: string;
+  notesAttachError: string;
+  notesAttachTooLarge: string;
+  notesAttachQuota: string;
+  notesAttachOffline: string;
+  notesAttachNotSynced: string;
+  notesAttachOpenError: string;
+  notesAttachDeleteConfirm: string;
+  notesAttachUploading: string;
+  notesConvertTaskTitle: string;
+  notesConvertMeetingTitle: string;
+  notesConvertCreateTask: string;
+  notesConvertCreateMeeting: string;
+  notesConvertSubtasks: string;
+  notesConvertAgenda: string;
+  notesConvertDescription: string;
+  notesConvertMeetingNotes: string;
+  notesConvertNoDeadline: string;
+  notesConvertNextWeek: string;
+  notesConvertNoPriority: string;
+  notesConvertDate: string;
+  notesConvertTime: string;
+  notesConvertDuration: string;
+  notesConvertInvalidDate: string;
+  notesConvertTitleRequired: string;
+  notesConvertError: string;
+  notesConvertTaskDone: string;
+  notesConvertMeetingDone: string;
+  notesConvertProject: string;
+  notesConvertNoteStays: string;
+  notesDetails: string;
+  notesOpenLinked: string;
+  /** Секція «Нотатки» в деталі задачі/зустрічі (повʼязані нотатки). */
+  notesLinkedTitle: string;
+  notesAddLinked: string;
+  notesLinkedEmpty: string;
+  notesLinkedOpenA11y: string;
+  notesFilterLabel: string;
 
   // ─── Оплата підписки (було PAY_LABELS в UpcomingPaymentsCard) ────────────────
   payAction: string;
@@ -4668,6 +4736,72 @@ const uk: Translations = {
   notesChecklist: 'Чек-лист',
   notesEmptyBody: 'Без тексту',
   notesMarkdownHint: 'Markdown: # заголовок, - пункт, - [ ] чек-лист, #тег',
+  notesViewList: 'Список',
+  notesViewGrid: 'Сітка',
+  notesArchiveFilter: 'Архів',
+  notesArchive: 'Архівувати',
+  notesUnarchive: 'Повернути з архіву',
+  notesArchived: 'В архіві',
+  notesNoArchived: 'В архіві порожньо',
+  notesMove: 'Перемістити',
+  notesMoveTitle: 'Куди перемістити нотатку?',
+  notesMoveError: 'Не вдалося перемістити нотатку. Спробуйте ще раз.',
+  notesMore: 'Ще дії',
+  notesToTask: '→ Задача',
+  notesToMeeting: '→ Зустріч',
+  notesExpand: 'Розгорнути',
+  notesCaptureTitle: 'Нова нотатка',
+  notesCapturePlaceholder: 'Перший рядок — назва',
+  notesSaving: 'Зберігаю…',
+  notesSaved: 'Збережено',
+  notesSaveFailed: 'Не збережено · повторити',
+  notesFormatChecklist: 'Чек-бокс',
+  notesFormatBullet: 'Пункт списку',
+  notesFormatHeading: 'Заголовок',
+  notesFormatBold: 'Жирний',
+  notesFormatTag: 'Тег',
+  notesFormatDone: 'Готово',
+  notesAttach: 'Вкласти файл',
+  notesAttachments: 'Вкладення',
+  notesAttachPhoto: 'Фото з галереї',
+  notesAttachCamera: 'Зняти фото',
+  notesAttachFile: 'Файл',
+  notesAttachError: 'Не вдалося вкласти файл. Спробуйте ще раз.',
+  notesAttachTooLarge: 'Файл більший за 25 МБ',
+  notesAttachQuota: 'Місце для файлів закінчилось: видаліть старі вкладення.',
+  notesAttachOffline: 'Вкладення доступні лише в онлайн-режимі',
+  notesAttachNotSynced: 'Нотатка ще синхронізується — спробуйте за хвилину.',
+  notesAttachOpenError: 'Не вдалося відкрити файл',
+  notesAttachDeleteConfirm: 'Видалити вкладення з нотатки?',
+  notesAttachUploading: 'Вивантажую…',
+  notesConvertTaskTitle: 'Нотатка → задача',
+  notesConvertMeetingTitle: 'Нотатка → зустріч',
+  notesConvertCreateTask: 'Створити задачу',
+  notesConvertCreateMeeting: 'Створити зустріч',
+  notesConvertSubtasks: 'Підзадачі',
+  notesConvertAgenda: 'Порядок денний',
+  notesConvertDescription: 'Опис',
+  notesConvertMeetingNotes: 'Нотатки зустрічі',
+  notesConvertNoDeadline: 'Без дедлайну',
+  notesConvertNextWeek: 'За тиждень',
+  notesConvertNoPriority: 'Без пріоритету',
+  notesConvertDate: 'Дата (РРРР-ММ-ДД)',
+  notesConvertTime: 'Час (ГГ:ХХ)',
+  notesConvertDuration: 'Тривалість',
+  notesConvertInvalidDate: 'Перевірте дату й час',
+  notesConvertTitleRequired: 'Додайте назву',
+  notesConvertError: 'Не вдалося створити. Спробуйте ще раз.',
+  notesConvertTaskDone: 'Задачу створено, нотатку привʼязано',
+  notesConvertMeetingDone: 'Зустріч створено, нотатку привʼязано',
+  notesConvertProject: 'Де створити',
+  notesConvertNoteStays: 'Нотатка лишиться на місці й отримає посилання',
+  notesDetails: 'Звʼязки й теги',
+  notesOpenLinked: 'Відкрити',
+  notesLinkedTitle: 'Нотатки',
+  notesAddLinked: '+ Нотатка',
+  notesLinkedEmpty: 'Повʼязаних нотаток ще немає',
+  notesLinkedOpenA11y: 'Відкрити нотатку «{title}»',
+  notesFilterLabel: 'Фільтри нотаток',
 
   // Оплата підписки (було PAY_LABELS)
   payAction: 'Оплачено',
@@ -7434,6 +7568,72 @@ const en: Translations = {
   notesChecklist: 'Checklist',
   notesEmptyBody: 'No text',
   notesMarkdownHint: 'Markdown: # heading, - item, - [ ] checklist, #tag',
+  notesViewList: 'List',
+  notesViewGrid: 'Grid',
+  notesArchiveFilter: 'Archive',
+  notesArchive: 'Archive',
+  notesUnarchive: 'Restore from archive',
+  notesArchived: 'Archived',
+  notesNoArchived: 'The archive is empty',
+  notesMove: 'Move',
+  notesMoveTitle: 'Move the note to',
+  notesMoveError: 'Could not move the note. Please retry.',
+  notesMore: 'More actions',
+  notesToTask: '→ Task',
+  notesToMeeting: '→ Meeting',
+  notesExpand: 'Expand',
+  notesCaptureTitle: 'New note',
+  notesCapturePlaceholder: 'First line is the title',
+  notesSaving: 'Saving…',
+  notesSaved: 'Saved',
+  notesSaveFailed: 'Not saved · retry',
+  notesFormatChecklist: 'Checkbox',
+  notesFormatBullet: 'Bullet',
+  notesFormatHeading: 'Heading',
+  notesFormatBold: 'Bold',
+  notesFormatTag: 'Tag',
+  notesFormatDone: 'Done',
+  notesAttach: 'Attach file',
+  notesAttachments: 'Attachments',
+  notesAttachPhoto: 'Photo from library',
+  notesAttachCamera: 'Take a photo',
+  notesAttachFile: 'File',
+  notesAttachError: 'Could not attach the file. Please retry.',
+  notesAttachTooLarge: 'The file is larger than 25 MB',
+  notesAttachQuota: 'File storage is full: delete old attachments first.',
+  notesAttachOffline: 'Attachments are available in online mode only',
+  notesAttachNotSynced: 'The note is still syncing. Try again in a minute.',
+  notesAttachOpenError: 'Could not open the file',
+  notesAttachDeleteConfirm: 'Remove the attachment from the note?',
+  notesAttachUploading: 'Uploading…',
+  notesConvertTaskTitle: 'Note → task',
+  notesConvertMeetingTitle: 'Note → meeting',
+  notesConvertCreateTask: 'Create task',
+  notesConvertCreateMeeting: 'Create meeting',
+  notesConvertSubtasks: 'Subtasks',
+  notesConvertAgenda: 'Agenda',
+  notesConvertDescription: 'Description',
+  notesConvertMeetingNotes: 'Meeting notes',
+  notesConvertNoDeadline: 'No deadline',
+  notesConvertNextWeek: 'In a week',
+  notesConvertNoPriority: 'No priority',
+  notesConvertDate: 'Date (YYYY-MM-DD)',
+  notesConvertTime: 'Time (HH:MM)',
+  notesConvertDuration: 'Duration',
+  notesConvertInvalidDate: 'Check the date and time',
+  notesConvertTitleRequired: 'Add a title',
+  notesConvertError: 'Could not create it. Please retry.',
+  notesConvertTaskDone: 'Task created and linked to the note',
+  notesConvertMeetingDone: 'Meeting created and linked to the note',
+  notesConvertProject: 'Create in',
+  notesConvertNoteStays: 'The note stays where it is and gets a link',
+  notesDetails: 'Links and tags',
+  notesOpenLinked: 'Open',
+  notesLinkedTitle: 'Notes',
+  notesAddLinked: '+ Note',
+  notesLinkedEmpty: 'No linked notes yet',
+  notesLinkedOpenA11y: 'Open note “{title}”',
+  notesFilterLabel: 'Note filters',
 
   // Subscription payment (was PAY_LABELS)
   payAction: 'Paid',

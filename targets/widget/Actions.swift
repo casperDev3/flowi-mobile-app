@@ -12,6 +12,7 @@ struct FlowiStrings {
   var addExpense: String { en ? "Add expense" : "Додати витрату" }
   var addEvent: String { en ? "Add event" : "Додати подію" }
   var addNote: String { en ? "Take a note" : "Зробити нотатку" }
+  var newNote: String { en ? "New note" : "Нова нотатка" }
   var finance: String { en ? "Finance" : "Фінанси" }
   var steps: String { en ? "Steps" : "Кроки" }
   var tasks: String { en ? "Tasks" : "Завдання" }
@@ -58,7 +59,7 @@ enum FlowiAction: String, AppEnum, CaseIterable {
     case .task: return URL(string: "ftrackingapp:///?create=1")!
     case .expense: return URL(string: "ftrackingapp:///explore?create=1")!
     case .event: return URL(string: "ftrackingapp:///calendar?create=meeting")!
-    case .note: return URL(string: "ftrackingapp:///notes?create=1")!
+    case .note: return FlowiLinks.noteCapture
     }
   }
 
@@ -120,4 +121,6 @@ enum FlowiLinks {
   static let steps = URL(string: "ftrackingapp:///health-activity")!
   static let tasks = URL(string: "ftrackingapp:///")!
   static let time = URL(string: "ftrackingapp:///time")!
+  /// Швидкий запис нотатки: міні-аркуш поверх поточного екрана (app/+native-intent.tsx).
+  static let noteCapture = URL(string: "ftrackingapp:///notes?capture=1")!
 }

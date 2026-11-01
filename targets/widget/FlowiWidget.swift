@@ -373,5 +373,6 @@ struct FlowiWidgetBundle: WidgetBundle {
     #if canImport(ActivityKit)
     TimerLiveActivity()
     #endif
+    FlowiCaptureWidget()
   }
 }

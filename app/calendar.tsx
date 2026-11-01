@@ -853,6 +853,8 @@ export default function CalendarScreen() {
       onPlayRecording={uri => { void playRecording(uri); }}
       onDeleteRecording={uri => deleteRecording(selectedOrig.id, uri)}
       playingUri={playingUri}
+      // Аркуш (телефон / вузький iPad) закриваємо перед відкриттям нотатки, панель — ні.
+      onBeforeOpenNote={detailIsPanel ? undefined : () => setSelectedKey(null)}
       colors={c}
       tr={tr}
       locale={locale}

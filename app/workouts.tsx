@@ -34,9 +34,7 @@ import { getHealthDSColors } from '@/components/health/palette';
 import { fontFamily, shadow } from '@/constants/theme';
 import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
 import { glassStyles } from '@/components/finance/finPalette';
-import { BentoCard, GlassSurface, HatchedBars, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
-
-const ACCENT2 = '#6366F1';
+import { BentoCard, HatchedBars, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
 
 type WorkoutType = 'run' | 'bike' | 'swim' | 'gym' | 'yoga' | 'walk' | 'other';
 
@@ -155,7 +153,7 @@ function ExerciseModal({
 
   const inp = {
     backgroundColor: c.subtle,
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, minHeight: 44,
+    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, minHeight: 44,
     color: c.text, fontSize: 15, fontFamily: fontFamily.regular,
   } as const;
 
@@ -169,7 +167,7 @@ function ExerciseModal({
               style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <IconSymbol name="xmark" size={18} color={c.sub} />
             </TouchableOpacity>
-            <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.bold, flex: 1 }}>
+            <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold, flex: 1 }}>
               {exercise ? 'Редагувати вправу' : 'Нова вправа'}
             </Text>
             <TouchableOpacity onPress={save} style={{ backgroundColor: c.action, borderRadius: 999, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 8 }}>
@@ -277,7 +275,7 @@ function ProgramModal({
 
   const inp = {
     backgroundColor: c.subtle,
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, minHeight: 44,
+    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, minHeight: 44,
     color: c.text, fontSize: 15, fontFamily: fontFamily.regular,
   } as const;
 
@@ -291,7 +289,7 @@ function ProgramModal({
               style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <IconSymbol name="xmark" size={18} color={c.sub} />
             </TouchableOpacity>
-            <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.bold, flex: 1 }}>
+            <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold, flex: 1 }}>
               {program ? 'Редагувати програму' : 'Нова програма'}
             </Text>
             <TouchableOpacity onPress={save} style={{ backgroundColor: c.action, borderRadius: 999, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 8 }}>
@@ -363,7 +361,7 @@ function ProgramModal({
                   style={{
                     width: 44, height: 26, borderRadius: 13,
                     backgroundColor: remOn ? c.action : c.border,
-                    justifyContent: 'center', paddingHorizontal: 3,
+                    justifyContent: 'center', paddingHorizontal: 4,
                   }}>
                   <View style={{
                     width: 20, height: 20, borderRadius: 10,
@@ -375,7 +373,7 @@ function ProgramModal({
 
               {remOn && <>
                 <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginBottom: 8 }}>Дні тижня</Text>
-                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
+                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
                   {DAY_LABELS.map((label, idx) => (
                     <TouchableOpacity
                       key={idx}
@@ -393,7 +391,7 @@ function ProgramModal({
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <TextInput style={[inp, { flex: 1, textAlign: 'center' }]} value={remHour} onChangeText={setRemHour}
                     keyboardType="number-pad" maxLength={2} placeholder="09" placeholderTextColor={c.muted} />
-                  <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.bold }}>:</Text>
+                  <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.semibold }}>:</Text>
                   <TextInput style={[inp, { flex: 1, textAlign: 'center' }]} value={remMin} onChangeText={setRemMin}
                     keyboardType="number-pad" maxLength={2} placeholder="00" placeholderTextColor={c.muted} />
                 </View>
@@ -465,23 +463,23 @@ function StatsModal({
                 { label: 'Цього тижня', value: thisWeek.length, sub: 'тренувань' },
                 { label: 'Стрік', value: streak, sub: 'днів' },
               ] as const).map(item => (
-                <GlassSurface key={item.label} radius={20} tint="coral" style={{ flex: 1, padding: 20, alignItems: 'center' }}>
+                <View key={item.label} style={{ ...c.solid, borderRadius: 16, flex: 1, padding: 20, alignItems: 'center' }}>
                   <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 6 }} numberOfLines={1}>{item.label}</Text>
                   <Text style={{ color: c.text, fontSize: 40, lineHeight: 44, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.8 }}>{item.value}</Text>
-                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{item.sub}</Text>
-                </GlassSurface>
+                  <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{item.sub}</Text>
+                </View>
               ))}
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
               <View
-                style={{ ...c.gl.card, flex: 1, borderRadius: 20, padding: 20, alignItems: 'center' }}>
+                style={{ ...c.solid, flex: 1, borderRadius: 16, padding: 20, alignItems: 'center' }}>
                 <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 6 }} numberOfLines={1}>Загальний час</Text>
                 <Text style={{ color: c.text, fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}>{fmtDuration(totalMin)}</Text>
               </View>
               {totalCal > 0 && (
                 <View
-                  style={{ ...c.gl.card, flex: 1, borderRadius: 20, padding: 20, alignItems: 'center' }}>
+                  style={{ ...c.solid, flex: 1, borderRadius: 16, padding: 20, alignItems: 'center' }}>
                   <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 6 }} numberOfLines={1}>Ккал спалено</Text>
                   <Text style={{ color: c.text, fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}>{totalCal}</Text>
                 </View>
@@ -491,17 +489,17 @@ function StatsModal({
             {/* 7-day chart */}
             <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Активність за 7 днів</Text>
             <View
-              style={{ ...c.gl.card, borderRadius: 20, padding: 20, marginBottom: 16 }}>
+              style={{ ...c.solid, borderRadius: 16, padding: 20, marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 72 }}>
                 {last7.map((item, idx) => (
                   <View key={idx} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
                     <View style={{
-                      width: '100%', borderRadius: 999,
+                      width: '100%', borderRadius: 4,
                       height: Math.max((item.count / max7) * 50, item.count > 0 ? 8 : 4),
-                      // DS v2: стовпці зі значенням — лайм, порожні дні — доріжка.
-                      backgroundColor: item.count > 0 ? c.g.accent.coral.fill : c.subtle,
+                      // Один акцент на графік: сьогодні — корал модуля, решта днів — нейтральні кроки.
+                      backgroundColor: item.count === 0 ? c.subtle : idx === last7.length - 1 ? c.g.accent.coral.fill : c.muted,
                     }} />
-                    <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold }}>{item.label}</Text>
+                    <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium }}>{item.label}</Text>
                   </View>
                 ))}
               </View>
@@ -511,14 +509,14 @@ function StatsModal({
             {byType.length > 0 && <>
               <Text style={[sectionLabel(c), { marginBottom: 10 }]}>За типом</Text>
               <View
-                style={{ ...c.gl.card, borderRadius: 20, marginBottom: 16 }}>
+                style={{ ...c.solid, borderRadius: 16, marginBottom: 16 }}>
                 {byType.map((wt, idx) => (
                   <View key={wt.key} style={{
-                    flexDirection: 'row', alignItems: 'center', padding: 14,
+                    flexDirection: 'row', alignItems: 'center', padding: 16,
                     borderBottomWidth: idx < byType.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: c.border,
                   }}>
-                    <View style={{ width: 34, height: 34, borderRadius: 999, backgroundColor: wt.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                      <IconSymbol name={wt.icon as any} size={16} color={wt.color} />
+                    <View style={{ width: 36, height: 36, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <IconSymbol name={wt.icon as any} size={16} color={c.coral} />
                     </View>
                     <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 }}>{wt.label}</Text>
                     <Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.44 }}>{wt.count}</Text>
@@ -530,7 +528,7 @@ function StatsModal({
             {/* This month */}
             <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Цього місяця</Text>
             <View
-              style={{ ...c.gl.card, borderRadius: 20, padding: 20 }}>
+              style={{ ...c.solid, borderRadius: 16, padding: 20 }}>
               <View style={{ flexDirection: 'row', gap: 16 }}>
                 <View style={{ flex: 1, alignItems: 'center' }}>
                   <Text style={{ color: c.text, fontSize: 40, lineHeight: 44, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.8 }}>{thisMonth.length}</Text>
@@ -623,12 +621,12 @@ const WorkoutRow = React.memo(function WorkoutRow({ w, c, isDark, lastInGroup, o
   const cfg = WORKOUT_TYPES.find(t => t.key === w.type) ?? WORKOUT_TYPES[6];
   return (
     <View
-      style={{ ...c.solid, borderRadius: 20, padding: 20, marginBottom: lastInGroup ? 24 : 8, flexDirection: 'row', alignItems: 'center' }}>
-      <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: cfg.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-        <IconSymbol name={cfg.icon as any} size={20} color={cfg.color} />
+      style={{ ...c.solid, borderRadius: 16, padding: 20, marginBottom: lastInGroup ? 24 : 8, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+        <IconSymbol name={cfg.icon as any} size={16} color={c.coral} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold }}>{w.title}</Text>
+        <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{w.title}</Text>
         <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
           {fmtDuration(w.durationMin)}{w.calories ? ` · ${w.calories} ккал` : ''}
           {w.groupId ? ` · ${tr.tgGroupBadge}` : ''}
@@ -649,12 +647,12 @@ const ExerciseRow = React.memo(function ExerciseRow({ ex, c, isDark, onEdit, onD
   const { tr } = useI18n();
   return (
     <View
-      style={{ ...c.solid, borderRadius: 20, padding: 20, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
-      <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: ACCENT2 + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-        <IconSymbol name="dumbbell.fill" size={18} color={ACCENT2} />
+      style={{ ...c.solid, borderRadius: 16, padding: 20, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+        <IconSymbol name="dumbbell.fill" size={16} color={c.coral} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold }}>{ex.name}</Text>
+        <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{ex.name}</Text>
         <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
           {[
             ex.muscleGroup,
@@ -668,11 +666,11 @@ const ExerciseRow = React.memo(function ExerciseRow({ ex, c, isDark, onEdit, onD
         onPress={() => onEdit(ex)}
         accessibilityRole="button" accessibilityLabel={`${tr.edit}: ${ex.name}`}
         style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <IconSymbol name="pencil" size={15} color={c.sub} />
+        <IconSymbol name="pencil" size={16} color={c.sub} />
       </TouchableOpacity>
       <TouchableOpacity onPress={() => onDelete(ex.id)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${ex.name}`}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <IconSymbol name="trash" size={15} color={c.danger} />
+        <IconSymbol name="trash" size={16} color={c.danger} />
       </TouchableOpacity>
     </View>
   );
@@ -688,14 +686,14 @@ const ProgramShortcut = React.memo(function ProgramShortcut({ prog, exercises, c
       activeOpacity={0.75}
       style={{
         flexDirection: 'row', alignItems: 'center',
-        padding: 14, borderRadius: 16, marginBottom: 8,
+        padding: 16, borderRadius: 16, marginBottom: 8,
         backgroundColor: c.nested,
       }}>
-      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: prog.color + '28', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
-        <IconSymbol name="dumbbell.fill" size={20} color={prog.color} />
+      <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: prog.color + '28', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+        <IconSymbol name="dumbbell.fill" size={16} color={prog.color} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold, marginBottom: 3 }}>{prog.name}</Text>
+        <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, marginBottom: 4 }}>{prog.name}</Text>
         <Text style={{ color: c.sub, fontSize: 12 }}>
           {progExs.length > 0
             ? progExs.slice(0, 3).map(e => e.name).join(', ') + (progExs.length > 3 ? ` +${progExs.length - 3}` : '')
@@ -717,14 +715,14 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
   const progExs = exercises.filter(e => prog.exerciseIds.includes(e.id));
   return (
     <View
-      style={{ ...c.solid, borderRadius: 20, marginBottom: 12 }}>
+      style={{ ...c.solid, borderRadius: 16, marginBottom: 12 }}>
       <View style={{ padding: 20 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: prog.color + '25', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-            <IconSymbol name="dumbbell.fill" size={18} color={prog.color} />
+          <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: prog.color + '25', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+            <IconSymbol name="dumbbell.fill" size={16} color={prog.color} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }}>{prog.name}</Text>
+            <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{prog.name}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
               {prog.exerciseIds.length} вправ
               {prog.reminderEnabled && prog.reminderDays.length > 0
@@ -736,11 +734,11 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
             onPress={() => onEdit(prog)}
             accessibilityRole="button" accessibilityLabel={`${tr.edit}: ${prog.name}`}
             style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <IconSymbol name="pencil" size={15} color={c.sub} />
+            <IconSymbol name="pencil" size={16} color={c.sub} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => onDelete(prog)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${prog.name}`}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <IconSymbol name="trash" size={15} color={c.danger} />
+            <IconSymbol name="trash" size={16} color={c.danger} />
           </TouchableOpacity>
         </View>
 
@@ -883,7 +881,7 @@ export default function WorkoutsScreen() {
       try {
         const id = await Notifications.scheduleNotificationAsync({
           content: {
-            title: 'Час тренуватись!',
+            title: 'Час тренуватись',
             body: prog.name,
             sound: true,
             ...(Platform.OS === 'android' ? { channelId: 'flowi-reminders' } : {}),
@@ -1060,7 +1058,7 @@ export default function WorkoutsScreen() {
           onPress={openNewExercise}
           style={{
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            gap: 8, padding: 14, minHeight: 48, borderRadius: 999, marginBottom: 16,
+            gap: 8, padding: 16, minHeight: 48, borderRadius: 999, marginBottom: 16,
             backgroundColor: c.action,
           }}>
           <IconSymbol name="plus" size={16} color={c.onAction} />
@@ -1074,7 +1072,7 @@ export default function WorkoutsScreen() {
           onPress={openNewProgram}
           style={{
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            gap: 8, padding: 14, minHeight: 48, borderRadius: 999, marginBottom: 16,
+            gap: 8, padding: 16, minHeight: 48, borderRadius: 999, marginBottom: 16,
             backgroundColor: c.action,
           }}>
           <IconSymbol name="plus" size={16} color={c.onAction} />
@@ -1112,10 +1110,10 @@ export default function WorkoutsScreen() {
     if (tab === 'exercises') {
       return (
         <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-          <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-            <IconSymbol name="dumbbell.fill" size={26} color={c.coral} />
+          <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+            <IconSymbol name="dumbbell.fill" size={24} color={c.coral} />
           </View>
-          <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.bold, marginBottom: 6 }}>Немає вправ</Text>
+          <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginBottom: 6 }}>Немає вправ</Text>
           <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>Створи свою бібліотеку вправ</Text>
         </View>
       );
@@ -1123,10 +1121,10 @@ export default function WorkoutsScreen() {
     if (tab === 'programs') {
       return (
         <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-          <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-            <IconSymbol name="list.bullet.clipboard" size={26} color={c.coral} />
+          <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+            <IconSymbol name="list.bullet.clipboard" size={24} color={c.coral} />
           </View>
-          <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.bold, marginBottom: 6 }}>Немає програм</Text>
+          <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginBottom: 6 }}>Немає програм</Text>
           <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>Створи програму з вправ та встанови нагадування</Text>
         </View>
       );
@@ -1137,10 +1135,10 @@ export default function WorkoutsScreen() {
     const hasPrograms = programs.length > 0;
     return (
       <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-        <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-          <IconSymbol name="figure.run" size={26} color={c.coral} />
+        <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+          <IconSymbol name="figure.run" size={24} color={c.coral} />
         </View>
-        <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.bold, marginBottom: 6 }}>Немає тренувань</Text>
+        <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginBottom: 6 }}>Немає тренувань</Text>
         <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>
           {hasPrograms ? 'Додай перше тренування вище' : 'Створи програму — і тренування зʼявляться тут'}
         </Text>
@@ -1149,10 +1147,10 @@ export default function WorkoutsScreen() {
             onPress={goToPrograms}
             style={{
               marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 8,
-              paddingHorizontal: 20, paddingVertical: 11, minHeight: 44, borderRadius: 999,
+              paddingHorizontal: 20, paddingVertical: 12, minHeight: 44, borderRadius: 999,
               backgroundColor: c.action,
             }}>
-            <IconSymbol name="plus" size={15} color={c.onAction} />
+            <IconSymbol name="plus" size={16} color={c.onAction} />
             <Text style={{ color: c.onAction, fontSize: 14, fontFamily: fontFamily.semibold }}>Нова програма</Text>
           </TouchableOpacity>
         )}
@@ -1193,12 +1191,12 @@ export default function WorkoutsScreen() {
                 <HeaderButton
                   onPress={() => router.push('/training' as Href)}
                   accessibilityLabel={tr.tgGroupsButton}>
-                  <IconSymbol name="person.2.fill" size={17} color={c.text} />
+                  <IconSymbol name="person.2.fill" size={18} color={c.text} />
                 </HeaderButton>
                 <HeaderButton
                   onPress={() => setShowStats(true)}
                   accessibilityLabel={tr.statistics}>
-                  <IconSymbol name="chart.bar.fill" size={17} color={c.text} />
+                  <IconSymbol name="chart.bar.fill" size={18} color={c.text} />
                 </HeaderButton>
               </>
             }>

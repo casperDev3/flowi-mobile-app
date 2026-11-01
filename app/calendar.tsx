@@ -705,7 +705,7 @@ export default function CalendarScreen() {
             tr={tr}
           />
         </View>
-        {!showSideColumn ? <View style={{ marginTop: 18 }}>{renderAgenda(anchor)}</View> : null}
+        {!showSideColumn ? <View style={{ marginTop: 20 }}>{renderAgenda(anchor)}</View> : null}
       </ScrollView>
     );
   } else if (view === 'week' && !isWide) {
@@ -777,13 +777,13 @@ export default function CalendarScreen() {
               onPress={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
               accessibilityLabel={tr.calSearch}
               style={{ borderColor: 'transparent', backgroundColor: searchOpen ? c.action : c.card }}>
-              <IconSymbol name="magnifyingglass" size={16} color={searchOpen ? c.onAction : c.text} />
+              <IconSymbol name="magnifyingglass" size={18} color={searchOpen ? c.onAction : c.text} />
             </HeaderButton>
             <HeaderButton
               onPress={() => { closeSearch(); goToday(); }}
               accessibilityLabel={tr.today}
               style={{ borderColor: 'transparent', backgroundColor: c.card }}>
-              <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? c.accent : c.text} />
+              <IconSymbol name="calendar" size={18} color={isCurrentPeriod ? c.accent : c.text} />
             </HeaderButton>
             <HeaderButton
               onPress={() => setShowGcalSheet(true)}
@@ -791,7 +791,7 @@ export default function CalendarScreen() {
               style={{ borderColor: 'transparent', backgroundColor: c.card }}>
               {gcal.importing
                 ? <ActivityIndicator size="small" color={dsTokens(isDark).status.success} />
-                : <IconSymbol name={gcal.token ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={17} color={gcal.token ? dsTokens(isDark).status.success : c.text} />}
+                : <IconSymbol name={gcal.token ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={18} color={gcal.token ? dsTokens(isDark).status.success : c.text} />}
             </HeaderButton>
           </>
         }
@@ -827,7 +827,7 @@ export default function CalendarScreen() {
       accessibilityLabel={tr.calCreateTitle}
       testID="calendar-fab"
       style={[st.fab, isWide ? st.fabWide : null, { backgroundColor: c.action }, shadow[isDark ? 'dark' : 'light'].popover]}>
-      <IconSymbol name="plus" size={26} color={c.onAction} />
+      <IconSymbol name="plus" size={24} color={c.onAction} />
     </TouchableOpacity>
   ) : null;
 

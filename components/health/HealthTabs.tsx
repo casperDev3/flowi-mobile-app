@@ -192,6 +192,6 @@ const s = StyleSheet.create({
   tabFill: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0, justifyContent: 'center', paddingHorizontal: 8 },
   label:   { fontSize: 13, fontFamily: fontFamily.semibold },
   labelFill: { flexShrink: 1 },
-  badge:   { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  badge:   { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   badgeText: { color: '#fff', fontSize: 10, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });

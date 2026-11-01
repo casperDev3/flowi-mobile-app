@@ -738,8 +738,8 @@ export function InlineTextArea({ value, onCommit, placeholder, label, editable =
 }
 
 const st = StyleSheet.create({
-  search:    { borderRadius: radius.pill, minHeight: 44, paddingHorizontal: 16, paddingVertical: 11, fontSize: 14, fontFamily: fontFamily.regular, marginBottom: 10 },
-  create:    { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: radius.pill, paddingHorizontal: 16, gap: 9, marginBottom: 8 },
+  search:    { borderRadius: radius.pill, minHeight: 44, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, fontFamily: fontFamily.regular, marginBottom: 10 },
+  create:    { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: radius.pill, paddingHorizontal: 16, gap: 8, marginBottom: 8 },
   presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   calendar:  { borderRadius: radius.nested, padding: 12 },
   numInput:  { flex: 1, borderRadius: radius.control, minHeight: 46, fontSize: 18, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], textAlign: 'center' },
@@ -747,7 +747,7 @@ const st = StyleSheet.create({
   segBtn:    { flex: 1, minHeight: 40, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dayBtn:    { flex: 1, minHeight: 40, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   stepRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  caption:   { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 7, marginTop: 4 },
+  caption:   { fontSize: 13, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 4 },
   stepBtn:   { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  area:      { borderWidth: 2, borderRadius: radius.control, fontFamily: fontFamily.regular, paddingHorizontal: 12, paddingTop: 11, paddingBottom: 11, fontSize: 14, lineHeight: 20, textAlignVertical: 'top' },
+  area:      { borderWidth: 2, borderRadius: radius.control, fontFamily: fontFamily.regular, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12, fontSize: 14, lineHeight: 20, textAlignVertical: 'top' },
 });

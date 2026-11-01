@@ -130,7 +130,7 @@ function NoteToTaskForm({ note, projects, onCancel, onSubmit }: {
         {/* Колір лише на рамці й гліфі: червоний дрібний текст не тягне AA. */}
         {titleMissing ? (
           <View accessibilityRole="alert" style={st.errorRow}>
-            <IconSymbol name="exclamationmark.circle.fill" size={13} color={t.status.danger} />
+            <IconSymbol name="exclamationmark.circle.fill" size={12} color={t.status.danger} />
             <Text style={[st.hint, st.errorText, { color: t.text.primary }]}>{s.titleRequired}</Text>
           </View>
         ) : null}
@@ -175,7 +175,7 @@ function NoteToTaskForm({ note, projects, onCancel, onSubmit }: {
 
         {error ? (
           <View accessibilityRole="alert" style={[st.errorRow, { paddingTop: 10 }]}>
-            <IconSymbol name="exclamationmark.circle.fill" size={13} color={t.status.danger} />
+            <IconSymbol name="exclamationmark.circle.fill" size={12} color={t.status.danger} />
             <Text style={[st.hint, st.errorText, { color: t.text.primary }]}>{error}</Text>
           </View>
         ) : null}
@@ -190,7 +190,7 @@ function NoteToTaskForm({ note, projects, onCancel, onSubmit }: {
             accessibilityRole="button" accessibilityLabel={busy ? s.saving : s.submit}
             accessibilityState={{ disabled: titleMissing || busy, busy }}
             style={[st.button, { backgroundColor: t.action.primary, opacity: titleMissing ? 0.45 : 1 }]}>
-            {busy ? <ActivityIndicator size="small" color={t.text.onAction} /> : <IconSymbol name="checklist" size={15} color={t.text.onAction} />}
+            {busy ? <ActivityIndicator size="small" color={t.text.onAction} /> : <IconSymbol name="checklist" size={16} color={t.text.onAction} />}
             <Text style={[st.buttonText, { color: t.text.onAction }]}>{busy ? s.saving : s.submit}</Text>
           </Pressable>
         </View>
@@ -204,18 +204,18 @@ const st = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   heading: { fontSize: 20, fontFamily: fontFamily.semibold, flexShrink: 1 },
   intro: { fontSize: 14, lineHeight: 20, paddingTop: 6, paddingBottom: 6 },
-  label: { fontSize: 13, fontFamily: fontFamily.semibold, paddingTop: 14, paddingBottom: 6 },
+  label: { fontSize: 13, fontFamily: fontFamily.semibold, paddingTop: 16, paddingBottom: 6 },
   input: { minHeight: 44, borderWidth: 1, borderRadius: radius.control, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16 },
   textarea: { minHeight: 140, maxHeight: 260 },
   hint: { fontSize: 12, lineHeight: 16, paddingTop: 4 },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4 },
   errorText: { paddingTop: 0, flexShrink: 1 },
   pills: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
-  pill: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 14, borderRadius: radius.pill, maxWidth: 240 },
+  pill: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 16, borderRadius: radius.pill, maxWidth: 240 },
   pillText: { fontSize: 13, fontFamily: fontFamily.semibold },
-  deleteRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, marginTop: 16, paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.nested },
+  deleteRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, marginTop: 16, paddingHorizontal: 16, paddingVertical: 10, borderRadius: radius.nested },
   deleteTitle: { fontSize: 15, fontFamily: fontFamily.medium },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 10, paddingTop: 20 },
-  button: { minHeight: 44, minWidth: 44, paddingHorizontal: 18, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  button: { minHeight: 44, minWidth: 44, paddingHorizontal: 20, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   buttonText: { fontSize: 15, fontFamily: fontFamily.semibold },
 });

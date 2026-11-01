@@ -105,9 +105,9 @@ export function OfflineOverlay({
           accessibilityRole="button"
           accessibilityLabel={tr.offlineReadOnly}
           style={[s.banner, { backgroundColor: bannerBg, borderBottomColor: bannerBord }]}>
-          <IconSymbol name="icloud.slash" size={13} color={accent} />
+          <IconSymbol name="icloud.slash" size={12} color={accent} />
           <Text style={[s.bannerText, { color: accent }]}>{tr.offlineReadOnly}</Text>
-          <IconSymbol name="wifi" size={13} color={sub} style={{ marginLeft: 'auto' }} />
+          <IconSymbol name="wifi" size={12} color={sub} style={{ marginLeft: 'auto' }} />
         </TouchableOpacity>
         {children}
       </View>
@@ -158,7 +158,7 @@ export function OfflineOverlay({
                   onPress={() => router.push('/login')}
                   accessibilityRole="button"
                   style={[s.btn, { backgroundColor: t.action.primary }]}>
-                  <IconSymbol name="person.fill" size={15} color={t.text.onAction} />
+                  <IconSymbol name="person.fill" size={16} color={t.text.onAction} />
                   <Text style={[s.btnLabel, { color: t.text.onAction }]}>{tr.authLogin}</Text>
                 </TouchableOpacity>
 
@@ -175,7 +175,7 @@ export function OfflineOverlay({
                 accessibilityRole="button"
                 accessibilityLabel={tr.enableOnline}
                 style={[s.btn, { backgroundColor: t.action.primary }]}>
-                <IconSymbol name="wifi" size={15} color={t.text.onAction} />
+                <IconSymbol name="wifi" size={16} color={t.text.onAction} />
                 <Text style={[s.btnLabel, { color: t.text.onAction }]}>{tr.enableOnline}</Text>
               </TouchableOpacity>
             )}
@@ -189,11 +189,11 @@ export function OfflineOverlay({
 const s = StyleSheet.create({
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   card:       { width: '100%', maxWidth: 340, borderRadius: radius.card, padding: space.cardPadding, alignItems: 'center' },
-  iconBox:    { width: 56, height: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  iconBox:    { width: 56, height: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   title:      { fontSize: 17, fontFamily: fontFamily.semibold, textAlign: 'center', marginBottom: 8 },
-  desc:       { fontFamily: fontFamily.regular, fontSize: 13, lineHeight: 19, textAlign: 'center', marginBottom: 18 },
+  desc:       { fontFamily: fontFamily.regular, fontSize: 13, lineHeight: 19, textAlign: 'center', marginBottom: 16 },
   btn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 48, paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.pill },
   btnLabel:   { fontFamily: fontFamily.semibold, fontSize: 14, marginLeft: 6 },
   banner:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  bannerText: { fontSize: 12, fontFamily: fontFamily.bold },
+  bannerText: { fontSize: 12, fontFamily: fontFamily.semibold },
 });

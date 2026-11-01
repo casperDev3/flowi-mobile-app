@@ -220,7 +220,7 @@ function TaskCompactCardInner<T extends Task>({
             <View
               style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
               <View style={[st.tag, { backgroundColor: statusColumn.color + '1F' }]}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColumn.color, marginRight: 5 }} />
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColumn.color, marginRight: 4 }} />
                 <Text numberOfLines={1} style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.medium }}>
                   {statusColumn.name}
                 </Text>
@@ -228,7 +228,7 @@ function TaskCompactCardInner<T extends Task>({
 
               {proj && badgeLabel && (
                 <View style={[st.tag, { backgroundColor: proj.color + '1F' }]}>
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color, marginRight: 5 }} />
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color, marginRight: 4 }} />
                   {/* maxWidth більший за колишні 110: у бейдж тепер уміщається
                       ще й назва спринта, і на 110 від неї лишалося три літери. */}
                   <Text numberOfLines={1} style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.medium, maxWidth: 180 }}>
@@ -242,7 +242,7 @@ function TaskCompactCardInner<T extends Task>({
                   озвучене у a11ySummary — сама фраза ховається разом із рештою
                   рядка через importantForAccessibility на батьківському View. */}
               {assigneeLabel && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <IconSymbol name="person.fill" size={10} color={c.sub} />
                   <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, maxWidth: 90 }}>
                     {assigneeLabel}
@@ -253,7 +253,7 @@ function TaskCompactCardInner<T extends Task>({
               {/* Виконані підзавдання. Показуємо лише коли вони є: «0/0» на
                   завданні без підзавдань — це шум, а не інформація. */}
               {task.subtasks.length > 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <IconSymbol
                     name={allSubtasksDone ? 'checkmark.circle.fill' : 'list.bullet'}
                     size={10}
@@ -324,5 +324,5 @@ const st = StyleSheet.create({
   tag: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
   // Колонка чекбокса: 44 завширшки, на всю висоту картки (мінімум 44 —
   // відʼємні відступи «з'їдають» вертикальні 9pt картки).
-  checkHit: { width: 44, minHeight: 44, marginVertical: -12, alignSelf: 'stretch', alignItems: 'center', paddingTop: 13 },
+  checkHit: { width: 44, minHeight: 44, marginVertical: -12, alignSelf: 'stretch', alignItems: 'center', paddingTop: 14 },
 });

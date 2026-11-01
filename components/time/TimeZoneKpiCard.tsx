@@ -41,7 +41,7 @@ export function TimeZoneKpiCard({ title, total, average, typical, tr }: {
 }) {
   return (
     <BentoCard compact title={title} icon="clock.fill" accent="amber" testID="time-static-kpis">
-      <View style={{ gap: 14 }}>
+      <View style={{ gap: 12 }}>
         <ZoneKpi value={total} label={tr.totalLabel} />
         <ZoneKpi value={average} label={tr.timeAverageTask} />
         <ZoneKpi value={typical} label={tr.timeTypicalSession} />

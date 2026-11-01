@@ -151,7 +151,7 @@ export function DialPicker({
                   </Text>
                   {canMakeDefault && meta.id === defaultDial && (
                     <View style={[st.defaultTag, { backgroundColor: t.accent.amber }]}>
-                      <IconSymbol name="star.fill" size={9} color={t.text.onAccent} />
+                      <IconSymbol name="star.fill" size={10} color={t.text.onAccent} />
                       <Text style={[st.defaultTagText, { color: t.text.onAccent }]}>{tr.dialIsDefault}</Text>
                     </View>
                   )}
@@ -176,7 +176,7 @@ export function DialPicker({
                 opacity: pressed ? 0.7 : 1,
               },
             ]}>
-            <IconSymbol name="star.fill" size={13} color={dialIsDefault ? t.state.disabledText : t.text.onAction} />
+            <IconSymbol name="star.fill" size={12} color={dialIsDefault ? t.state.disabledText : t.text.onAction} />
             <Text numberOfLines={1} style={[st.makeDefaultText, { color: dialIsDefault ? t.text.secondary : t.text.onAction }]}>
               {dialIsDefault
                 ? `${tr.dialIsDefault}: ${String(tr[DIALS.find(d => d.id === dial)?.labelKey ?? 'dialDigits'])}`
@@ -216,8 +216,8 @@ const st = StyleSheet.create({
   preview: { height: PREVIEW_SIZE + 24, alignItems: 'center', justifyContent: 'center' },
   name:    { fontSize: 12 },
   defaultTag: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2,
   },
   defaultTagText: { fontSize: 10, fontFamily: fontFamily.semibold },
   makeDefault: {

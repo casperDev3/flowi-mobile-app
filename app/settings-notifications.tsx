@@ -246,10 +246,10 @@ function ToggleRow({ icon, iconColor, title, subtitle, value, disabled, onChange
 }
 
 const st = StyleSheet.create({
-  intro:     { fontSize: 13, lineHeight: 18, marginTop: 6, marginBottom: 14 },
-  card:      { borderRadius: 24, marginBottom: 12 },
+  intro:     { fontSize: 13, lineHeight: 18, marginTop: 6, marginBottom: 12 },
+  card:      { borderRadius: 16, marginBottom: 12 },
   notice:    { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 20 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
   iconBox:   { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   divider:   { height: StyleSheet.hairlineWidth, marginLeft: 64 },
   // Omni: заголовок групи — 16/600 (як назва bento-картки), без капсу.

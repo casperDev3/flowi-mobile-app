@@ -95,7 +95,7 @@ export function TaskTimerTab({
           onPress={running ? onStop : onStart}
           accessibilityRole="button"
           style={[st.btn, { backgroundColor: t.action.primary }]}>
-          <IconSymbol name={running ? 'stop.fill' : 'play.fill'} size={15} color={running ? t.accent.coral : t.text.onAction} />
+          <IconSymbol name={running ? 'stop.fill' : 'play.fill'} size={16} color={running ? t.accent.coral : t.text.onAction} />
           <Text style={{ color: t.text.onAction, fontFamily: fontFamily.semibold, fontSize: 15, marginLeft: 8 }}>
             {running ? tr.stopTimer : tr.startTimer}
           </Text>
@@ -150,10 +150,10 @@ export function TaskTimerTab({
 }
 
 const st = StyleSheet.create({
-  caption:  { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.6, marginBottom: 10, textTransform: 'uppercase' },
+  caption:  { fontSize: 13, fontFamily: fontFamily.medium, marginBottom: 8 },
   bigClock: { ...type.display },
-  label:    { fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  btn:      { minHeight: 48, paddingVertical: 13, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  label:    { fontSize: 13, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 16 },
+  btn:      { minHeight: 48, paddingVertical: 14, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   row:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nestedCompact, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
   rowValue: { fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });

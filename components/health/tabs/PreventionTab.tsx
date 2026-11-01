@@ -136,7 +136,7 @@ export function PreventionTab({ h }: HealthTabProps) {
             <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.exportReport}</Text>
             <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.reportSub}</Text>
           </View>
-          <IconSymbol name="chevron.right" size={13} color={c.sub} />
+          <IconSymbol name="chevron.right" size={14} color={c.sub} />
         </View>
       </TouchableOpacity>
     </ScrollView>

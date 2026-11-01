@@ -158,8 +158,8 @@ export default function DeveloperScreen() {
           <BentoCard title="Соціальні мережі" icon="person.2.fill" accent="lavender">
           <View style={[st.socialsCard, { backgroundColor: k.surface.subtle }]}>
             {SOCIALS.map((s, i) => {
-              const iconColor = s.color(isDark);
-              const bgColor   = s.bg(isDark);
+              const iconColor = c.sub; // гліф у ролі тексту, не в кольорі бренду мережі
+              const bgColor   = c.dim;
               return (
                 <Pressable
                   key={s.key}
@@ -204,15 +204,15 @@ const st = StyleSheet.create({
     borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   avatarText:     { fontSize: 26, fontFamily: fontFamily.medium, letterSpacing: -0.5 },
-  devName:        { fontSize: 22, fontFamily: fontFamily.semibold, letterSpacing: -0.4, marginBottom: 4 },
+  devName:        { fontSize: 22, fontFamily: fontFamily.semibold, marginBottom: 4 },
   devRole:        { fontSize: 14, fontFamily: fontFamily.medium, marginBottom: 16 },
   githubBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
     minHeight: 40,
@@ -224,7 +224,7 @@ const st = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
-  socialRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, gap: 13 },
+  socialRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, gap: 12 },
   socialIconWrap: { width: 42, height: 42, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   socialLabel:    { fontSize: 15, fontFamily: fontFamily.semibold },
   socialHandle:   { fontSize: 12, fontFamily: fontFamily.regular, marginTop: 1 },

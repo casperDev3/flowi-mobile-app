@@ -95,7 +95,7 @@ export function QuestCard({ c, quest, progress, mode, doneCount, assigneeCount, 
             <Badge label={measurable ? tr.tgQuestMeasurable : tr.tgQuestCheckbox} color={c.sub} />
             <Badge label={`+${quest.xpReward ?? 0} XP`} color={TG_XP} />
             {quest.dueDate ? <Badge label={quest.dueDate} color={c.sub} /> : null}
-            {info?.health ? <Badge label={`🔒 ${tr[info.labelKey]}`} color={c.sub} /> : null}
+            {info?.health ? <Badge label={tr[info.labelKey]} color={c.sub} /> : null}
           </View>
           {quest.description ? <Text style={{ color: c.sub, fontSize: 13, marginTop: 6 }}>{quest.description}</Text> : null}
         </View>
@@ -131,7 +131,7 @@ export function QuestCard({ c, quest, progress, mode, doneCount, assigneeCount, 
       {!measurable && mode === 'member' && onToggle ? (
         <View style={{ marginTop: 12, gap: 6 }}>
           {done && progress?.photoUri ? (
-            <Text style={{ color: c.sub, fontSize: 12 }}>{`📷 ${tr.tgPhotoAttached} · ${tr.tgPhotoLocalHint}`}</Text>
+            <Text style={{ color: c.sub, fontSize: 12 }}>{`${tr.tgPhotoAttached} · ${tr.tgPhotoLocalHint}`}</Text>
           ) : null}
           <PrimaryButton
             label={done ? tr.tgUndo : quest.photoRequired ? `${tr.tgMarkDone} · ${tr.tgAddPhoto}` : tr.tgMarkDone}

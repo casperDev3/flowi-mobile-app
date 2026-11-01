@@ -255,7 +255,7 @@ export default function ProjectSprintsScreen() {
   const shortDate = (iso: string | undefined) =>
     iso ? new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '';
 
-  const inputStyle = { borderRadius: radius.control, backgroundColor: tk.surface.subtle, minHeight: 44, paddingHorizontal: 14, paddingVertical: 8, color: c.text, fontFamily: fontFamily.regular } as const;
+  const inputStyle = { borderRadius: radius.control, backgroundColor: tk.surface.subtle, minHeight: 44, paddingHorizontal: 16, paddingVertical: 8, color: c.text, fontFamily: fontFamily.regular } as const;
 
   /** Спільна форма: назва + дати «з»/«по» + помилка/попередження. */
   const renderDraftForm = (submitLabel: string) => (
@@ -480,12 +480,12 @@ export default function ProjectSprintsScreen() {
             <Text style={[type.caption, { color: c.sub }]}>{tr.sprintMoveHint}</Text>
             {sprintMoveTargets(projectSprints, sprint).map(target => (
               <TouchableOpacity key={target.id} onPress={() => closeSprint(sprint, target)} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
-                <IconSymbol name="flag" size={13} color={c.sub} />
+                <IconSymbol name="flag" size={12} color={c.sub} />
                 <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{target.name}</Text>
               </TouchableOpacity>
             ))}
             <TouchableOpacity onPress={() => closeSprint(sprint, null)} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
-              <IconSymbol name="tray" size={13} color={c.sub} />
+              <IconSymbol name="tray" size={12} color={c.sub} />
               <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.sprintMoveToBacklog}</Text>
             </TouchableOpacity>
           </View>
@@ -521,7 +521,7 @@ export default function ProjectSprintsScreen() {
                     placeholder={tr.sprintAddTaskIn.replace('{name}', sprint.name)}
                     accessibilityLabel={tr.sprintAddTaskIn.replace('{name}', sprint.name)}
                     placeholderTextColor={tk.text.muted}
-                    style={{ flex: 1, borderRadius: radius.control, backgroundColor: tk.surface.subtle, minHeight: 44, paddingHorizontal: 14, paddingVertical: 7, color: c.text, fontSize: 14, fontFamily: fontFamily.regular }}
+                    style={{ flex: 1, borderRadius: radius.control, backgroundColor: tk.surface.subtle, minHeight: 44, paddingHorizontal: 16, paddingVertical: 8, color: c.text, fontSize: 14, fontFamily: fontFamily.regular }}
                   />
                   <IconAction icon="plus" label={tr.sprintAddTaskA11y} color={c.text} onPress={() => addTask(sprint)} colors={c} />
                 </View>
@@ -532,7 +532,7 @@ export default function ProjectSprintsScreen() {
                   accessibilityLabel={`${tr.sprintAddTaskA11y}: ${sprint.name}`}
                   accessibilityState={{ expanded: false }}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, minHeight: 44 }}>
-                  <IconSymbol name="plus" size={13} color={c.text} />
+                  <IconSymbol name="plus" size={12} color={c.text} />
                   <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.projectAddTask}</Text>
                 </TouchableOpacity>
               )
@@ -623,7 +623,7 @@ export default function ProjectSprintsScreen() {
               onPress={openCreate}
               accessibilityLabel={tr.sprintNew}
               style={{ backgroundColor: tk.action.primary, borderColor: 'transparent' }}>
-              <IconSymbol name="plus" size={17} color={tk.text.onAction} />
+              <IconSymbol name="plus" size={18} color={tk.text.onAction} />
             </HeaderButton>
           ) : null}
           <TasksMenuButton onPress={() => setMenuOpen(true)} label={tr.sprintListMenu} active={filtersActive} colors={c} />
@@ -656,7 +656,7 @@ export default function ProjectSprintsScreen() {
           </View>
         ) : null}
         {projectSprints.length === 0 && !draft ? (
-          <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 30 }}>{tr.sprintNoSprintsHint}</Text>
+          <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 32 }}>{tr.sprintNoSprintsHint}</Text>
         ) : visibleSprints.length === 0 && projectSprints.length > 0 ? (
           <View style={{ alignItems: 'center', gap: 10, marginTop: 24 }}>
             <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>{tr.sprintNoMatch}</Text>

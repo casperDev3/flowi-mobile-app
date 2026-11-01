@@ -48,7 +48,7 @@ export function CreateChooser({ visible, subtitle, onClose, onMeeting, onTask, i
         <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{title}</Text>
         <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 2 }}>{hint}</Text>
       </View>
-      <IconSymbol name="chevron.right" size={13} color={c.sub} />
+      <IconSymbol name="chevron.right" size={12} color={c.sub} />
     </TouchableOpacity>
   );
 
@@ -92,7 +92,7 @@ const st = StyleSheet.create({
   overlay: { flex: 1 },
   overlayCenter: { alignItems: 'center', justifyContent: 'center' },
   sheet: { borderRadius: radius.card, padding: 20 },
-  option: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: radius.nested, paddingHorizontal: 14, paddingVertical: 12 },
+  option: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: radius.nested, paddingHorizontal: 16, paddingVertical: 12 },
   icon: { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   close: { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

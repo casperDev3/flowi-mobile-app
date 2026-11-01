@@ -63,10 +63,10 @@ const withActions = (
 );
 
 describe('ScreenHeader', () => {
-  it('верхній відступ = інсет + 14', () => {
+  it('верхній відступ = інсет + 16 (сітка 4)', () => {
     const tree = render(withActions);
     const container = tree.root.findAll((n: any) => typeof n.type === 'string')[0];
-    expect(flat(container.props.style).paddingTop).toBe(INSETS.top + 14);
+    expect(flat(container.props.style).paddingTop).toBe(INSETS.top + 16);
   });
 
   it('заголовок в один рядок і з обмеженим масштабуванням шрифту', () => {
@@ -89,7 +89,7 @@ describe('ScreenHeader', () => {
 
     const actions = hosts.find((n: any) => {
       const st = flat(n.props.style);
-      return st.flexDirection === 'row' && st.flexShrink === 0 && st.gap === 7;
+      return st.flexDirection === 'row' && st.flexShrink === 0 && st.gap === 8;
     });
     expect(actions).toBeDefined();
   });

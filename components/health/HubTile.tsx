@@ -57,13 +57,13 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
           ...ds.glass(isDark, 'card'), ...(card ? { backgroundColor: card } : null), ...shadow[isDark ? 'dark' : 'light'].card }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <View style={{ width: 38, height: 38, borderRadius: radius.pill, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
-            <IconSymbol name={icon as any} size={19} color={color} />
+            <IconSymbol name={icon as any} size={20} color={color} />
           </View>
           <View style={{ flex: 1 }} />
           {/* Omni: плитка-перехід — декоративна ↗ праворуч (сама плитка кнопка). */}
           <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
             style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: (isDark ? theme.dark : theme.light).surface.subtle }}>
-            <IconSymbol name="arrow.up.right" size={13} color={text} />
+            <IconSymbol name="arrow.up.right" size={14} color={text} />
           </View>
           {badge != null && badge > 0 && (
             <View style={{ minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, backgroundColor: (isDark ? theme.dark : theme.light).accent.coral, alignItems: 'center', justifyContent: 'center' }}>
@@ -72,8 +72,8 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
           )}
         </View>
         <Text numberOfLines={2} style={{ color: text, fontSize: 16, fontFamily: fontFamily.semibold, marginTop: 12 }}>{title}</Text>
-        {stat ? <Text numberOfLines={2} style={{ color: text, fontSize: 13, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginTop: 3 }}>{stat}</Text>
-              : hint ? <Text numberOfLines={2} style={{ color: sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 3 }}>{hint}</Text> : null}
+        {stat ? <Text numberOfLines={2} style={{ color: text, fontSize: 13, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginTop: 4 }}>{stat}</Text>
+              : hint ? <Text numberOfLines={2} style={{ color: sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 4 }}>{hint}</Text> : null}
       </View>
     </TouchableOpacity>
   );

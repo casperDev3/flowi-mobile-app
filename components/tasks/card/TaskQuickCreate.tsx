@@ -189,8 +189,8 @@ export function TaskQuickCreateScroll(props: TaskQuickCreateProps) {
 
 const st = StyleSheet.create({
   title:   { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 12 },
-  input:   { borderRadius: radius.control, borderWidth: 1.5, paddingHorizontal: 16, paddingVertical: 13, fontSize: 16, fontFamily: fontFamily.medium },
-  error:   { fontSize: 12, fontFamily: fontFamily.medium, marginTop: 5 },
+  input:   { borderRadius: radius.control, borderWidth: 1.5, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, fontFamily: fontFamily.medium },
+  error:   { fontSize: 12, fontFamily: fontFamily.medium, marginTop: 4 },
   chips:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   buttons: { flexDirection: 'row', gap: 8, marginTop: 18, marginBottom: 4 },
 });

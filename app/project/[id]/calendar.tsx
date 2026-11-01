@@ -301,7 +301,7 @@ export default function ProjectCalendar() {
             tr={tr}
           />
         </View>
-        <View style={{ marginTop: 18 }}>{agenda}</View>
+        <View style={{ marginTop: 20 }}>{agenda}</View>
       </ScrollView>
     );
   } else if (view === 'week' && !isWide) {
@@ -364,7 +364,7 @@ export default function ProjectCalendar() {
             onPress={() => setAnchor(todayKey)}
             accessibilityLabel={tr.today}
             style={{ borderColor: 'transparent', backgroundColor: c.card }}>
-            <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? c.accent : c.text} />
+            <IconSymbol name="calendar" size={18} color={isCurrentPeriod ? c.accent : c.text} />
           </HeaderButton>
           {canEdit ? (
             <HeaderButton

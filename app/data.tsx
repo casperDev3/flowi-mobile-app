@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/shared/ScreenHeader';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
-import { fontFamily, radius, type as dsType } from '@/constants/theme';
+import { accentRoles, fontFamily, moduleAccent, radius, type as dsType, type ModuleKey } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 import { useAutoBackup } from '@/store/auto-backup';
 import { BACKUP_KEYS } from '@/store/backup-keys';
@@ -32,31 +32,31 @@ import { BentoCard, BentoGrid, KpiCounter, MeshBackground, PageHeader } from '@/
 import { useResponsive } from '@/hooks/use-responsive';
 
 const ALL_KEYS = [
-  { key: 'tasks',             label: 'Завдання',    icon: 'checklist',          color: '#7C3AED' },
-  { key: 'task_statuses',     label: 'Статуси задач', icon: 'rectangle.3.group', color: '#8B5CF6' },
-  { key: 'transactions',      label: 'Транзакції',  icon: 'banknote',           color: '#0EA5E9' },
-  { key: 'accounts',          label: 'Рахунки',     icon: 'creditcard.fill',    color: '#0EA5E9' },
-  { key: 'time_entries',      label: 'Записи часу', icon: 'timer',              color: '#6366F1' },
-  { key: 'notes',             label: 'Нотатки',     icon: 'note.text',          color: '#F59E0B' },
-  { key: 'projects',          label: 'Проекти',     icon: 'folder.fill',        color: '#10B981' },
+  { key: 'tasks',             label: 'Завдання',    icon: 'checklist',          module: 'tasks' as ModuleKey },
+  { key: 'task_statuses',     label: 'Статуси задач', icon: 'rectangle.3.group', module: 'tasks' as ModuleKey },
+  { key: 'transactions',      label: 'Транзакції',  icon: 'banknote',           module: 'finance' as ModuleKey },
+  { key: 'accounts',          label: 'Рахунки',     icon: 'creditcard.fill',    module: 'finance' as ModuleKey },
+  { key: 'time_entries',      label: 'Записи часу', icon: 'timer',              module: 'time' as ModuleKey },
+  { key: 'notes',             label: 'Нотатки',     icon: 'note.text',          module: 'notes' as ModuleKey },
+  { key: 'projects',          label: 'Проекти',     icon: 'folder.fill',        module: 'projects' as ModuleKey },
   // Плитка потрібна не лише заради лічильника: файловий експорт нижче
   // збирає payload САМЕ по ALL_KEYS, тож ключ, якого тут немає, у файл не
   // потрапляє — хоч би що стояло в EXPORT_KEY_MAP.
-  { key: 'sprints',           label: 'Спринти',     icon: 'flag.fill',          color: '#10B981' },
-  { key: 'meetings',          label: 'Зустрічі',    icon: 'calendar',           color: '#6366F1' },
-  { key: 'health_entries_v2', label: 'Здоров\'я',   icon: 'heart.fill',         color: '#10B981' },
-  { key: 'workouts',          label: 'Тренування',  icon: 'figure.run',         color: '#0EA5E9' },
-  { key: 'exercises',         label: 'Вправи',      icon: 'dumbbell.fill',      color: '#0EA5E9' },
-  { key: 'workout_programs',  label: 'Програми',    icon: 'clipboard.fill',     color: '#0EA5E9' },
-  { key: 'savings_jars',      label: 'Скарбнички',  icon: 'creditcard.fill',    color: '#EAB308' },
-  { key: 'containers',        label: 'Ящики',       icon: 'archivebox.fill',    color: '#7C3AED' },
-  { key: 'bugs',              label: 'Баги',        icon: 'ladybug.fill',       color: '#EF4444' },
-  { key: 'ideas',             label: 'Ідеї',        icon: 'lightbulb.fill',     color: '#8B5CF6' },
-  { key: 'health_meds',       label: 'Ліки',        icon: 'pills.fill',         color: '#14B8A6' },
-  { key: 'health_checkups',   label: 'Медогляди',   icon: 'cross.case.fill',    color: '#EF4444' },
-  { key: 'health_vaccines',   label: 'Щеплення',    icon: 'syringe',            color: '#F97316' },
-  { key: 'health_habits',     label: 'Звички',      icon: 'checklist',          color: '#A855F7' },
-  { key: 'subscriptions',     label: 'Підписки',    icon: 'repeat',             color: '#8B5CF6' },
+  { key: 'sprints',           label: 'Спринти',     icon: 'flag.fill',          module: 'projects' as ModuleKey },
+  { key: 'meetings',          label: 'Зустрічі',    icon: 'calendar',           module: 'meetings' as ModuleKey },
+  { key: 'health_entries_v2', label: 'Здоров\'я',   icon: 'heart.fill',         module: 'health' as ModuleKey },
+  { key: 'workouts',          label: 'Тренування',  icon: 'figure.run',         module: 'workouts' as ModuleKey },
+  { key: 'exercises',         label: 'Вправи',      icon: 'dumbbell.fill',      module: 'workouts' as ModuleKey },
+  { key: 'workout_programs',  label: 'Програми',    icon: 'clipboard.fill',     module: 'workouts' as ModuleKey },
+  { key: 'savings_jars',      label: 'Скарбнички',  icon: 'creditcard.fill',    module: 'finance' as ModuleKey },
+  { key: 'containers',        label: 'Ящики',       icon: 'archivebox.fill',    module: 'containers' as ModuleKey },
+  { key: 'bugs',              label: 'Баги',        icon: 'ladybug.fill',       module: 'ideas' as ModuleKey },
+  { key: 'ideas',             label: 'Ідеї',        icon: 'lightbulb.fill',     module: 'ideas' as ModuleKey },
+  { key: 'health_meds',       label: 'Ліки',        icon: 'pills.fill',         module: 'health' as ModuleKey },
+  { key: 'health_checkups',   label: 'Медогляди',   icon: 'cross.case.fill',    module: 'health' as ModuleKey },
+  { key: 'health_vaccines',   label: 'Щеплення',    icon: 'syringe',            module: 'health' as ModuleKey },
+  { key: 'health_habits',     label: 'Звички',      icon: 'checklist',          module: 'health' as ModuleKey },
+  { key: 'subscriptions',     label: 'Підписки',    icon: 'repeat',             module: 'finance' as ModuleKey },
 ] as const;
 
 // Ключі, що йдуть у файловий експорт БЕЗ плитки-лічильника на екрані:
@@ -464,7 +464,7 @@ export default function DataScreen() {
           <BentoCard title="Авто-резервування" icon="clock.arrow.2.circlepath" accent="lavender">
             <View style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
               <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
-                <IconSymbol name="clock.arrow.2.circlepath" size={17} color={c.accent} />
+                <IconSymbol name="clock.arrow.2.circlepath" size={16} color={c.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>Авто-резервування</Text>
@@ -481,7 +481,7 @@ export default function DataScreen() {
 
             <View style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
               <View style={[st.iconBox, { backgroundColor: t.status.success + '1F' }]}>
-                <IconSymbol name="checkmark.shield.fill" size={17} color={t.status.success} />
+                <IconSymbol name="checkmark.shield.fill" size={16} color={t.status.success} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>Остання копія</Text>
@@ -491,7 +491,7 @@ export default function DataScreen() {
 
             <TouchableOpacity onPress={handleBackupNow} disabled={backingUp} style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
               <View style={[st.iconBox, { backgroundColor: t.action.primary }]}>
-                <IconSymbol name="arrow.clockwise" size={17} color={t.text.onAction} />
+                <IconSymbol name="arrow.clockwise" size={16} color={t.text.onAction} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ color: backingUp ? c.sub : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
@@ -504,7 +504,7 @@ export default function DataScreen() {
 
             <TouchableOpacity onPress={handleOpenLastBackup} disabled={openingBackup} style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
               <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
-                <IconSymbol name="folder.badge.magnifyingglass" size={17} color={c.accent} />
+                <IconSymbol name="folder.badge.magnifyingglass" size={16} color={c.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ color: openingBackup ? c.sub : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
@@ -517,7 +517,7 @@ export default function DataScreen() {
 
             <TouchableOpacity onPress={handleRestoreFromBackup} disabled={restoring} style={st.row}>
               <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
-                <IconSymbol name="arrow.triangle.2.circlepath" size={17} color={c.accent} />
+                <IconSymbol name="arrow.triangle.2.circlepath" size={16} color={c.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ color: restoring ? c.sub : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
@@ -533,7 +533,7 @@ export default function DataScreen() {
           <BentoCard title="Вивантаження та завантаження" icon="square.and.arrow.up" accent="lavender">
             <TouchableOpacity onPress={handleExport} disabled={exporting} style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
               <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
-                <IconSymbol name="square.and.arrow.up" size={17} color={c.accent} />
+                <IconSymbol name="square.and.arrow.up" size={16} color={c.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ color: exporting ? c.sub : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
@@ -548,7 +548,7 @@ export default function DataScreen() {
 
             <TouchableOpacity onPress={handleImport} disabled={importing} style={st.row}>
               <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
-                <IconSymbol name="square.and.arrow.down" size={17} color={c.accent} />
+                <IconSymbol name="square.and.arrow.down" size={16} color={c.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ color: importing ? c.sub : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
@@ -573,7 +573,7 @@ export default function DataScreen() {
             </View>
             <TouchableOpacity onPress={handleClear} style={[st.row, { paddingTop: 12 }]}>
               <View style={[st.iconBox, { backgroundColor: c.danger + '1F' }]}>
-                <IconSymbol name="trash.fill" size={17} color={c.danger} />
+                <IconSymbol name="trash.fill" size={16} color={c.danger} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ color: c.danger, fontSize: 14, fontFamily: fontFamily.semibold }}>Очистити всі дані</Text>
@@ -588,7 +588,7 @@ export default function DataScreen() {
             {/* Total */}
             <View style={[st.statRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
               <View style={[st.statDot, { backgroundColor: c.dim }]}>
-                <IconSymbol name="externaldrive.fill" size={13} color={c.text} />
+                <IconSymbol name="externaldrive.fill" size={16} color={c.sub} />
               </View>
               <Text style={[st.statLabel, { color: c.text }]}>Всього записів</Text>
               {/* Лічильник — display-цифри DS. */}
@@ -598,7 +598,7 @@ export default function DataScreen() {
               <StatRow
                 key={item.key}
                 icon={item.icon as IconSymbolName}
-                color={item.color}
+                color={accentRoles(moduleAccent[item.module], isDark).fill}
                 label={item.label}
                 value={counts[item.key] ?? 0}
                 text={c.text}
@@ -635,9 +635,11 @@ const StatRow = React.memo(function StatRow(
   // DS v2: нейтральні гліфи на subtle-плашці; колір модуля — тонкою крапкою.
   return (
     <View style={[st.statRow, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
-      <View style={[st.statDot, { backgroundColor: color + '1F' }]}>
-        <IconSymbol name={icon} size={13} color={color} />
+      <View style={st.statDot}>
+        <IconSymbol name={icon} size={16} color={sub} />
       </View>
+      {/* Підпис Flowi: кольорова крапка модуля поруч із назвою. */}
+      <View style={[st.moduleDot, { backgroundColor: color }]} />
       <Text style={[st.statLabel, { color: sub }]}>{label}</Text>
       <Text style={[st.statVal, { color: value ? text : sub }]}>{value}</Text>
     </View>
@@ -648,9 +650,10 @@ const st = StyleSheet.create({
   // Рядки лежать усередині BentoCard (вона дає бічні поля) — власних немає.
   statRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 10, gap: 10, minHeight: 44 },
   statDot:     { width: 28, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  moduleDot:   { width: 8, height: 8, borderRadius: 4 },
   statLabel:   { flex: 1, fontSize: 14, fontFamily: fontFamily.regular },
   statVal:     { fontSize: 14, fontFamily: fontFamily.semibold, minWidth: 24, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 14, minHeight: 56 },
+  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 16, minHeight: 56 },
   iconBox:     { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   actionBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
   dangerHint:  { flexDirection: 'row', alignItems: 'flex-start', borderRadius: radius.nestedCompact, padding: 12, marginBottom: 4 },

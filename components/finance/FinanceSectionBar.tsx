@@ -96,7 +96,7 @@ export function FinanceTabBar({ tabs, active, onChange, c, tr, stretch = true }:
           moreActive,
           () => setMoreOpen(true),
           moreActive ? TAB_ICON[active] : 'ellipsis',
-          <IconSymbol name="chevron.down" size={10} color={moreActive ? t.text.onAction : t.text.secondary} style={{ marginLeft: 3 }} />,
+          <IconSymbol name="chevron.down" size={10} color={moreActive ? t.text.onAction : t.text.secondary} style={{ marginLeft: 4 }} />,
           tr.finMoreSections,
         ) : null}
       </View>
@@ -214,7 +214,7 @@ export function FinanceFilterBar({
           accessibilityLabel={`${tr.finFilterPeriod}: ${periodLabel}`}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, minHeight: 36 }}>
           <Text numberOfLines={1} style={{ color: t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold, maxWidth: 180, ...dsType.numeric }}>{periodLabel}</Text>
-          <IconSymbol name="chevron.down" size={11} color={t.text.secondary} />
+          <IconSymbol name="chevron.down" size={12} color={t.text.secondary} />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => onPeriod(shiftPeriod(filter.period, 1))}
@@ -234,7 +234,7 @@ export function FinanceFilterBar({
         accessibilityRole="button"
         accessibilityLabel={tr.finFilterButton}
         accessibilityValue={{ text: isWide ? countLabel : chipLabel }}
-        style={[st.chip, { backgroundColor: chipActive ? t.action.primary : (gs.card.backgroundColor as string), flexDirection: 'row', gap: 5 }]}>
+        style={[st.chip, { backgroundColor: chipActive ? t.action.primary : (gs.card.backgroundColor as string), flexDirection: 'row', gap: 4 }]}>
         <IconSymbol name="line.3.horizontal.decrease" size={12} color={chipActive ? t.text.onAction : t.text.secondary} />
         <Text numberOfLines={1} style={{ color: chipActive ? t.text.onAction : t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold }}>
           {isWide ? countLabel : chipLabel}
@@ -449,16 +449,16 @@ function PeriodSheet({ visible, onClose, period, onPick, c, tr, isWide, isDark }
 
 const st = StyleSheet.create({
   // Сегментований перемикач DS v2: біла pill-доріжка, активний сегмент — pill action.primary.
-  segBar: { flexDirection: 'row', paddingVertical: 3, marginTop: 10, gap: 8 },
+  segBar: { flexDirection: 'row', paddingVertical: 4, marginTop: 10, gap: 8 },
   seg: { flexDirection: 'row', minHeight: 40, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   segStretch: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: 8 },
   periodBox: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 4 },
   arrow: { width: 32, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
   chip: { minHeight: 36, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 3 },
+  segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 4 },
   segmentBtn: { minHeight: 34, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   sheet: { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: space.cardPadding, paddingBottom: 36 },
-  sheetLabel: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 },
+  sheetLabel: { fontSize: 13, fontFamily: fontFamily.medium, marginBottom: 8 },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: touchTarget, borderRadius: radius.pill, paddingHorizontal: 16 },
   input: { flex: 1, minHeight: touchTarget, borderRadius: radius.control, paddingHorizontal: space[4], fontSize: 15, fontFamily: fontFamily.regular, ...dsType.numeric },
   primaryBtn: { minHeight: 48, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },

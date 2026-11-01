@@ -47,7 +47,7 @@ export const SearchHitRow = React.memo(function SearchHitRow({ match, search, pl
       accessibilityLabel={`${container.name}${placeLabel ? `, ${placeLabel}` : ''}`} accessibilityState={{ selected }}>
       {/* Omni (DS v2.2): суцільна картка surface.card без рамки; вибір — 2px рамкою кольору коробки. */}
       <View style={{ borderRadius: radius.nested, backgroundColor: c.t.surface.card, borderWidth: 2,
-        borderColor: selected ? color : 'transparent', padding: 14, overflow: 'hidden' }}>
+        borderColor: selected ? color : 'transparent', padding: 16, overflow: 'hidden' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
           <Highlighted text={container.name} search={search} color={color}
@@ -60,7 +60,7 @@ export const SearchHitRow = React.memo(function SearchHitRow({ match, search, pl
           <Highlighted text={placeLabel} search={search} color={color} style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 2, marginLeft: 16 }} />
         ) : null}
         {shown.length ? (
-          <View style={{ marginTop: 8, gap: 5, marginLeft: 16 }}>
+          <View style={{ marginTop: 8, gap: 4, marginLeft: 16 }}>
             {shown.map(item => (
               <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                 <Highlighted text={item.name} search={search} color={color} style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }} />

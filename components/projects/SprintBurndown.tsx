@@ -121,5 +121,5 @@ export const SprintBurndown = React.memo(function SprintBurndown({
 const st = StyleSheet.create({
   note:   { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.regular },
   axis:   { fontSize: 10, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
-  legend: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legend: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });

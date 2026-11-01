@@ -79,7 +79,7 @@ export function SkeletonCard({ style }: SkeletonCardProps) {
         <Skeleton width={30} height={30} radius={9} />
         <Skeleton width={120} height={14} radius={6} />
       </View>
-      <Skeleton width="80%" height={12} radius={6} style={{ marginTop: 10 }} />
+      <Skeleton width="80%" height={12} radius={6} style={{ marginTop: 12 }} />
       <Skeleton width="60%" height={12} radius={6} style={{ marginTop: 6 }} />
     </View>
   );

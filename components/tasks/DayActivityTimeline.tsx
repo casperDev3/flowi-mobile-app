@@ -133,7 +133,7 @@ export function DayActivityTimeline({
 
 function LegendDot({ color, label, textColor }: { color: string; label: string; textColor: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
       <Text style={{ color: textColor, fontSize: 12, fontFamily: fontFamily.regular }}>{label}</Text>
     </View>

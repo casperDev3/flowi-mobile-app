@@ -49,7 +49,7 @@ export function ContainerSearchPanel({ renderResults }: {
 
   const results = search.trim() ? (
     <View style={{ gap: 8 }} accessibilityLiveRegion="polite">
-      <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium }}>
         {data.status === 'failed' ? tr.ctrReadFailed : matches.length ? fill(tr.ctrFound, { n: matches.length }) : tr.ctrNothingFound}
       </Text>
       {matches.slice(0, MAX_RESULTS).map(match => (
@@ -69,8 +69,8 @@ export function ContainerSearchPanel({ renderResults }: {
     <View>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.pill,
-          paddingHorizontal: 14, minHeight: 44, ...c.gl.card }}>
-          <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
+          paddingHorizontal: 16, minHeight: 44, ...c.gl.card }}>
+          <IconSymbol name="magnifyingglass" size={16} color={c.sub} />
           <TextInput placeholder={tr.ctrQuickSearchPlaceholder} placeholderTextColor={c.muted} value={search} onChangeText={setSearch}
             accessibilityLabel={tr.ctrQuickSearchPlaceholder} returnKeyType="search"
             style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.regular, color: c.text, paddingVertical: 10 }} />
@@ -84,7 +84,7 @@ export function ContainerSearchPanel({ renderResults }: {
         <TouchableOpacity onPress={() => setScanning(true)} accessibilityRole="button" accessibilityLabel={tr.ctrScan}
           style={{ width: 44, height: 44, borderRadius: radius.pill, ...c.gl.card,
             alignItems: 'center', justifyContent: 'center' }}>
-          <IconSymbol name="viewfinder" size={17} color={c.text} />
+          <IconSymbol name="viewfinder" size={16} color={c.text} />
         </TouchableOpacity>
       </View>
 

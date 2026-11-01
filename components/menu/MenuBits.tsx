@@ -38,8 +38,8 @@ export function menuBits(c: MenuColors, busy: boolean) {
       onPress={action}
       style={({ pressed }) => ({
         minHeight: 44,
-        paddingHorizontal: 14,
-        paddingVertical: 11,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         borderRadius: 999,
         backgroundColor: selected ? c.primary : c.dim,
         // Тонка межа — щоб тиха pill читалась і на canvas, і на білій картці.
@@ -51,7 +51,7 @@ export function menuBits(c: MenuColors, busy: boolean) {
         flexDirection: 'row',
         gap: 6,
       })}>
-      {icon && <IconSymbol name={icon} size={15} color={selected ? c.onPrimary : c.text} />}
+      {icon && <IconSymbol name={icon} size={16} color={selected ? c.onPrimary : c.text} />}
       <Text
         style={{
           textAlign: 'center',
@@ -117,7 +117,7 @@ export function menuBits(c: MenuColors, busy: boolean) {
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 5,
+          gap: 4,
           paddingHorizontal: 10,
           paddingVertical: 4,
           borderRadius: 999,
@@ -130,7 +130,7 @@ export function menuBits(c: MenuColors, busy: boolean) {
   };
 
   const todayPill = (
-    <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: c.primary }}>
+    <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: c.primary }}>
       <Text style={{ color: c.onPrimary, fontSize: 11, fontFamily: fontFamily.semibold }}>Сьогодні</Text>
     </View>
   );

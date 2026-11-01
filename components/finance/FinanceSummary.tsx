@@ -195,7 +195,7 @@ export function FinanceSummary({
                   }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={[s.accountIcon, { backgroundColor: tint + (isDark ? '2E' : '1F') }]}>
-                      <IconSymbol name={(account.icon as IconSymbolName) ?? KIND_ICON[account.kind]} size={15} color={tint} />
+                      <IconSymbol name={(account.icon as IconSymbolName) ?? KIND_ICON[account.kind]} size={16} color={tint} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text numberOfLines={1} style={{ color: t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold }}>
@@ -393,7 +393,7 @@ function FlowCell({ label, value, color, sub, dot }: { label: string; value: str
 const s = StyleSheet.create({
   card:         { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact },
   cardTitle:    { ...dsType.h2 },
-  sectionLabel: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.6, textTransform: 'uppercase' },
+  sectionLabel: { fontSize: 13, fontFamily: fontFamily.medium },
   // 158pt тримає в один рядок і «Основний UAH», і суму на шість знаків.
   accountCard:  { width: 158, borderRadius: radius.cardCompact, borderWidth: 2, padding: 14, overflow: 'hidden' },
   accountAdd:   { borderStyle: 'dashed', borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

@@ -104,7 +104,7 @@ export function InvitePanel({ c, groupId, onMemberAdded }: {
         </View>
         {mode === 'link' ? (
           <>
-            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, marginBottom: 6 }}>{tr.tgExpiresIn}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginBottom: 6 }}>{tr.tgExpiresIn}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               {EXPIRY.map(x => <Chip key={x.hours} c={c} label={tr[x.key]} active={hours === x.hours} onPress={() => setHours(x.hours)} />)}
             </View>
@@ -137,7 +137,7 @@ export function InvitePanel({ c, groupId, onMemberAdded }: {
             {invites.map((inv, i) => (
               <View key={inv.id} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 48, borderTopWidth: i ? 1 : 0, borderTopColor: c.border }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold }}>{inv.role === 'coach' ? tr.tgRoleCoach : tr.tgRoleMember}</Text>
+                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{inv.role === 'coach' ? tr.tgRoleCoach : tr.tgRoleMember}</Text>
                   <Text style={{ color: c.sub, fontSize: 12 }}>
                     {`${isoToLocalDateInput(inv.expires_at)} · ${fmt(tr.tgInviteUses, { uses: inv.max_uses ? `${inv.uses}/${inv.max_uses}` : inv.uses })}`}
                   </Text>

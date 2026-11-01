@@ -43,7 +43,7 @@ export function AddTaskHeaderButton({
       // hitSlop тут не впирається в межі предка — A11Y-08).
       hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
       style={[st.header, { backgroundColor: t.action.primary }]}>
-      <IconSymbol name="plus" size={15} color={t.text.onAction} />
+      <IconSymbol name="plus" size={16} color={t.text.onAction} />
       <Text numberOfLines={1} maxFontSizeMultiplier={1.4} style={[st.headerLabel, { color: t.text.onAction }]}>{label}</Text>
     </TouchableOpacity>
   );

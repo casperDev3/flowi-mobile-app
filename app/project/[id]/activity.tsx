@@ -103,7 +103,7 @@ export default function ProjectActivityScreen() {
         {loading ? (
           <ActivityIndicator color={c.sub} style={{ marginTop: 40 }} />
         ) : offline ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: tk.surface.card, borderRadius: radius.cardCompact, padding: 14, marginTop: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: tk.surface.card, borderRadius: radius.cardCompact, padding: 16, marginTop: 8 }}>
             <IconSymbol name="exclamationmark.circle" size={14} color={c.sub} />
             <Text style={[type.caption, { color: c.sub, marginLeft: 6, flex: 1 }]}>{tr.projectMembersOfflineHint}</Text>
           </View>
@@ -115,7 +115,7 @@ export default function ProjectActivityScreen() {
           <>
             {/* Omni: стрічка — на одній суцільній картці, події — вертикальна
                 шкала з круглими icon-chip, з'єднаними тонкою лінією. */}
-            <BentoCard style={{ marginTop: 4, marginBottom: 14 }}>
+            <BentoCard style={{ marginTop: 4, marginBottom: 12 }}>
             {mergeConsecutiveActivity(entries).map((entry, index, list) => (
               <View key={entry.id} style={{ flexDirection: 'row', gap: 12, paddingBottom: index < list.length - 1 ? 16 : 0 }}>
                 <View style={{ alignItems: 'center' }}>

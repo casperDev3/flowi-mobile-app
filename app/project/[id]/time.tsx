@@ -181,7 +181,7 @@ export default function ProjectTimeScreen() {
           onPress={() => openEntry(null)}
           accessibilityLabel={tr.timeAddEntry}
           style={{ backgroundColor: tk.action.primary, borderColor: 'transparent' }}>
-          <IconSymbol name="plus" size={17} color={tk.text.onAction} />
+          <IconSymbol name="plus" size={18} color={tk.text.onAction} />
         </HeaderButton>
       ) : undefined}>
       <ScrollView
@@ -204,7 +204,7 @@ export default function ProjectTimeScreen() {
         ) : null}
 
         {own.length === 0 ? (
-          <Text style={[type.body, { color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 30 }]}>{tr.timeNoEntries}</Text>
+          <Text style={[type.body, { color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 32 }]}>{tr.timeNoEntries}</Text>
         ) : own.map(entry => {
           const anomaly = rowAnomalies.get(entry.id);
           const severity = anomalySeverity(anomaly?.kinds ?? []);
@@ -234,13 +234,13 @@ export default function ProjectTimeScreen() {
                 borderWidth: 1.5,
                 borderColor: flag ?? 'transparent',
                 backgroundColor: tk.surface.card,
-                padding: 14,
+                padding: 16,
                 marginBottom: 8,
                 overflow: 'hidden',
               }}>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {flag && <IconSymbol name="exclamationmark.triangle.fill" size={12} color={flag} style={{ marginRight: 5 }} />}
+                  {flag && <IconSymbol name="exclamationmark.triangle.fill" size={12} color={flag} style={{ marginRight: 4 }} />}
                   <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flexShrink: 1 }}>{title}</Text>
                 </View>
                 <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
@@ -256,8 +256,8 @@ export default function ProjectTimeScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`${tr.anomalyTrimTo.replace('{duration}', fmtDur(trim))}: ${title}`}
                     style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: radius.pill, backgroundColor: tk.surface.subtle, minHeight: 32, paddingHorizontal: 12, marginTop: 8 }}>
-                    <IconSymbol name="arrow.down.trend" size={11} color={tk.action.secondaryText} />
-                    <Text style={{ color: tk.action.secondaryText, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginLeft: 5 }}>
+                    <IconSymbol name="arrow.down.trend" size={12} color={tk.action.secondaryText} />
+                    <Text style={{ color: tk.action.secondaryText, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginLeft: 4 }}>
                       {tr.anomalyTrimTo.replace('{duration}', fmtDur(trim))}
                     </Text>
                   </TouchableOpacity>

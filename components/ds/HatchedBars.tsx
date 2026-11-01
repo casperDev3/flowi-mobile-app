@@ -171,8 +171,8 @@ export function HatchedBars({
 
 const st = StyleSheet.create({
   tipWrap: { position: 'absolute', width: 96, alignItems: 'center' },
-  tip: { height: TOOLTIP_PILL_H, borderRadius: radius.pill, paddingHorizontal: 10, justifyContent: 'center' },
+  tip: { height: TOOLTIP_PILL_H, borderRadius: radius.pill, paddingHorizontal: 12, justifyContent: 'center' },
   tipText: { fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
-  labels: { flexDirection: 'row', marginTop: 6 },
+  labels: { flexDirection: 'row', marginTop: 8 },
   label: { fontSize: 11, lineHeight: 14, textAlign: 'center', fontFamily: fontFamily.medium },
 });

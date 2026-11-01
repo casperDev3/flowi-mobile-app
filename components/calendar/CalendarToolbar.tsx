@@ -97,7 +97,7 @@ export function CalendarToolbar({
     <View style={[st.navRow, wide && { flex: 1 }]}>
       <TouchableOpacity onPress={onPrev} accessibilityRole="button" accessibilityLabel={tr.calPrevPeriod}
         style={[st.navBtn, { backgroundColor: c.card }]}>
-        <IconSymbol name="chevron.left" size={15} color={c.sub} />
+        <IconSymbol name="chevron.left" size={16} color={c.sub} />
       </TouchableOpacity>
       <Text accessibilityRole="header" style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}
         numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
@@ -105,7 +105,7 @@ export function CalendarToolbar({
       </Text>
       <TouchableOpacity onPress={onNext} accessibilityRole="button" accessibilityLabel={tr.calNextPeriod}
         style={[st.navBtn, { backgroundColor: c.card }]}>
-        <IconSymbol name="chevron.right" size={15} color={c.sub} />
+        <IconSymbol name="chevron.right" size={16} color={c.sub} />
       </TouchableOpacity>
     </View>
   );

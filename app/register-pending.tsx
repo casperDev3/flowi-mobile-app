@@ -237,7 +237,7 @@ const st = StyleSheet.create({
   title: { fontSize: 24, fontFamily: fontFamily.semibold, textAlign: 'center', marginBottom: 10 },
   msg: { fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 24 },
   statusCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16,
     paddingHorizontal: 16, paddingVertical: 12, marginBottom: 24, alignSelf: 'stretch',
   },
   statusText: { fontSize: 13, fontFamily: fontFamily.medium },

@@ -3,7 +3,7 @@
  *
  *  primary   — action.primary (чорна у світлій, світла у темній) + text.onAction.
  *              Лишається СУЦІЛЬНОЮ навіть у Liquid Glass — якір контрасту.
- *              `glow` — м'яке світіння акцентом модуля (одна головна дія на екран).
+ *              `glow` — застаріле: лише нейтральна тінь, кольорового світіння немає (unslop).
  *  accent    — суцільна заливка акценту (solid) + onSolid (#111113).
  *  secondary — скляна pill (glass.surfaceSubtle + обідок) + text.primary
  *  ghost     — прозора, лише підпис
@@ -120,8 +120,10 @@ export function PillButton({
           borderColor: focused
             ? t.focus.ring
             : variant === 'secondary' && !inactive && !reduceTransparency ? g.rim : 'transparent',
+          // Unslop: кольорове світіння прибрано — `glow` лишився в API як
+          // м'яка нейтральна тінь (головна дія вирізняється чорно-білою pill).
           ...(glow && !inactive && (variant === 'primary' || variant === 'accent') && Platform.OS !== 'android'
-            ? { shadowColor: roles.glow, shadowOpacity: isDark ? 0.6 : 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } }
+            ? { shadowColor: '#111113', shadowOpacity: isDark ? 0.4 : 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } }
             : null),
           transform: pressed && !reduced && !inactive ? [{ scale: 0.98 }] : undefined,
         } as ViewStyle,

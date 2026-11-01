@@ -86,7 +86,7 @@ export function NoteMarkdown({
                 disabled={!onToggle}
                 onPress={() => onToggle?.(block.line)}
                 style={[s.box, { borderColor: block.done ? c.accent : c.border, backgroundColor: block.done ? c.accent : 'transparent' }]}>
-                <Text style={{ color: block.done ? c.panel : 'transparent', fontFamily: fontFamily.bold }}>✓</Text>
+                <Text style={{ color: block.done ? c.panel : 'transparent', fontFamily: fontFamily.semibold }}>✓</Text>
               </TouchableOpacity>
             )}
             {block.kind === 'bullet' && <Text style={[s.marker, { color: c.sub }]}>•</Text>}

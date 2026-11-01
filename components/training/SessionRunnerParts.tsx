@@ -56,7 +56,7 @@ export function SetRow({ c, set, onChange, readOnly }: {
   const n = set.setIndex;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 }}>
-      <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.bold, width: 64 }}>{fmt(tr.tgSetN, { n })}</Text>
+      <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, width: 64 }}>{fmt(tr.tgSetN, { n })}</Text>
       {readOnly ? (
         <Text style={{ color: c.text, fontSize: 15, flex: 1 }}>
           {`${set.reps} × ${formatKg(set.weightG)} ${tr.tgUnitKg}${set.rpe ? ` · RPE ${set.rpe}` : ''}`}
@@ -164,7 +164,7 @@ export function ElapsedClock({ c, startedAt }: { c: TrainingColors; startedAt: s
   const h = Math.floor(sec / 3600);
   const label = h > 0 ? `${h}:${mmss(sec - h * 3600).padStart(5, '0')}` : mmss(sec);
   return (
-    <Text accessibilityLabel={`${tr.tgElapsed} ${label}`} style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.bold, fontVariant: ['tabular-nums'] }}>
+    <Text accessibilityLabel={`${tr.tgElapsed} ${label}`} style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
       {`⏱ ${label}`}
     </Text>
   );

@@ -101,7 +101,7 @@ export function AccountSheet({ visible, onClose }: { visible: boolean; onClose: 
                 accessibilityState={{ checked: active }}
                 accessibilityLabel={opt.label}
                 style={[st.segItem, active ? { backgroundColor: t.action.primary } : null]}>
-                <IconSymbol name={opt.icon} size={15} color={active ? t.text.onAction : t.text.secondary} />
+                <IconSymbol name={opt.icon} size={16} color={active ? t.text.onAction : t.text.secondary} />
                 <Text numberOfLines={1} style={[st.segText, { color: active ? t.text.onAction : t.text.secondary }]}>{opt.label}</Text>
               </Pressable>
             );
@@ -113,8 +113,8 @@ export function AccountSheet({ visible, onClose }: { visible: boolean; onClose: 
 }
 
 const st = StyleSheet.create({
-  card: { borderRadius: 24, padding: 20, gap: 14 },
-  profile: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4 },
+  card: { borderRadius: 24, padding: 20, gap: 16 },
+  profile: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 4 },
   guest: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: 18, fontFamily: fontFamily.semibold },
   email: { fontSize: 13, fontFamily: fontFamily.regular, marginTop: 2 },

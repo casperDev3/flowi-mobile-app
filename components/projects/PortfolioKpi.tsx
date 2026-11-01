@@ -171,8 +171,8 @@ function formatAverage(value: number): string {
 const st = StyleSheet.create({
   toggle:     { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  tile:       { borderRadius: radius.nested, paddingHorizontal: 16, paddingVertical: 14 },
+  tile:       { borderRadius: radius.nested, paddingHorizontal: 16, paddingVertical: 16 },
   tileValue:  { flexShrink: 1, fontSize: 32, lineHeight: 36, fontFamily: fontFamily.light, letterSpacing: -0.64, fontVariant: ['tabular-nums'] },
   tileLabel:  { fontSize: 12, fontFamily: fontFamily.regular, marginTop: 4 },
-  chartTitle: { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.4, textTransform: 'uppercase' },
+  chartTitle: { fontSize: 12, fontFamily: fontFamily.medium },
 });

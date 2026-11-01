@@ -301,7 +301,7 @@ export function RecurringIncomesSection({ tr, lang, isDark, projectId }: {
             accessibilityRole="button"
             accessibilityLabel={tr.finRiNew}
             style={[st.addIcon, { backgroundColor: c.action }]}>
-            <IconSymbol name="plus" size={17} color={c.onAction} />
+            <IconSymbol name="plus" size={18} color={c.onAction} />
           </TouchableOpacity>
         }>
       {totals.length > 0 ? (
@@ -463,7 +463,7 @@ export function RecurringIncomesSection({ tr, lang, isDark, projectId }: {
             <View style={[st.handle, { backgroundColor: c.muted }]} />
             {receive && receiveItem ? (
               <>
-                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase' }}>{tr.finRiReceiveTitle}</Text>
+                <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.medium }}>{tr.finRiReceiveTitle}</Text>
                 <Text numberOfLines={2} style={{ color: c.text, fontSize: 19, fontFamily: fontFamily.semibold, marginTop: 4 }}>{receiveItem.name}</Text>
                 <Text style={[st.label, { color: c.sub }]}>{tr.amount} ({receiveAccount?.currency || receiveItem.currency})</Text>
                 <TextInput

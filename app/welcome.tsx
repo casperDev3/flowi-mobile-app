@@ -148,7 +148,7 @@ const st = StyleSheet.create({
     borderRadius: 999,
     minHeight: 52,
     justifyContent: 'center',
-    paddingVertical: 15,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   secondaryBtnText: {

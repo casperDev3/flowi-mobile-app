@@ -2,7 +2,7 @@
  * components/ds/PromoCard.tsx — promo-картка DS v2.1 («Upgrade to Pro» тощо).
  *
  * Переливчастий gradient.iridescent під Liquid Glass (BlurView / заливка),
- * спекулярний обідок і лавандове світіння; у темній — темніші насичені стопи
+ * спекулярний обідок і нейтральна тінь (unslop: без кольорового світіння); у темній — темніші насичені стопи
  * з 15% lavender-glow. «Зменшити прозорість» → градієнт без блюру, щільніша
  * підкладка під текст.
  */
@@ -34,7 +34,7 @@ export function PromoCard({ title, caption, actionLabel, onAction, actionTestID,
       style={[
         { borderRadius: radius.card },
         Platform.OS !== 'android'
-          ? { shadowColor: g.accent.lavender.glow, shadowOpacity: isDark ? 0.45 : 0.3, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } }
+          ? { shadowColor: '#111113', shadowOpacity: isDark ? 0.4 : 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } }
           : null,
         style,
       ]}>

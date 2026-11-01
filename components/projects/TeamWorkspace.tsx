@@ -268,7 +268,7 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
     // секції стояли на ≈38pt від краю замість спільних 20 (P2 аудиту 2026-10).
     // Індикатор синку тепер у шапці (actions), як на Огляді, а не порожньою
     // пілюлею на всю ширину над підсумком.
-    <View style={{ gap: 18, paddingVertical: 16, paddingHorizontal: embedded ? 0 : 20 }}>
+    <View style={{ gap: 16, paddingVertical: 16, paddingHorizontal: embedded ? 0 : 20 }}>
       <TeamOfflineStatus projectId={pid} />
       {embedded && canCreate && (
         // «Огляд» вбудований в інший екран без власної шапки — кнопка тут.

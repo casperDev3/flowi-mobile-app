@@ -42,7 +42,7 @@ export function OmniPanel({
     <View style={[st.panel, { backgroundColor: t.surface.card }, shadow[dark ? 'dark' : 'light'].card, style]}>
       <View style={st.head}>
         <View style={[st.chip, { backgroundColor: t.surface.subtle }]}>
-          <IconSymbol name={icon} size={15} color={palette.text} />
+          <IconSymbol name={icon} size={16} color={palette.text} />
         </View>
         <View style={{ flex: 1 }}>
           <Text accessibilityRole="header" numberOfLines={1} style={[st.title, { color: palette.text }]}>{title}</Text>
@@ -171,7 +171,7 @@ export function OmniWeekBars({
           </Svg>
         ) : null}
       </View>
-      <View style={{ flexDirection: 'row', gap, marginTop: 5 }}>
+      <View style={{ flexDirection: 'row', gap, marginTop: 4 }}>
         {data.map(d => (
           <Text
             key={d.key}
@@ -195,5 +195,5 @@ const st = StyleSheet.create({
   chip: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 16, lineHeight: 22, fontFamily: fontFamily.semibold },
   subtitle: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.regular },
-  pill: { minHeight: 36, paddingHorizontal: 14, borderRadius: radius.pill, justifyContent: 'center' },
+  pill: { minHeight: 36, paddingHorizontal: 16, borderRadius: radius.pill, justifyContent: 'center' },
 });

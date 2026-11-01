@@ -112,7 +112,7 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
             ? (sub.archivedAt ? tr.subArchivedChip : tr.subEnded.replace('{date}', formatDateKey(sub.endDate ?? '', locale)))
             : `${formatDateKey(sub.nextPaymentDate, locale)} · ${paymentWhenLabel(sub.nextPaymentDate, today, tr)}`}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
           <Text numberOfLines={1} style={{ color: ds.text.secondary, fontSize: 11, fontFamily: fontFamily.regular }}>{formatPeriod(sub.period, lang)}</Text>
           {project ? (
             <View style={[st.projectChip, { backgroundColor: ds.surface.subtle }]}>
@@ -133,7 +133,7 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
             accessibilityLabel={`${tr.subPayNow}: ${sub.name}`}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             style={[st.renewMini, { backgroundColor: overdue ? ds.action.primary : ds.surface.subtle }]}>
-            <IconSymbol name="checkmark" size={11} color={overdue ? ds.text.onAction : ds.action.secondaryText} />
+            <IconSymbol name="checkmark" size={12} color={overdue ? ds.text.onAction : ds.action.secondaryText} />
             <Text style={{ color: overdue ? ds.text.onAction : ds.action.secondaryText, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.subPayNow}</Text>
           </TouchableOpacity>
         ) : null}
@@ -177,7 +177,7 @@ export function SubscriptionDetailHeader({ sub, onEdit, onClose, colors: c, tr }
         accessibilityLabel={tr.edit}
         hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
         style={[st.headerBtn, { ...gs.subtle }]}>
-        <IconSymbol name="pencil" size={15} color={ds.text.primary} />
+        <IconSymbol name="pencil" size={16} color={ds.text.primary} />
       </TouchableOpacity>
       <TouchableOpacity
         onPress={onClose}
@@ -185,7 +185,7 @@ export function SubscriptionDetailHeader({ sub, onEdit, onClose, colors: c, tr }
         accessibilityLabel={tr.close}
         hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
         style={[st.headerBtn, { ...gs.subtle }]}>
-        <IconSymbol name="xmark" size={15} color={ds.text.primary} />
+        <IconSymbol name="xmark" size={16} color={ds.text.primary} />
       </TouchableOpacity>
     </View>
   );
@@ -422,7 +422,7 @@ const st = StyleSheet.create({
   iconBox:     { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   iconBoxLg:   { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   projectChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
-  statusChip:  { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
+  statusChip:  { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
   renewMini:   { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, minHeight: 30, paddingHorizontal: 12, paddingVertical: 4 },
   headerRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12 },
   headerBtn:   { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
@@ -431,6 +431,6 @@ const st = StyleSheet.create({
   btn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: radius.pill, minHeight: 48, paddingHorizontal: 16 },
   infoBlock:   { marginTop: 16, borderRadius: radius.nested, paddingHorizontal: space[4] },
   infoRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
-  sectionLabel:{ fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 },
+  sectionLabel:{ fontSize: 13, fontFamily: fontFamily.medium, marginBottom: 8 },
   historyRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 },
 });

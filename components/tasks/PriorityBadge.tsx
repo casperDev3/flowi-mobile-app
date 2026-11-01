@@ -45,7 +45,7 @@ export function PriorityBadge({ level, size = 'sm', style }: PriorityBadgeProps)
 const s = StyleSheet.create({
   badge: {
     borderRadius: 6,
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

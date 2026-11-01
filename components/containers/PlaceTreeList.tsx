@@ -79,7 +79,7 @@ export function PlaceTreeList({
         <IconSymbol name="shippingbox.fill" size={14} color={color} />
         <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.medium }}>{box.name}</Text>
         <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, ...dsType.numeric }}>{stats.count}</Text>
-        <IconSymbol name="chevron.right" size={11} color={c.sub} />
+        <IconSymbol name="chevron.right" size={12} color={c.sub} />
       </TouchableOpacity>
     );
   };
@@ -115,7 +115,7 @@ export function PlaceTreeList({
           <TouchableOpacity onPress={() => onAddPlace(node.place.id)} accessibilityRole="button"
             accessibilityLabel={`${tr.ctrPlaceCreateHere}: ${node.place.name}`}
             style={{ width: 40, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-            <IconSymbol name="plus" size={13} color={active ? c.t.text.onAction : c.sub} />
+            <IconSymbol name="plus" size={12} color={active ? c.t.text.onAction : c.sub} />
           </TouchableOpacity>
         </View>
         {open ? (
@@ -144,10 +144,10 @@ export function PlaceTreeList({
   return (
     <View>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, marginBottom: 4 }}>
-        <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr.ctrPlaces}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium }}>{tr.ctrPlaces}</Text>
         <TouchableOpacity onPress={() => onAddPlace(null)} accessibilityRole="button" accessibilityLabel={tr.ctrPlaceNew}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, paddingHorizontal: 8 }}>
-          <IconSymbol name="plus" size={13} color={c.text} />
+          <IconSymbol name="plus" size={12} color={c.text} />
           <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.ctrPlaceNew}</Text>
         </TouchableOpacity>
       </View>

@@ -53,7 +53,7 @@ function LogCard({ c, localId, log, onSaveNote, canNote }: {
       </View>
       {(log.exercises ?? []).map(ex => (
         <View key={ex.exerciseId + ex.name} style={{ marginTop: 8 }}>
-          <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold }}>{ex.name}</Text>
+          <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{ex.name}</Text>
           <Text style={{ color: c.sub, fontSize: 13 }}>
             {ex.sets.map(s => `${s.done ? '' : '✕ '}${s.reps}×${formatKg(s.weightG)}${s.rpe ? `@${s.rpe}` : ''}`).join('  ·  ')}
           </Text>
@@ -147,7 +147,7 @@ export function MemberHistory({ c, groupId, userId, stream, canNote }: {
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={{ color: c.text, fontSize: 28, fontFamily: fontFamily.light, letterSpacing: -0.56, fontVariant: ['tabular-nums'] }}>{`${member.xp_total || xpTotal} XP`}</Text>
-              <Text style={{ color: c.sub, fontSize: 13 }}>{`🔥 ${fmt(tr.tgStreakDays, { n: member.streak_days })}`}</Text>
+              <Text style={{ color: c.sub, fontSize: 13 }}>{`${tr.tgStreak} ${fmt(tr.tgStreakDays, { n: member.streak_days })}`}</Text>
             </View>
           </View>
         </Card>
@@ -160,7 +160,7 @@ export function MemberHistory({ c, groupId, userId, stream, canNote }: {
             {data.quest_progress.map(({ local_id, data: p }) => (
               <View key={local_id} style={{ flexDirection: 'row', justifyContent: 'space-between', minHeight: 36, alignItems: 'center' }}>
                 <Text style={{ color: c.text, fontSize: 14, flex: 1 }} numberOfLines={1}>{questTitle(p.questId)}</Text>
-                <Text style={{ color: p.completed ? c.t.status.success : c.sub, fontSize: 13, fontFamily: fontFamily.bold }}>
+                <Text style={{ color: p.completed ? c.t.status.success : c.sub, fontSize: 13, fontFamily: fontFamily.semibold }}>
                   {p.completed ? tr.tgStatusCompleted
                     : p.targetValue != null ? `${formatMetricValue(p.currentValue)} / ${formatMetricValue(p.targetValue)} ${p.unit ?? ''}` : '—'}
                 </Text>

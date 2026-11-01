@@ -63,7 +63,7 @@ export function TimeKpiTiles({
   // DS v2: KPI — великі тонкі цифри одним кольором (text.primary), без
   // кольорового кодування; роздільники — hairline.
   const cell = { sub: c.sub, large, color: c.text };
-  const divider = <View style={{ width: StyleSheet.hairlineWidth, marginVertical: 14, backgroundColor: c.border }} />;
+  const divider = <View style={{ width: StyleSheet.hairlineWidth, marginVertical: 12, backgroundColor: c.border }} />;
   return (
     <GlassSurface radius={radius.cardCompact} tint="amber" style={s.statsRow}>
       <StatCell value={totalSeconds > 0 ? formatDuration(totalSeconds) : '—'} label={tr.totalLabel} {...cell} />

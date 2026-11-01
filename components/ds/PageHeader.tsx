@@ -139,12 +139,12 @@ export function PageHeader({ title, subtitle, kpis, action, bleed = 0, style }: 
 
 const st = StyleSheet.create({
   kpiHit: { minHeight: 44, justifyContent: 'center' },
-  kpi: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  kpi: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   kpiValue: { fontFamily: fontFamily.light, fontSize: 48, lineHeight: 52, letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
   kpiValueCompact: { fontSize: 40, lineHeight: 44, letterSpacing: -1 },
   kpiMeta: { maxWidth: 110 },
-  kpiDelta: { fontSize: 11, lineHeight: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
-  kpiLabel: { fontSize: 12, lineHeight: 15, fontFamily: fontFamily.medium },
+  kpiDelta: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
+  kpiLabel: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.medium },
   kpiRow: { flexDirection: 'row', alignItems: 'center', gap: 24 },
   wideRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 },
   wideRight: { flexDirection: 'row', alignItems: 'center', gap: 24, flexWrap: 'wrap' },

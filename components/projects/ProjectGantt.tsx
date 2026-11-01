@@ -225,7 +225,7 @@ export function ProjectGantt({
 
   if (!rows.length) {
     return (
-      <Text style={[st.note, { color: palette.sub, textAlign: 'center', paddingVertical: 18 }]}>
+      <Text style={[st.note, { color: palette.sub, textAlign: 'center', paddingVertical: 16 }]}>
         {chart.skipped ? `${tr.ganttNoStartDate}: ${chart.skipped}` : tr.ganttNothingToDraw}
       </Text>
     );
@@ -416,7 +416,7 @@ function barLabel(row: GanttRow, locale: string, tr: ReturnType<typeof useI18n>[
 }
 
 const st = StyleSheet.create({
-  legend:     { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 14, rowGap: 5 },
+  legend:     { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 12, rowGap: 4 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendText: { fontSize: 11, fontFamily: fontFamily.medium, flexShrink: 1 },
   axis:       { position: 'absolute', top: 4, fontSize: 10, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },

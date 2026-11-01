@@ -121,7 +121,7 @@ export function ActiveTimersSidebarCard({ colors: c, projectId }: {
             </View>
           </View>
           {!single && (
-            <IconSymbol name={expanded ? 'chevron.down' : 'chevron.up'} size={13} color={c.sub} />
+            <IconSymbol name={expanded ? 'chevron.down' : 'chevron.up'} size={12} color={c.sub} />
           )}
         </Pressable>
         {single && (
@@ -161,7 +161,7 @@ export function ActiveTimersSidebarCard({ colors: c, projectId }: {
             onPress={() => router.push(trackerRoute as never)}
             accessibilityRole="button"
             style={[st.action, { ...gs.subtle }]}>
-            <IconSymbol name="timer" size={13} color={t.action.secondaryText} />
+            <IconSymbol name="timer" size={12} color={t.action.secondaryText} />
             <Text numberOfLines={1} style={[st.actionText, { color: t.action.secondaryText }]}>{tr.navTimeTracker}</Text>
           </Pressable>
           <Pressable
@@ -169,7 +169,7 @@ export function ActiveTimersSidebarCard({ colors: c, projectId }: {
             accessibilityRole="button"
             accessibilityLabel={`${tr.focusMode}, ${tr.activeTimers}: ${count}`}
             style={[st.action, { backgroundColor: t.action.primary }]}>
-            <IconSymbol name="viewfinder" size={13} color={t.text.onAction} />
+            <IconSymbol name="viewfinder" size={12} color={t.text.onAction} />
             <Text numberOfLines={1} style={[st.actionText, { color: t.text.onAction }]}>{tr.focusMode}</Text>
           </Pressable>
         </View>

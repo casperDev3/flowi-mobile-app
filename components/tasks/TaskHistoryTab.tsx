@@ -80,7 +80,7 @@ export function TaskHistoryTab({ events, textColor, subColor, tr, locale }: Task
               {event.note ? (
                 <Text style={[type.caption, { color: subColor, marginTop: 1 }]} numberOfLines={2}>{event.note}</Text>
               ) : null}
-              <Text style={[type.caption, type.numeric, { color: subColor, marginTop: 3 }]}>
+              <Text style={[type.caption, type.numeric, { color: subColor, marginTop: 4 }]}>
                 {at.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                 {' · '}
                 {at.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}

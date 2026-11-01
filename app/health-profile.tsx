@@ -192,7 +192,7 @@ export default function HealthProfileScreen() {
                   accessibilityRole="button" accessibilityState={{ selected: profile.activity === o.key }}
                   style={[s.rowBtn, { backgroundColor: profile.activity === o.key ? k.action.primary : c.dim }]}>
                   <Text style={{ color: profile.activity === o.key ? k.text.onAction : c.text, fontFamily: fontFamily.medium, fontSize: 14, flex: 1 }}>{o.label}</Text>
-                  {profile.activity === o.key && <IconSymbol name="checkmark" size={15} color={k.text.onAction} />}
+                  {profile.activity === o.key && <IconSymbol name="checkmark" size={16} color={k.text.onAction} />}
                 </TouchableOpacity>
               ))}
             </View>
@@ -250,12 +250,12 @@ export default function HealthProfileScreen() {
                   <IconSymbol name="heart.fill" size={16} color={ACCENT} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold }}>Apple Health</Text>
+                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>Apple Health</Text>
                   <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
                     {lang === 'uk' ? 'Кроки, калорії, сон і пульс із HealthKit' : 'Steps, calories, sleep and pulse from HealthKit'}
                   </Text>
                 </View>
-                <IconSymbol name="chevron.right" size={13} color={c.sub} />
+                <IconSymbol name="chevron.right" size={14} color={c.sub} />
               </TouchableOpacity>
             ) : (
               <Text style={{ color: c.sub, fontSize: 12, marginTop: 10 }}>
@@ -322,7 +322,7 @@ const s = StyleSheet.create({
   label:     { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 18 },
   input:     { fontSize: 20, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], borderRadius: 12, minHeight: 48, paddingHorizontal: 14, paddingVertical: 12 },
   segBtn:    { flex: 1, borderRadius: 999, minHeight: 44, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
-  rowBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: 14, minHeight: 48, paddingHorizontal: 16, paddingVertical: 13 },
+  rowBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: 14, minHeight: 48, paddingHorizontal: 16, paddingVertical: 14 },
   preview:   { borderRadius: 20, padding: 20, marginTop: 24 },
   saveBtn:   { borderRadius: 999, minHeight: 52, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
 });

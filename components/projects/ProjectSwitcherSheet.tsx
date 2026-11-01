@@ -102,7 +102,7 @@ export function ProjectSwitcherList({
         onPress={onExit}
         accessibilityRole="button"
         style={[st.row, { marginBottom: 4 }]}>
-        <IconSymbol name="chevron.left" size={15} color={c.text} />
+        <IconSymbol name="chevron.left" size={16} color={c.text} />
         <Text style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.projectExitToPersonal}</Text>
       </TouchableOpacity>
 
@@ -213,11 +213,11 @@ export function ProjectSwitcherTrigger({
 
 const st = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  sheetWrap: { paddingHorizontal: 12, paddingBottom: 34 },
+  sheetWrap: { paddingHorizontal: 12, paddingBottom: 32 },
   sheet: { borderRadius: radius.card, padding: 20 },
-  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
+  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   title: { fontSize: 17, fontFamily: fontFamily.semibold, marginBottom: 12 },
-  sectionLabel: { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.4, marginTop: 12, marginBottom: 4, paddingHorizontal: 12 },
+  sectionLabel: { fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 12, marginBottom: 4, paddingHorizontal: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 12, borderRadius: radius.pill },
   dot: { width: 10, height: 10, borderRadius: 5 },
   trigger: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 36, marginBottom: 2 },

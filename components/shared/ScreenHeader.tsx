@@ -153,7 +153,7 @@ function Breadcrumbs({ crumbs, color }: { crumbs: Crumb[]; color: string }) {
     <View style={styles.crumbs} accessibilityRole="header">
       {crumbs.map((crumb, i) => (
         <React.Fragment key={`${crumb.label}:${i}`}>
-          {i > 0 ? <IconSymbol name="chevron.right" size={11} color={color} /> : null}
+          {i > 0 ? <IconSymbol name="chevron.right" size={12} color={color} /> : null}
           {crumb.onPress ? (
             <TouchableOpacity
               onPress={crumb.onPress}
@@ -254,7 +254,7 @@ export function ScreenHeader({
   const sidePad = 20 + Math.max(insets.left, insets.right);
 
   return (
-    <View style={{ paddingTop: topInset + 14, paddingHorizontal: sidePad, paddingBottom }}>
+    <View style={{ paddingTop: topInset + 16, paddingHorizontal: sidePad, paddingBottom }}>
       {toolbar ? <View style={styles.toolbar}>{toolbar}</View> : null}
       {lead === 'crumbs' && crumbs ? (
         <Breadcrumbs crumbs={crumbs} color={crumbColor ?? color} />
@@ -271,7 +271,7 @@ export function ScreenHeader({
               onPress={back.onPress}
               accessibilityLabel={back.label}
               style={back.style}>
-              <IconSymbol name="chevron.left" size={17} color={back.color ?? color} />
+              <IconSymbol name="chevron.left" size={18} color={back.color ?? color} />
             </HeaderButton>
           ) : null}
           {leading}
@@ -322,22 +322,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   // Кегль крихт навмисно малий: це підпис над заголовком, а не другий
   // заголовок. opacity, а не окремий колір, — щоб екранам не доводилось
   // заводити ще одну змінну палітри заради одного рядка.
   crumb: {
     fontSize: 12,
-    fontFamily: fontFamily.semibold,
-    letterSpacing: -0.1,
+    fontFamily: fontFamily.medium,
     opacity: 0.7,
   },
   // Явний нуль документує намір: кнопки не стискаються НІКОЛИ, інакше
   // 36pt-квадрат перетворюється на вертикальну смужку.
   actions: {
     flexDirection: 'row',
-    gap: 7,
+    gap: 8,
     flexShrink: 0,
   },
   // lineHeight заданий явно: без нього великий кегль обрізається зверху
@@ -363,7 +362,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   toolbar: {
-    marginBottom: 14,
+    marginBottom: 16,
   },
   neutralGlass: {
     backgroundColor: 'rgba(127,127,135,0.14)',

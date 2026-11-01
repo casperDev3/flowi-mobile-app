@@ -84,9 +84,9 @@ const st = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    minHeight: 36, paddingHorizontal: 14, borderRadius: radius.pill,
+    minHeight: 36, paddingHorizontal: 16, borderRadius: radius.pill,
   },
   label: { fontSize: 13, fontFamily: fontFamily.semibold },
-  count: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
+  count: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   countText: { fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });

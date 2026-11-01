@@ -280,7 +280,7 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
       zone={panel.zone}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 14, width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center' }}>
+        contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 12, width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center' }}>
         {/* Omni: пошук і фільтри — одна суцільна картка над списком. */}
         <BentoCard compact style={{ gap: 12 }}>
         <TeamInput label={tr.pbSearch} value={search} onChange={setSearch} />

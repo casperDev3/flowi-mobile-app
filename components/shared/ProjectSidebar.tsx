@@ -131,7 +131,7 @@ export function ProjectSidebar({
         accessibilityState={{ selected: active }}
         accessibilityLabel={label}
         style={[st.row, collapsed && st.rowCollapsed, active && { backgroundColor: c.activeBg }, active && activeExtra]}>
-        <IconSymbol name={icon} size={19} color={active ? c.onActive : c.sub} />
+        <IconSymbol name={icon} size={18} color={active ? c.onActive : c.sub} />
         {!collapsed && (
           <Text numberOfLines={1} style={{ color: active ? c.activeText : c.text, fontSize: 14, fontFamily: active ? fontFamily.semibold : fontFamily.medium, flex: 1 }}>
             {label}
@@ -143,7 +143,7 @@ export function ProjectSidebar({
 
   return (
     <View
-      style={[st.root, { width: projectSidebarWidthFor(collapsed), backgroundColor: reduceTransparency ? c.bg : 'transparent', paddingTop: insets.top + 10 }]}
+      style={[st.root, { width: projectSidebarWidthFor(collapsed), backgroundColor: reduceTransparency ? c.bg : 'transparent', paddingTop: insets.top + 12 }]}
       accessibilityRole="menu">
       {!reduceTransparency ? (
         <>
@@ -158,8 +158,8 @@ export function ProjectSidebar({
         accessibilityRole="link"
         accessibilityLabel={tr.projectBackToProjectsA11y}
         style={[st.row, collapsed && st.rowCollapsed]}>
-        <IconSymbol name="chevron.left" size={15} color={c.sub} />
-        {!collapsed && <Text numberOfLines={1} style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }}>{tr.projectBackToProjects}</Text>}
+        <IconSymbol name="chevron.left" size={16} color={c.sub} />
+        {!collapsed && <Text numberOfLines={1} style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.medium, flex: 1 }}>{tr.projectBackToProjects}</Text>}
       </TouchableOpacity>
 
       {/* 2–3. Ідентичність проєкту (тап — свічер) + згортання. */}
@@ -178,7 +178,7 @@ export function ProjectSidebar({
           ) : (
             <>
               <Text numberOfLines={2} style={[st.brand, { color: c.text }]}>{name}</Text>
-              <IconSymbol name="chevron.down" size={11} color={c.sub} />
+              <IconSymbol name="chevron.down" size={12} color={c.sub} />
             </>
           )}
         </TouchableOpacity>
@@ -199,7 +199,7 @@ export function ProjectSidebar({
           const groupClosed = !collapsed && !!group.labelKey && closed.includes(group.id);
           const label = group.labelKey ? tr[group.labelKey] : '';
           return (
-            <View key={group.id} style={{ marginBottom: collapsed ? 4 : 10 }}>
+            <View key={group.id} style={{ marginBottom: collapsed ? 4 : 16 }}>
               {collapsed && index > 0 ? <View style={[st.sep, { backgroundColor: c.border }]} /> : null}
               {!collapsed && group.labelKey ? (
                 <TouchableOpacity
@@ -208,8 +208,8 @@ export function ProjectSidebar({
                   accessibilityState={{ expanded: !groupClosed }}
                   onPress={() => toggleGroup(group.id)}
                   style={st.groupHead}>
-                  <Text style={[st.groupTitle, { color: c.sub }]}>{label.toUpperCase()}</Text>
-                  <IconSymbol name={groupClosed ? 'chevron.right' : 'chevron.down'} size={10} color={c.sub} />
+                  <Text style={[st.groupTitle, { color: c.sub }]}>{label}</Text>
+                  <IconSymbol name={groupClosed ? 'chevron.right' : 'chevron.down'} size={12} color={c.sub} />
                 </TouchableOpacity>
               ) : null}
               {!groupClosed && groupItems.map(item =>
@@ -219,7 +219,7 @@ export function ProjectSidebar({
         })}
       </ScrollView>
 
-      <View style={{ paddingBottom: insets.bottom + 10, gap: 4 }}>
+      <View style={{ paddingBottom: insets.bottom + 12, gap: 4 }}>
         {!collapsed && <ActiveTimersSidebarCard projectId={projectId} colors={{ border: c.border, text: c.text, sub: c.sub, accent: c.accent, activeBg: reduceTransparency ? t.surface.subtle : g.surfaceSubtle }} />}
         {navRow('settings', 'gearshape.fill', tr.tabOptions, projectRoute(projectId, 'settings'))}
       </View>
@@ -240,18 +240,18 @@ export function ProjectSidebar({
 const st = StyleSheet.create({
   root:       { paddingHorizontal: 12 },
   rimRight:   { position: 'absolute', top: 0, bottom: 0, right: 0, width: StyleSheet.hairlineWidth },
-  identity:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingBottom: 10, marginBottom: 2, borderBottomWidth: StyleSheet.hairlineWidth },
+  identity:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingBottom: 12, marginBottom: 4, borderBottomWidth: StyleSheet.hairlineWidth },
   identityCollapsed: { flexDirection: 'column', gap: 2 },
   identityBtn:{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 6, borderRadius: Atlas.radius.medium },
-  identityBtnCollapsed: { flex: 0, alignSelf: 'stretch', flexDirection: 'column', justifyContent: 'center', gap: 3, paddingHorizontal: 0, paddingVertical: 4 },
+  identityBtnCollapsed: { flex: 0, alignSelf: 'stretch', flexDirection: 'column', justifyContent: 'center', gap: 4, paddingHorizontal: 0, paddingVertical: 4 },
   brandCollapsed: { fontSize: 10, fontFamily: fontFamily.semibold, maxWidth: '100%', textAlign: 'center' },
   avatar:     { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontSize: 15, fontFamily: fontFamily.bold },
+  avatarText: { color: '#fff', fontSize: 15, fontFamily: fontFamily.semibold },
   brand:      { fontSize: 16, fontFamily: fontFamily.semibold, flex: 1 },
   iconBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
   groupHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32, paddingHorizontal: 10, borderRadius: Atlas.radius.small },
-  groupTitle: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.6 },
-  sep:        { height: StyleSheet.hairlineWidth, marginHorizontal: 8, marginVertical: 6 },
-  row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 14, borderRadius: radius.pill },
+  groupTitle: { fontSize: 12, fontFamily: fontFamily.medium },
+  sep:        { height: StyleSheet.hairlineWidth, marginHorizontal: 8, marginVertical: 8 },
+  row:        { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, paddingHorizontal: 12, borderRadius: radius.pill },
   rowCollapsed: { justifyContent: 'center', paddingHorizontal: 0 },
 });

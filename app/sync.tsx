@@ -417,7 +417,7 @@ export default function SyncScreen() {
             {/* ── CONFLICTS ── */}
             {conflicts.length > 0 && (
               <View style={{ marginTop: 4 }}>
-                <Text style={[st.sectionLabel, { color: c.sub }]}>КОНФЛІКТИ ({conflicts.length})</Text>
+                <Text style={[st.sectionLabel, { color: c.sub }]}>Конфлікти ({conflicts.length})</Text>
                 {conflicts.map(conflict => (
                   <ConflictCard key={conflict.id} conflict={conflict}
                     onResolve={handleResolve} c={c} isDark={isDark} />
@@ -463,7 +463,7 @@ const ConflictCard = React.memo(function ConflictCard({ conflict, onResolve, c, 
 
       <View style={[st.conflictHead, { borderBottomColor: c.border }]}>
         <View style={[st.conflictDot, { backgroundColor: c.t.status.warning }]} />
-        <Text style={[st.conflictLabel, { color: c.sub }]}>{label.toUpperCase()}</Text>
+        <Text style={[st.conflictLabel, { color: c.sub }]}>{label}</Text>
         <Text style={[st.conflictName, { color: c.text, flex: 1 }]} numberOfLines={1}>{name}</Text>
         <Text style={[st.diffCount, { color: c.sub }]}>{diffs.length} змін</Text>
       </View>
@@ -478,12 +478,12 @@ const ConflictCard = React.memo(function ConflictCard({ conflict, onResolve, c, 
         {/* Два рівноправні рішення — дві pill: основна (моє) і вторинна (інше). */}
         <TouchableOpacity onPress={() => onResolve(conflict.id, 'local')}
           style={[st.resolveBtn, { backgroundColor: c.t.action.primary }]}>
-          <IconSymbol name="checkmark" size={13} color={c.t.text.onAction} />
+          <IconSymbol name="checkmark" size={12} color={c.t.text.onAction} />
           <Text style={[st.resolveBtnText, { color: c.t.text.onAction }]}>Залишити моє</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => onResolve(conflict.id, 'remote')}
           style={[st.resolveBtn, { backgroundColor: c.dim }]}>
-          <IconSymbol name="checkmark" size={13} color={c.t.action.secondaryText} />
+          <IconSymbol name="checkmark" size={12} color={c.t.action.secondaryText} />
           <Text style={[st.resolveBtnText, { color: c.t.action.secondaryText }]}>Прийняти інше</Text>
         </TouchableOpacity>
       </View>
@@ -500,13 +500,13 @@ function VersionPanel({ label, accent, diffs, version, c }: {
     <View style={{ flex: 1 }}>
       <View style={st.vLabelRow}>
         <View style={[st.vDot, { backgroundColor: accent }]} />
-        <Text style={[st.vLabel, { color: c.sub }]}>{label.toUpperCase()}</Text>
+        <Text style={[st.vLabel, { color: c.sub }]}>{label}</Text>
       </View>
       {diffs.length === 0
         ? <Text style={{ fontSize: 12, color: c.sub }}>Без змін</Text>
         : diffs.map(f => (
-          <View key={f.key} style={{ marginBottom: 7 }}>
-            <Text style={[st.fKey, { color: c.sub }]}>{(FIELD_LABELS[f.key] ?? f.key).toUpperCase()}</Text>
+          <View key={f.key} style={{ marginBottom: 8 }}>
+            <Text style={[st.fKey, { color: c.sub }]}>{FIELD_LABELS[f.key] ?? f.key}</Text>
             <Text style={[st.fVal, { color: c.text }]} numberOfLines={2}>
               {version === 'local' ? f.local : f.remote}
             </Text>
@@ -552,11 +552,11 @@ function fmtSyncTime(ms: number): string {
 const st = StyleSheet.create({
   card:          { marginBottom: space.cardGap },
   count:         { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
-  statusRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.pill, marginBottom: 14 },
+  statusRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: radius.pill, marginBottom: 12 },
   statusDot:     { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   statusText:    { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   pendingText:   { ...dsType.caption, fontVariant: ['tabular-nums'], marginBottom: 12, paddingHorizontal: 2 },
-  hintRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.nestedCompact, marginBottom: 12 },
+  hintRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: radius.nestedCompact, marginBottom: 12 },
   hintText:      { fontSize: 12, fontFamily: fontFamily.regular, lineHeight: 17, flex: 1 },
   syncBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: radius.pill, marginTop: 4 },
   syncBtnText:   { fontSize: 14, fontFamily: fontFamily.semibold },
@@ -564,21 +564,21 @@ const st = StyleSheet.create({
   bannerIcon:    { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   bannerTitle:   { ...dsType.h2, fontSize: 14 },
   bannerSub:     { ...dsType.caption, marginTop: 2 },
-  sectionLabel:  { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.8, marginLeft: 4 },
+  sectionLabel:  { fontSize: 11, fontFamily: fontFamily.semibold, marginLeft: 4 },
   conflictCard:  { borderRadius: radius.cardCompact, overflow: 'hidden', marginBottom: 12 },
   conflictHead:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   conflictDot:   { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
-  conflictLabel: { fontSize: 10, fontFamily: fontFamily.semibold, letterSpacing: 0.6 },
+  conflictLabel: { fontSize: 10, fontFamily: fontFamily.semibold },
   conflictName:  { fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 4 },
   diffCount:     { fontSize: 10, fontFamily: fontFamily.semibold },
-  versionsRow:   { flexDirection: 'row', padding: 14, gap: 12 },
+  versionsRow:   { flexDirection: 'row', padding: 16, gap: 12 },
   vDivider:      { width: StyleSheet.hairlineWidth },
   vLabelRow:     { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
   vDot:          { width: 5, height: 5, borderRadius: 3 },
-  vLabel:        { fontSize: 10, fontFamily: fontFamily.semibold, letterSpacing: 0.5 },
-  fKey:          { fontSize: 10, fontFamily: fontFamily.semibold, letterSpacing: 0.3, marginBottom: 2 },
+  vLabel:        { fontSize: 10, fontFamily: fontFamily.semibold },
+  fKey:          { fontSize: 10, fontFamily: fontFamily.semibold, marginBottom: 2 },
   fVal:          { fontSize: 12, fontFamily: fontFamily.medium, lineHeight: 16 },
   conflictActions:{ flexDirection: 'row', gap: 8, padding: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  resolveBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, minHeight: 44, borderRadius: radius.pill },
+  resolveBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 44, borderRadius: radius.pill },
   resolveBtnText:{ fontSize: 13, fontFamily: fontFamily.semibold },
 });

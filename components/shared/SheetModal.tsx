@@ -119,7 +119,7 @@ export function SheetHandle({ color = 'rgba(128,128,128,0.6)' }: { color?: strin
             accessibilityLabel={ctx.closeLabel}
             accessibilityRole="button"
           >
-            <IconSymbol name="xmark" size={17} color={color} />
+            <IconSymbol name="xmark" size={16} color={color} />
           </TouchableOpacity>
         </View>
       </View>
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
   handleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 4,
   },
   // Усередині картки: без власних бокових полів (їх дає картка), ✕ — 44×44.

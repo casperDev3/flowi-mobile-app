@@ -81,7 +81,7 @@ export function PreferencesMatrix({ doc, channels, disabledModules, tr, colors: 
             <View style={st.row}>
               <View style={st.labelCol}>
                 <View style={[st.iconBox, { backgroundColor: look.color + '20' }]}>
-                  <IconSymbol name={look.icon} size={15} color={look.color} />
+                  <IconSymbol name={look.icon} size={16} color={look.color} />
                 </View>
                 <Text style={[st.catLabel, { color: c.text }]} numberOfLines={2}>{label}</Text>
               </View>
@@ -104,10 +104,10 @@ export function PreferencesMatrix({ doc, channels, disabledModules, tr, colors: 
               accessibilityState={{ expanded: isOpen }}
               accessibilityLabel={`${label}: ${isOpen ? tr.ncHideEvents : tr.ncShowEvents}`}
               style={st.expandBtn}>
-              <Text style={{ color: c.accent, fontSize: 13, fontFamily: fontFamily.bold }}>
+              <Text style={{ color: c.accent, fontSize: 13, fontFamily: fontFamily.semibold }}>
                 {isOpen ? tr.ncHideEvents : `${tr.ncShowEvents} · ${category.events.length}`}
               </Text>
-              <IconSymbol name={isOpen ? 'chevron.up' : 'chevron.down'} size={13} color={c.accent} />
+              <IconSymbol name={isOpen ? 'chevron.up' : 'chevron.down'} size={12} color={c.accent} />
             </TouchableOpacity>
 
             {isOpen ? category.events.map(event => {
@@ -186,7 +186,7 @@ const CELL = 56;
 
 const st = StyleSheet.create({
   headRow:    { flexDirection: 'row', alignItems: 'flex-end', paddingLeft: 12, marginBottom: 6 },
-  headCell:   { width: CELL, textAlign: 'center', fontSize: 11, fontFamily: fontFamily.bold },
+  headCell:   { width: CELL, textAlign: 'center', fontSize: 11, fontFamily: fontFamily.semibold },
   card:       { borderRadius: Atlas.radius.xlarge, marginBottom: 12, overflow: 'hidden', paddingVertical: 4 },
   row:        { flexDirection: 'row', alignItems: 'center', paddingLeft: 12, paddingVertical: 6 },
   labelCol:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0, paddingRight: 4 },

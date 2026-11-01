@@ -313,7 +313,7 @@ export default function AppleHealthScreen() {
               style={{ backgroundColor: c.dim }}>
               {syncing
                 ? <ActivityIndicator size="small" color={c.text} />
-                : <IconSymbol name="arrow.clockwise" size={16} color={c.text} />}
+                : <IconSymbol name="arrow.clockwise" size={18} color={c.text} />}
             </HeaderButton>
           ) : undefined}>
           {readFailed ? (
@@ -443,8 +443,8 @@ export default function AppleHealthScreen() {
               {/* Фази ночі, що закінчилась сьогодні (якщо джерело їх дало). */}
               {today?.sleep && today.sleep.deep != null && (
                 <View style={[s.hkvRow, { backgroundColor: k.surface.subtle, marginTop: 8, flexWrap: 'wrap', gap: 8 }]}>
-                  <IconSymbol name="moon.fill" size={15} color={HEALTH_ACCENTS.sleep} />
-                  <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.bold, flex: 1 }}>{tr.hautoSleepPhases}</Text>
+                  <IconSymbol name="moon.fill" size={16} color={HEALTH_ACCENTS.sleep} />
+                  <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }}>{tr.hautoSleepPhases}</Text>
                   <Text style={{ color: c.sub, fontSize: 12, width: '100%' }}>
                     {`${tr.hautoSleepDeep} ${fmtSleep(today.sleep.deep)} · ${tr.hautoSleepRem} ${fmtSleep(today.sleep.rem ?? 0)} · ${tr.hautoSleepLight} ${fmtSleep(today.sleep.light ?? 0)} · ${tr.hautoSleepAwake} ${fmtSleep(today.sleep.awake ?? 0)}`}
                   </Text>

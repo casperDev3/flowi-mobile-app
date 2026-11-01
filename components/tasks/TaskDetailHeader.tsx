@@ -224,6 +224,6 @@ const st = StyleSheet.create({
   iconBtn:    { width: ACTION.height, height: ACTION.height, borderRadius: ACTION.radius, alignItems: 'center', justifyContent: 'center' },
   timer:      { marginBottom: 10 },
   tabs:       { flexDirection: 'row', gap: 4, borderRadius: radius.pill, padding: 4 },
-  tab:        { flex: 1, minHeight: 36, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 5, paddingHorizontal: 4 },
+  tab:        { flex: 1, minHeight: 36, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, paddingHorizontal: 4 },
   runDot:     { width: 6, height: 6, borderRadius: 3 },
 });

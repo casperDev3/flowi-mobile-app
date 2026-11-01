@@ -106,7 +106,7 @@ export function ProjectAnalytics({
         onChange={key => setSelected(key === ALL_KEY ? '' : key)}
         palette={palette}
         accessibilityLabel={tr.projectAnalytics}
-        style={{ marginTop: 12, marginBottom: 14 }}
+        style={{ marginTop: 12, marginBottom: 12 }}
       />
 
       {/* Omni bento: панелі — суцільні картки; на планшеті по дві в ряд. */}
@@ -246,7 +246,7 @@ function CategoryBars({
     <View style={{ gap: 10 }}>
       {slices.map(slice => (
         <View key={slice.key}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
             <Text numberOfLines={1} style={{ color: palette.text, fontSize: 12, fontFamily: fontFamily.semibold, flex: 1 }}>
               {slice.label}
             </Text>
@@ -302,8 +302,8 @@ export function WeekBars({
 }
 
 const st = StyleSheet.create({
-  heading:    { fontSize: 20, fontFamily: fontFamily.semibold, letterSpacing: -0.2 },
-  chip:       { paddingHorizontal: 14, minHeight: 36, justifyContent: 'center', borderRadius: radius.pill },
+  heading:    { fontSize: 20, fontFamily: fontFamily.semibold },
+  chip:       { paddingHorizontal: 16, minHeight: 36, justifyContent: 'center', borderRadius: radius.pill },
   panel:      { borderRadius: radius.cardCompact, padding: 20, marginBottom: 12 },
   panelTitle: { fontSize: 16, fontFamily: fontFamily.semibold },
   note:       { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.regular },

@@ -164,7 +164,7 @@ export default function ForgotPasswordScreen() {
             accessibilityRole="button"
             accessibilityLabel={tr.back}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="chevron.left" size={22} color={c.text} />
+            <IconSymbol name="chevron.left" size={24} color={c.text} />
           </TouchableOpacity>
         </View>
 
@@ -185,7 +185,7 @@ export default function ForgotPasswordScreen() {
               style={[st.card, { backgroundColor: c.card }]}
             >
                   <View style={st.fieldWrap}>
-                    <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authEmail.toUpperCase()}</Text>
+                    <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authEmail}</Text>
                     <TextInput
                       style={[st.input, { color: c.text }]}
                       placeholderTextColor={k.text.muted}
@@ -230,7 +230,7 @@ export default function ForgotPasswordScreen() {
             >
                   {/* Code */}
                   <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
-                    <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authEnterCode.toUpperCase()}</Text>
+                    <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authEnterCode}</Text>
                     <TextInput
                       style={[st.input, { color: c.text, fontSize: 28, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: 6 }]}
                       placeholderTextColor={k.text.muted}
@@ -246,7 +246,7 @@ export default function ForgotPasswordScreen() {
 
                   {/* New password */}
                   <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
-                    <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authNewPassword.toUpperCase()}</Text>
+                    <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authNewPassword}</Text>
                     <View style={st.passwordRow}>
                       <TextInput
                         style={[st.input, { color: c.text, flex: 1 }]}
@@ -271,7 +271,7 @@ export default function ForgotPasswordScreen() {
 
                   {/* Repeat password */}
                   <View style={st.fieldWrap}>
-                    <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPasswordRepeat.toUpperCase()}</Text>
+                    <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPasswordRepeat}</Text>
                     <View style={st.passwordRow}>
                       <TextInput
                         style={[st.input, { color: c.text, flex: 1 }]}
@@ -334,7 +334,7 @@ export default function ForgotPasswordScreen() {
 const st = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 16,
     paddingBottom: 4,
   },
   scroll: {
@@ -355,17 +355,16 @@ const st = StyleSheet.create({
     paddingHorizontal: 4,
   },
   card: {
-    borderRadius: 24,
+    borderRadius: 16,
     overflow: 'hidden',
   },
   fieldWrap: {
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 16,
   },
   fieldLabel: {
     fontSize: 12,
     fontFamily: fontFamily.medium,
-    letterSpacing: 0.3,
     marginBottom: 4,
   },
   passwordRow: {

@@ -147,6 +147,6 @@ const st = StyleSheet.create({
   stubModule:      { fontSize: 14, fontFamily: fontFamily.semibold },
   stubBody:        { fontFamily: fontFamily.regular, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   // 48 заввишки — вище мінімальних 44pt за HIG: це головна дія на екрані.
-  stubButton:      { marginTop: 12, height: 48, minWidth: 200, borderRadius: radius.pill, paddingHorizontal: 22, alignItems: 'center', justifyContent: 'center' },
+  stubButton:      { marginTop: 12, height: 48, minWidth: 200, borderRadius: radius.pill, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center' },
   stubButtonLabel: { fontSize: 15, fontFamily: fontFamily.semibold },
 });

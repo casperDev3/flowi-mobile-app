@@ -130,7 +130,7 @@ export function ProjectZoneStatic({
         <Text accessibilityRole="header" style={[st.staticTitle, { color: t.text.primary }]}>{s.portfolio}</Text>
         <Text style={[st.staticSub, { color: t.text.secondary }]}>{scopeLabel}</Text>
 
-        <View accessibilityLabel={s.portfolioA11y} style={{ gap: 14, marginTop: 14 }}>
+        <View accessibilityLabel={s.portfolioA11y} style={{ gap: 12, marginTop: 16 }}>
           <KpiCounter value={kpi.projects} label={s.kpiProjects} />
           <KpiCounter value={atRisk} label={s.kpiAtRisk} valueColor={atRisk > 0 ? t.text.primary : undefined} />
           <KpiCounter value={kpi.overdue} label={s.kpiOverdue} valueColor={kpi.overdue > 0 ? g.accent.coral.ink : undefined} />
@@ -355,8 +355,8 @@ const st = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   openText: { fontSize: 14, fontFamily: fontFamily.semibold },
-  sectionTitle: { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 6 },
-  section: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 14, marginTop: 12, gap: 8 },
+  sectionTitle: { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 6 },
+  section: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 16, marginTop: 12, gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   rowLabel: { fontSize: 13, fontFamily: fontFamily.regular },
   rowValue: { flexShrink: 1, fontSize: 14, fontFamily: fontFamily.semibold, textAlign: 'right', fontVariant: ['tabular-nums'] },
@@ -370,7 +370,7 @@ const st = StyleSheet.create({
   deadlineName: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium },
   deadlineDate: { fontSize: 12, fontVariant: ['tabular-nums'] },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  dotLg: { width: 12, height: 12, borderRadius: 6, marginTop: 9 },
+  dotLg: { width: 12, height: 12, borderRadius: 6, marginTop: 8 },
   muted: { fontSize: 13, fontFamily: fontFamily.regular },
   roleChip: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 28, paddingHorizontal: 10, borderRadius: radius.pill },
   detailHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingTop: 4 },

@@ -164,16 +164,16 @@ export default function HabitsScreen() {
               // Omni (DS v2.2): суцільна картка вмісту (не скло) з м'якою тінню.
               <View key={h.id} style={[s.card, { backgroundColor: k.surface.card }, shadow[isDark ? 'dark' : 'light'].card]}>
                 <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: h.color + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name={h.icon} size={17} color={h.color} />
+                  <IconSymbol name={h.icon} size={18} color={h.color} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
                   <Text style={[{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }, done && { color: c.sub, textDecorationLine: 'line-through' }]}>{h.title}</Text>
                   <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
-                    🔥 {tr.streak}: {streak} {tr.daysStreak}{h.reminderAt ? ` · ⏰ ${h.reminderAt}` : ''}
+                    {tr.streak}: {streak} {tr.daysStreak}{h.reminderAt ? ` · ${h.reminderAt}` : ''}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => remove(h)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${h.title}`} style={s.removeBtn}>
-                  <IconSymbol name="trash" size={15} color={c.sub} />
+                  <IconSymbol name="trash" size={16} color={c.sub} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => toggle(h)}
                   accessibilityRole="checkbox" accessibilityState={{ checked: done }} accessibilityLabel={h.title}
@@ -201,7 +201,7 @@ export default function HabitsScreen() {
                   {ICONS.map(ic => (
                     <TouchableOpacity key={ic} onPress={() => setIcon(ic)}
                       style={[s.pick, { backgroundColor: icon === ic ? k.action.primary : c.dim }]}>
-                      <IconSymbol name={ic} size={17} color={icon === ic ? k.text.onAction : c.sub} />
+                      <IconSymbol name={ic} size={18} color={icon === ic ? k.text.onAction : c.sub} />
                     </TouchableOpacity>
                   ))}
                 </View>

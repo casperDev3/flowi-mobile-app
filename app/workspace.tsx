@@ -231,7 +231,7 @@ export default function WorkspaceScreen() {
               accessibilityRole="button"
               accessibilityLabel={tr.back}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <IconSymbol name="chevron.left" size={22} color={c.text} />
+              <IconSymbol name="chevron.left" size={24} color={c.text} />
             </TouchableOpacity>
           </View>
         ) : null}
@@ -329,28 +329,28 @@ export default function WorkspaceScreen() {
 }
 
 const st = StyleSheet.create({
-  header: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 4 },
+  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 },
   scroll: { paddingHorizontal: 20, paddingTop: 40, paddingBottom: 60 },
   title: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32, marginBottom: 8 },
   subtitle: { fontSize: 14, lineHeight: 20, marginBottom: 24 },
   card: {
-    borderRadius: 24, overflow: 'hidden',
+    borderRadius: 16, overflow: 'hidden',
   },
-  fieldWrap: { paddingHorizontal: 20, paddingVertical: 14 },
-  fieldLabel: { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginBottom: 4 },
+  fieldWrap: { paddingHorizontal: 20, paddingVertical: 16 },
+  fieldLabel: { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 4 },
   input: { fontSize: 16, fontFamily: fontFamily.regular, paddingVertical: 4 },
   hintRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 8,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, marginTop: 14,
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, marginTop: 16,
   },
   hintText: { fontSize: 13, lineHeight: 18, flex: 1 },
   successCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: 20, padding: 20, marginTop: 14,
+    borderRadius: 16, padding: 20, marginTop: 16,
   },
   colorDot: { width: 14, height: 14, borderRadius: 7 },
-  workspaceName: { fontSize: 16, fontFamily: fontFamily.bold },
-  hintSmall: { fontSize: 12, marginTop: 3, lineHeight: 16 },
-  primaryBtn: { borderRadius: 999, minHeight: 52, justifyContent: 'center', paddingVertical: 15, alignItems: 'center', marginTop: 20 },
+  workspaceName: { fontSize: 16, fontFamily: fontFamily.semibold },
+  hintSmall: { fontSize: 12, marginTop: 4, lineHeight: 16 },
+  primaryBtn: { borderRadius: 999, minHeight: 52, justifyContent: 'center', paddingVertical: 16, alignItems: 'center', marginTop: 20 },
   primaryBtnText: { fontSize: 16, fontFamily: fontFamily.semibold },
 });

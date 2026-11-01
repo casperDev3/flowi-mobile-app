@@ -71,7 +71,7 @@ export default function LeaderboardScreen() {
             <Text style={{ color: c.t.featured.text, fontSize: 15, fontFamily: fontFamily.semibold }}>
               {fmt(tr.tgYourPlace, { rank: data.me.rank, xp: data.me.xp })}
             </Text>
-            {meRow ? <Text style={{ color: c.t.featured.text, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{`🔥${meRow.streak_days}`}</Text> : null}
+            {meRow ? <Text style={{ color: c.t.featured.text, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{`${tr.tgStreak} ${fmt(tr.tgStreakDays, { n: meRow.streak_days })}`}</Text> : null}
           </View>
         </BentoCard>
       ) : undefined}>
@@ -89,7 +89,7 @@ export default function LeaderboardScreen() {
             style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name="chevron.left" size={16} color={c.text} />
           </TouchableOpacity>
-          <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }}>
+          <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>
             {`${data?.from ?? weekMonday} — ${data?.to ?? addDays(weekMonday, 6)}`}
           </Text>
           <TouchableOpacity

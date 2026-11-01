@@ -259,7 +259,7 @@ export type GlassTokens = {
   shadow: ViewStyle;
   /** Суцільні поверхні для «Зменшення прозорості» (iOS) / prefers-reduced-transparency (веб). */
   solid: { card: string; strong: string; subtle: string };
-  /** Кольорова сітка canvas: основа + розмиті радіальні плями. */
+  /** Кольорова сітка canvas: основа + розмиті радіальні плями (unslop: приглушено ~40%, лише підкладка під скло). */
   mesh: { base: string; blobs: readonly GlassMeshBlob[] };
   accent: Readonly<Record<GlassAccent, GlassAccentRoles>>;
 };
@@ -278,7 +278,7 @@ const glassLight: GlassTokens = {
   shadow: Platform.select<ViewStyle>({
     android: {},
     default: {
-      shadowColor: '#281E6E',
+      shadowColor: '#111113',
       shadowOpacity: 0.1,
       shadowRadius: 16,
       shadowOffset: { width: 0, height: 8 },
@@ -288,11 +288,11 @@ const glassLight: GlassTokens = {
   mesh: {
     base: '#F1F0F5',
     blobs: [
-      { color: '#B8A4F8', opacity: 0.38, cx: 0.08, cy: 0.04, rx: 0.85, ry: 0.42 }, // лаванда, вгорі ліворуч
-      { color: '#DDF54A', opacity: 0.3, cx: 0.98, cy: 0.1, rx: 0.7, ry: 0.34 },    // лайм, вгорі праворуч
-      { color: '#F6B93B', opacity: 0.26, cx: 0.95, cy: 0.95, rx: 0.8, ry: 0.4 },   // бурштин, внизу праворуч
-      { color: '#4F7CF7', opacity: 0.2, cx: 0.02, cy: 0.88, rx: 0.75, ry: 0.38 },  // синій, внизу ліворуч
-      { color: '#E8543F', opacity: 0.12, cx: 0.9, cy: 0.52, rx: 0.5, ry: 0.26 },   // корал, по центру праворуч
+      { color: '#B8A4F8', opacity: 0.22, cx: 0.08, cy: 0.04, rx: 0.85, ry: 0.42 }, // лаванда, вгорі ліворуч
+      { color: '#DDF54A', opacity: 0.18, cx: 0.98, cy: 0.1, rx: 0.7, ry: 0.34 },    // лайм, вгорі праворуч
+      { color: '#F6B93B', opacity: 0.16, cx: 0.95, cy: 0.95, rx: 0.8, ry: 0.4 },   // бурштин, внизу праворуч
+      { color: '#4F7CF7', opacity: 0.12, cx: 0.02, cy: 0.88, rx: 0.75, ry: 0.38 },  // синій, внизу ліворуч
+      { color: '#E8543F', opacity: 0.08, cx: 0.9, cy: 0.52, rx: 0.5, ry: 0.26 },   // корал, по центру праворуч
     ],
   },
   accent: {
@@ -329,11 +329,11 @@ const glassDark: GlassTokens = {
   mesh: {
     base: '#0D0D10',
     blobs: [
-      { color: '#7B5CFF', opacity: 0.32, cx: 0.06, cy: 0.04, rx: 0.85, ry: 0.42 }, // фіолет, вгорі ліворуч
-      { color: '#4F7CF7', opacity: 0.22, cx: 0.98, cy: 0.12, rx: 0.7, ry: 0.34 },  // синій, вгорі праворуч
-      { color: '#E8543F', opacity: 0.14, cx: 0.95, cy: 0.95, rx: 0.8, ry: 0.4 },   // корал, внизу праворуч
-      { color: '#CDEB3A', opacity: 0.1, cx: 0.02, cy: 0.9, rx: 0.7, ry: 0.36 },    // лайм, внизу ліворуч
-      { color: '#F2B135', opacity: 0.1, cx: 0.5, cy: 0.55, rx: 0.55, ry: 0.28 },   // бурштин, по центру
+      { color: '#7B5CFF', opacity: 0.18, cx: 0.06, cy: 0.04, rx: 0.85, ry: 0.42 }, // фіолет, вгорі ліворуч
+      { color: '#4F7CF7', opacity: 0.12, cx: 0.98, cy: 0.12, rx: 0.7, ry: 0.34 },  // синій, вгорі праворуч
+      { color: '#E8543F', opacity: 0.08, cx: 0.95, cy: 0.95, rx: 0.8, ry: 0.4 },   // корал, внизу праворуч
+      { color: '#CDEB3A', opacity: 0.06, cx: 0.02, cy: 0.9, rx: 0.7, ry: 0.36 },    // лайм, внизу ліворуч
+      { color: '#F2B135', opacity: 0.06, cx: 0.5, cy: 0.55, rx: 0.55, ry: 0.28 },   // бурштин, по центру
     ],
   },
   accent: {
@@ -496,7 +496,7 @@ export function accentRoles(accent: GlassAccent, isDark: boolean): GlassAccentRo
 
 // ─── Форма ────────────────────────────────────────────────────────────────────
 
-/** Радіуси: картки 20–24, вкладені блоки 14–16, контроли 12, кнопки й чипи — pill. */
+/** Радіуси: картки 16, вкладені 12, контроли 10, pill (компактні варіанти — 14 / 10). */
 export const radius = {
   card: 16,
   cardCompact: 14,

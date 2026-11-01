@@ -50,7 +50,7 @@ export function GoogleCalendarSheet({ visible, onClose, gcal, isDark, c }: {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
                 <View style={{ width: 44, height: 44, borderRadius: radius.pill, backgroundColor: c.dim,
                   alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name="calendar" size={22} color={GOOGLE_BLUE} />
+                  <IconSymbol name="calendar" size={24} color={GOOGLE_BLUE} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 18, fontFamily: fontFamily.semibold, color: c.text }}>Google Calendar</Text>
@@ -109,7 +109,7 @@ export function GoogleCalendarSheet({ visible, onClose, gcal, isDark, c }: {
               {clientId && !token && (
                 <>
                   <View style={{ backgroundColor: c.dim, borderRadius: radius.nested, padding: 16, marginBottom: 16 }}>
-                    <Text style={{ fontSize: 11, color: c.sub, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5 }}>CLIENT ID</Text>
+                    <Text style={{ fontSize: 12, color: c.sub, fontFamily: fontFamily.medium }}>Client ID</Text>
                     <Text style={{ fontSize: 13, color: c.text, marginTop: 4 }} numberOfLines={1}>
                       {clientId.length > 40 ? clientId.slice(0, 37) + '...' : clientId}
                     </Text>
@@ -124,7 +124,7 @@ export function GoogleCalendarSheet({ visible, onClose, gcal, isDark, c }: {
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => { void gcal.saveClientId(''); setClientInput(''); }}
                     style={[st.btn, { backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
-                    <IconSymbol name="pencil" size={15} color={c.sub} />
+                    <IconSymbol name="pencil" size={16} color={c.sub} />
                     <Text style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.gcalChangeClientId}</Text>
                   </TouchableOpacity>
                 </>
@@ -133,7 +133,7 @@ export function GoogleCalendarSheet({ visible, onClose, gcal, isDark, c }: {
               {token && (
                 <>
                   {lastSync && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14,
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16,
                       paddingVertical: 12, borderRadius: radius.nested, backgroundColor: c.dim, marginBottom: 16 }}>
                       <IconSymbol name="checkmark.circle.fill" size={16} color={t.status.success} />
                       <View style={{ flex: 1 }}>
@@ -141,7 +141,7 @@ export function GoogleCalendarSheet({ visible, onClose, gcal, isDark, c }: {
                         <Text style={{ fontSize: 12, color: c.sub, marginTop: 1 }}>{lastSync}</Text>
                       </View>
                       {importCount > 0 && (
-                        <View style={{ paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: t.accent.lime }}>
+                        <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: t.accent.lime }}>
                           <Text style={{ fontSize: 12, fontFamily: fontFamily.semibold, color: t.text.onAccent, fontVariant: ['tabular-nums'] }}>{tr.gcalNewCount.replace('{n}', String(importCount))}</Text>
                         </View>
                       )}
@@ -165,7 +165,7 @@ export function GoogleCalendarSheet({ visible, onClose, gcal, isDark, c }: {
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => { void gcal.saveClientId(''); setClientInput(''); }}
                     style={[st.btn, { backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
-                    <IconSymbol name="pencil" size={15} color={c.sub} />
+                    <IconSymbol name="pencil" size={16} color={c.sub} />
                     <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.gcalChangeClientId}</Text>
                   </TouchableOpacity>
                 </>
@@ -183,5 +183,5 @@ const st = StyleSheet.create({
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   sheet: { borderRadius: radius.card, padding: 20, overflow: 'hidden' },
   inp: { borderRadius: radius.control, minHeight: 44, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, fontFamily: fontFamily.regular },
-  btn: { minHeight: 48, paddingVertical: 11, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  btn: { minHeight: 48, paddingVertical: 12, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
 });

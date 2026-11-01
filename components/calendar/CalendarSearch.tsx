@@ -81,7 +81,7 @@ export function CalendarSearch({
           accessibilityLabel={`${tr.calA11yTask}: ${item.task.title}${item.done ? `, ${tr.done}` : ''}`}
           style={[st.row, { backgroundColor: c.card, opacity: item.done ? 0.55 : 1 }]}>
           <IconSymbol name={item.done ? 'checkmark.circle.fill' : 'circle'} size={18} color={item.done ? dsTokens(isDark).status.success : item.color} />
-          <View style={{ flex: 1, gap: 3 }}>
+          <View style={{ flex: 1, gap: 4 }}>
             <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium, textDecorationLine: item.done ? 'line-through' : 'none' }} numberOfLines={2}>
               {item.task.title}
             </Text>
@@ -98,7 +98,7 @@ export function CalendarSearch({
     <View style={{ flex: 1 }}>
       <View style={st.barRow}>
         <View style={[st.inputBox, { backgroundColor: c.card }]}>
-          <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
+          <IconSymbol name="magnifyingglass" size={16} color={c.sub} />
           <TextInput
             testID="calendar-search-input"
             autoFocus
@@ -130,12 +130,12 @@ export function CalendarSearch({
         showsVerticalScrollIndicator={false}>
         {!trimmed ? (
           <View style={st.empty}>
-            <IconSymbol name="magnifyingglass" size={26} color={c.sub} />
+            <IconSymbol name="magnifyingglass" size={24} color={c.sub} />
             <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, marginTop: 8, textAlign: 'center' }}>{tr.calSearchHint}</Text>
           </View>
         ) : result.total === 0 ? (
           <View style={st.empty}>
-            <IconSymbol name="magnifyingglass" size={26} color={c.sub} />
+            <IconSymbol name="magnifyingglass" size={24} color={c.sub} />
             <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, marginTop: 8, textAlign: 'center' }}>{tr.calSearchEmpty}</Text>
           </View>
         ) : (
@@ -168,7 +168,7 @@ const st = StyleSheet.create({
   clearBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   cancelBtn: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   section: { fontSize: 16, fontFamily: fontFamily.semibold },
-  dayLabel: { fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  dayLabel: { fontSize: 12, fontFamily: fontFamily.medium },
   row: {
     minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10,
     borderRadius: radius.nested, paddingHorizontal: 16, paddingVertical: 12,

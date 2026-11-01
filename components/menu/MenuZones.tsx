@@ -80,7 +80,7 @@ export function MenuZoneStatic({
 
       <Card c={c} label={s.summaryA11y}>
         <Text accessibilityRole="header" style={[st.title, { color: c.text }]}>{s.summary}</Text>
-        <View style={{ gap: 14, marginTop: 12 }}>
+        <View style={{ gap: 12, marginTop: 12 }}>
           <KpiCounter value={sum.dishes} label={s.dishes} />
           <KpiCounter value={`${sum.daysWithMenu}/${sum.days}`} label={s.daysWithMenu} />
           {menu.week_meals.length > 0 ? <KpiCounter value={sum.emptySlots} label={s.emptySlots} /> : null}
@@ -95,7 +95,7 @@ export function MenuZoneStatic({
           accessibilityLabel={fillMenuZone(s.requestsA11y, { n: pending })}
           testID="menu-static-requests"
           style={({ pressed }) => [st.requests, { backgroundColor: c.dim, opacity: pressed ? 0.7 : 1 }]}>
-          <IconSymbol name="tray" size={15} color={c.text} />
+          <IconSymbol name="tray" size={16} color={c.text} />
           <Text style={[st.requestsText, { color: c.text }]}>{s.requests}</Text>
           {pending > 0 ? (
             <View style={[st.count, { backgroundColor: c.primary }]}>
@@ -124,7 +124,7 @@ export function MenuZoneStatic({
                     st.group,
                     { backgroundColor: selected || pressed ? c.dim : 'transparent' },
                   ]}>
-                  <IconSymbol name={selected ? 'checkmark.circle.fill' : 'person.2.fill'} size={15} color={selected ? c.text : c.sub} />
+                  <IconSymbol name={selected ? 'checkmark.circle.fill' : 'person.2.fill'} size={16} color={selected ? c.text : c.sub} />
                   <Text numberOfLines={1} style={[st.groupName, { color: c.text }]}>{g.name}</Text>
                   {g.archived ? <Text style={[st.rowLabel, { color: c.sub }]}>{s.archived}</Text> : null}
                 </Pressable>
@@ -141,11 +141,11 @@ const st = StyleSheet.create({
   root: { gap: 12, paddingBottom: 12 },
   card: { borderRadius: Atlas.radius.xlarge, padding: 16 },
   title: { fontSize: 17, fontFamily: fontFamily.semibold },
-  section: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, marginTop: 14, gap: 8 },
+  section: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, marginTop: 16, gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   rowLabel: { fontSize: 13, fontFamily: fontFamily.regular },
   rowValue: { flexShrink: 1, fontSize: 14, fontFamily: fontFamily.semibold, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  requests: { marginTop: 14, minHeight: 44, borderRadius: 999, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  requests: { marginTop: 16, minHeight: 44, borderRadius: 999, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
   requestsText: { flex: 1, fontSize: 14, fontFamily: fontFamily.semibold },
   count: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   countText: { fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },

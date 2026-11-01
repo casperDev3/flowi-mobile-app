@@ -153,7 +153,7 @@ const st = StyleSheet.create({
     minHeight: 36, paddingHorizontal: 14, borderRadius: radius.pill,
   },
   label: { fontSize: 13, fontFamily: fontFamily.semibold },
-  count: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
+  count: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   countText: { fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   menu: { position: 'absolute' },
   menuInner: { padding: 6 },

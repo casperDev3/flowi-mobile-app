@@ -73,30 +73,30 @@ export const MeetingCard = React.memo(function MeetingCard({
       }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ alignItems: 'center', minWidth: 52 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color }} />
-              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
+              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{mtg.time || '--:--'}</Text>
             </View>
             <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], marginTop: 1 }}>{dur}</Text>
           </View>
           <View style={{ width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: c.border, marginVertical: 2 }} />
-          <View style={{ flex: 1, gap: 3 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.accent.coral }} />}
               <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
-              {isRecurring && <IconSymbol name="repeat" size={11} color={c.sub} />}
-              {tracking && <IconSymbol name="timer" size={11} color={t.status.success} />}
+              {isRecurring && <IconSymbol name="repeat" size={12} color={c.sub} />}
+              {tracking && <IconSymbol name="timer" size={12} color={t.status.success} />}
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
               <MeetingProjectChip project={project} textColor={c.text} />
               {mtg.location ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <IconSymbol name="mappin" size={10} color={c.sub} />
                   <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular }} numberOfLines={1}>{mtg.location}</Text>
                 </View>
               ) : null}
               {mtg.link ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <IconSymbol name="link" size={10} color={c.accent} />
                   <Text style={{ color: c.accent, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.calJoin}</Text>
                 </View>
@@ -113,7 +113,7 @@ export const MeetingCard = React.memo(function MeetingCard({
               accessibilityRole="button"
               accessibilityLabel={recordLabel}
               style={[st.iconBtn, { backgroundColor: hasRecordings ? t.accent.lavenderSoft : c.dim }]}>
-              <IconSymbol name={hasRecordings ? 'waveform' : 'mic'} size={13} color={hasRecordings ? c.accent : c.sub} />
+              <IconSymbol name={hasRecordings ? 'waveform' : 'mic'} size={12} color={hasRecordings ? c.accent : c.sub} />
             </TouchableOpacity>
           )}
           {onDelete && (
@@ -123,7 +123,7 @@ export const MeetingCard = React.memo(function MeetingCard({
               accessibilityRole="button"
               accessibilityLabel={deleteLabel}
               style={[st.iconBtn, { backgroundColor: c.dim }]}>
-              <IconSymbol name="trash" size={13} color={t.status.danger} />
+              <IconSymbol name="trash" size={12} color={t.status.danger} />
             </TouchableOpacity>
           )}
         </View>

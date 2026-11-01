@@ -1,4 +1,4 @@
-import { fontFamily, radius, type as dsType } from '@/constants/theme';
+import { fontFamily, radius, shadow, type as dsType } from '@/constants/theme';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -52,8 +52,8 @@ export const ItemRow = React.memo(function ItemRow({
   const { tr } = useI18n();
   const discarded = item.status === 'discarded';
   return (
-    <View style={{ borderRadius: radius.nested, ...c.gl.card,
-      paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6, opacity: discarded ? 0.72 : 1 }}>
+    <View style={{ borderRadius: radius.nested, backgroundColor: c.t.surface.card, ...shadow[c.isDark ? 'dark' : 'light'].card,
+      paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6, opacity: discarded ? 0.72 : 1 }}>
       <TouchableOpacity onPress={() => actions.onEdit(item)} activeOpacity={0.75} accessibilityRole="button"
         accessibilityLabel={`${tr.ctrEditItem}: ${item.name}`} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
         {item.photoIds?.length ? (
@@ -70,9 +70,9 @@ export const ItemRow = React.memo(function ItemRow({
             {item.qty !== 1 ? <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, ...dsType.numeric }}>×{item.qty}</Text> : null}
             <StatusBadge status={item.status} lentTo={item.lentTo} textColor={c.text} />
           </View>
-          {item.note ? <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 3, lineHeight: 17 }}>{item.note}</Text> : null}
+          {item.note ? <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 4, lineHeight: 17 }}>{item.note}</Text> : null}
           {item.tags.length > 0 ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
               {item.tags.map(tag => (
                 <View key={tag} style={{ backgroundColor: c.dim, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 }}>
                   <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium }}>#{tag}</Text>

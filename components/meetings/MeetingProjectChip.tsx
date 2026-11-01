@@ -39,7 +39,7 @@ export function MeetingProjectChip({
 }
 
 const st = StyleSheet.create({
-  chip:   { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 5, paddingVertical: 1, alignSelf: 'flex-start' },
+  chip:   { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 4, paddingVertical: 1, alignSelf: 'flex-start' },
   chipMd: { paddingHorizontal: 8, paddingVertical: 4, gap: 6, borderRadius: radius.pill },
   dot:    { width: 8, height: 8, borderRadius: 4 },
 });

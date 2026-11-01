@@ -70,17 +70,16 @@ export function MonthPicker({
         onPress={handleOpen}
         activeOpacity={0.7}
         hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Text
             style={{
               fontSize: 15,
-              fontFamily: fontFamily.bold,
+              fontFamily: fontFamily.semibold,
               color: isCurrent ? accentColor : textColor,
-              letterSpacing: -0.3,
             }}>
             {formatMonthYear(month, months)}
           </Text>
-          <IconSymbol name="chevron.down" size={11} color={isCurrent ? accentColor : subColor} />
+          <IconSymbol name="chevron.down" size={12} color={isCurrent ? accentColor : subColor} />
         </View>
       </TouchableOpacity>
 
@@ -115,7 +114,7 @@ export function MonthPicker({
                   borderRadius: 2,
                   backgroundColor: t.border.hairline,
                   alignSelf: 'center',
-                  marginBottom: 22,
+                  marginBottom: 24,
                 }}
               />
 
@@ -125,7 +124,7 @@ export function MonthPicker({
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  marginBottom: 18,
+                  marginBottom: 16,
                 }}>
                 <TouchableOpacity
                   onPress={() => setPickerYear(y => y - 1)}
@@ -140,7 +139,7 @@ export function MonthPicker({
                   <IconSymbol name="chevron.left" size={14} color={subColor} />
                 </TouchableOpacity>
 
-                <View style={{ alignItems: 'center', gap: 3 }}>
+                <View style={{ alignItems: 'center', gap: 4 }}>
                   <Text
                     style={{
                       ...type.displaySm,
@@ -155,7 +154,6 @@ export function MonthPicker({
                       fontSize: 12,
                       fontFamily: fontFamily.medium,
                       color: subColor,
-                      letterSpacing: -0.1,
                     }}>
                     {pickerYear === now.getFullYear()
                       ? todayLabel
@@ -182,7 +180,7 @@ export function MonthPicker({
                 style={{
                   height: 1,
                   backgroundColor: t.border.hairline,
-                  marginBottom: 14,
+                  marginBottom: 16,
                 }}
               />
 
@@ -204,7 +202,7 @@ export function MonthPicker({
                           activeOpacity={0.75}
                           style={{
                             flex: 1,
-                            paddingVertical: 14,
+                            paddingVertical: 16,
                             borderRadius: radius.pill,
                             minHeight: 44,
                             alignItems: 'center',
@@ -216,7 +214,6 @@ export function MonthPicker({
                               fontSize: 14,
                               fontFamily: isSelected ? fontFamily.semibold : fontFamily.medium,
                               color: isSelected ? t.text.onAction : textColor,
-                              letterSpacing: -0.1,
                             }}>
                             {name}
                           </Text>

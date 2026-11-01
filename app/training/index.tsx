@@ -128,7 +128,7 @@ export default function TrainingGroupsScreen() {
                   <Badge label={g.role === 'coach' ? tr.tgRoleCoach : tr.tgRoleMember} color={g.role === 'coach' ? TG_ACCENT : c.sub} />
                   {g.role === 'member' ? (
                     <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
-                      {`${g.xp_total} XP · 🔥${g.streak_days}`}
+                      {`${g.xp_total} XP · ${tr.tgStreak} ${fmt(tr.tgStreakDays, { n: g.streak_days })}`}
                     </Text>
                   ) : null}
                 </View>
@@ -139,7 +139,7 @@ export default function TrainingGroupsScreen() {
         </ResponsiveGrid>
 
         {active.length > 0 && online ? (
-          <View style={{ gap: 10, marginTop: 18 }}>
+          <View style={{ gap: 10, marginTop: 20 }}>
             <PrimaryButton label={tr.tgCreateGroup} icon="plus" variant="soft" onPress={() => setSheet('create')} />
           </View>
         ) : null}

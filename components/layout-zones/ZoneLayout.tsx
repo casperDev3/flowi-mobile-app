@@ -249,12 +249,12 @@ const st = StyleSheet.create({
   // Динамічна зона — вміст, а не оверлей: суцільна bento-картка (surface.card),
   // не скло (DS: скло лише функціональний шар).
   dynamic: { marginRight: zone.gap, borderRadius: radius.card, overflow: 'hidden' },
-  dynHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: space.cardPaddingCompact, paddingRight: 6, paddingTop: 6, minHeight: 50 },
-  dynTitle: { flex: 1, fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.4, textTransform: 'uppercase' },
+  dynHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: space.cardPaddingCompact, paddingRight: 4, paddingTop: 4, minHeight: 52 },
+  dynTitle: { flex: 1, fontSize: 13, fontFamily: fontFamily.medium },
   closeBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   dynHeader: { paddingHorizontal: space.cardPaddingCompact, paddingBottom: 4 },
   dynBody: { paddingHorizontal: space.cardPaddingCompact, paddingBottom: 32, paddingTop: 4 },
   dynFooter: { paddingHorizontal: space.cardPaddingCompact, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
   mainBody: { flex: 1, minHeight: 0 },
-  togglesBar: { alignItems: 'center', paddingTop: 6, paddingBottom: 10 },
+  togglesBar: { alignItems: 'center', paddingTop: 8, paddingBottom: 8 },
 });

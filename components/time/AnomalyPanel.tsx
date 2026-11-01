@@ -91,7 +91,7 @@ export function AnomalyPanel({
             <View style={s.kindRow}>
               {kinds.map(kind => (
                 <View key={kind} style={[s.kindPill, { backgroundColor: c.t.surface.subtle }]}>
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.t.accent.coral, marginRight: 5 }} />
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.t.accent.coral, marginRight: 4 }} />
                   <Text style={[s.kindText, { color: c.text }]}>{anomalyLabel(kind, tr)}</Text>
                 </View>
               ))}
@@ -167,7 +167,7 @@ function QuickAction({
       accessibilityLabel={label}
       style={[s.action, { backgroundColor: border }]}>
       <IconSymbol name={icon} size={12} color={color} />
-      <Text numberOfLines={1} style={{ color, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 5, ...dsType.numeric }}>
+      <Text numberOfLines={1} style={{ color, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 4, ...dsType.numeric }}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -247,7 +247,7 @@ const s = StyleSheet.create({
   rowTitle: { fontSize: 14, fontFamily: fontFamily.semibold },
   rowMeta: { ...dsType.caption, marginTop: 2, ...dsType.numeric },
   kindRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  kindPill: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  kindPill: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 4 },
   kindText: { fontSize: 11, fontFamily: fontFamily.semibold },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   action: { flexDirection: 'row', alignItems: 'center', minHeight: 36, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },

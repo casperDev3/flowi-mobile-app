@@ -114,11 +114,11 @@ export function UpcomingPaymentsCard({
         activeOpacity={0.75}
         style={[st.row, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border.hairline }]}>
         <View style={[st.iconBox, { backgroundColor: (sub.color || '#8B6CFF') + '22' }]}>
-          <IconSymbol name={(sub.icon || 'repeat') as IconSymbolName} size={15} color={sub.color || '#8B6CFF'} />
+          <IconSymbol name={(sub.icon || 'repeat') as IconSymbolName} size={16} color={sub.color || '#8B6CFF'} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text numberOfLines={1} style={{ ...dsType.bodyMedium, color: t.text.primary }}>{sub.name}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
             {isOverdue ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.accent.coral }} /> : null}
             <Text numberOfLines={1} style={{ ...dsType.caption, color: isOverdue ? t.text.primary : t.text.secondary, fontFamily: isOverdue ? fontFamily.semibold : fontFamily.regular }}>
               {whenLabel(item)}
@@ -183,12 +183,12 @@ export function UpcomingPaymentsCard({
 }
 
 const st = StyleSheet.create({
-  badge:   { borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 2 },
+  badge:   { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
   card:    { paddingBottom: 8 },
   link:    { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32, paddingHorizontal: 12, borderRadius: radius.pill },
   row:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 56 },
   iconBox: { width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  renewBtn: { borderRadius: radius.pill, minHeight: 32, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 5 },
+  renewBtn: { borderRadius: radius.pill, minHeight: 32, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 6 },
   sectionHead: { paddingTop: 10, paddingBottom: 2 },
-  sectionText: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, textTransform: 'uppercase' },
+  sectionText: { fontSize: 13, fontFamily: fontFamily.medium },
 });

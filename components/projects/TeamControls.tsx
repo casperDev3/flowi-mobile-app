@@ -43,7 +43,7 @@ export function TeamInput({ label, value, onChange, editable = true, multiline =
   const palette = useContext(ProjectPaletteContext);
   const text = palette?.text ?? t.text.primary;
   return (
-    <View style={{ gap: 5 }}>
+    <View style={{ gap: 4 }}>
       <Text style={{ color: palette?.sub ?? t.text.secondary, fontSize: 12, fontFamily: fontFamily.medium }}>{label}</Text>
       <TextInput
         accessibilityLabel={label}
@@ -56,7 +56,7 @@ export function TeamInput({ label, value, onChange, editable = true, multiline =
         style={{
           // DS v2: поле — subtle-тло без рамки, радіус контрола.
           borderRadius: radius.control, fontFamily: fontFamily.regular, fontSize: 14,
-          paddingHorizontal: 14, paddingVertical: 10, color: text, backgroundColor: palette?.dim ?? glassOf(t).surfaceSubtle,
+          paddingHorizontal: 16, paddingVertical: 10, color: text, backgroundColor: palette?.dim ?? glassOf(t).surfaceSubtle,
           minHeight: multiline ? 80 : ACTION.height, opacity: editable ? 1 : 0.7,
           textAlignVertical: multiline ? 'top' : 'center',
         }}

@@ -268,7 +268,7 @@ export default function AdminWorkspaceScreen() {
             <ActivityIndicator color={c.sub} />
           </View>
         ) : loadError ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
             <IconSymbol name="exclamationmark.triangle" size={28} color={c.red} />
             <Text style={{ color: c.sub, fontSize: 14, textAlign: 'center' }}>{tr.adminLoadError}</Text>
             <TouchableOpacity
@@ -412,7 +412,7 @@ const st = StyleSheet.create({
   count: { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   // Вкладена група рядків усередині bento-картки (surface.subtle).
   card: { borderRadius: Atlas.radius.large, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16 },
   rowLabel: { fontSize: 14, fontFamily: fontFamily.semibold },
   rowSub: { fontSize: 12, marginTop: 2 },
   emptyText: { fontSize: 13, padding: 16, textAlign: 'center' },
@@ -423,6 +423,6 @@ const st = StyleSheet.create({
   // без власного `paddingHorizontal` вміст торкався б країв картки.
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
   reasonInput: { borderRadius: 12, minHeight: 40, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, fontFamily: fontFamily.regular },
-  actionBtn: { paddingHorizontal: 14, paddingVertical: 7, minHeight: 36, justifyContent: 'center', borderRadius: 999 },
+  actionBtn: { paddingHorizontal: 16, paddingVertical: 8, minHeight: 36, justifyContent: 'center', borderRadius: 999 },
   actionBtnText: { fontSize: 13, fontFamily: fontFamily.semibold },
 });

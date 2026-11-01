@@ -63,6 +63,6 @@ export function TaskTimerButton({ task, running, activeStartedAt, onStart, onSto
 
 const st = StyleSheet.create({
   btn:        { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-  label:      { fontFamily: fontFamily.semibold, marginLeft: 7 },
+  label:      { fontFamily: fontFamily.semibold, marginLeft: 8 },
   clock:      { fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });

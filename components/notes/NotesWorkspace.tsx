@@ -825,7 +825,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
                 accessibilityState={{ selected: selected?.id === item.id }} onPress={() => open(item)}
                 style={[s.card, { backgroundColor: c.panel, borderColor: selected?.id === item.id ? tk.action.primary : 'transparent' }, cardShadow]}>
                 <View style={s.cardHead}>
-                  {item.pinned && <Text testID={`note-pin-${item.id}`} style={{ color: c.accent, fontSize: 15 }}>★</Text>}
+                  {item.pinned && <View testID={`note-pin-${item.id}`}><IconSymbol name="pin.fill" size={16} color={c.sub} /></View>}
                   <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontFamily: fontFamily.semibold, fontSize: 16 }}>{item.title || tr.untitled}</Text>
                 </View>
                 <Text numberOfLines={2} style={{ color: c.sub, marginTop: 6 }}>{notePreview(item)}</Text>
@@ -874,7 +874,7 @@ const s = StyleSheet.create({
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 },
   tagRow: { flexDirection: 'row', gap: 8, paddingVertical: 4, paddingRight: 8 },
   // Omni: кнопки-фільтри — pill; вибрана — чорна (action.primary).
-  button: { minHeight: 44, minWidth: 44, paddingHorizontal: 14, flexDirection: 'row', gap: 6, justifyContent: 'center', alignItems: 'center', borderRadius: 999 },
+  button: { minHeight: 44, minWidth: 44, paddingHorizontal: 16, flexDirection: 'row', gap: 6, justifyContent: 'center', alignItems: 'center', borderRadius: 999 },
   search: { minHeight: 48, paddingHorizontal: 16, borderRadius: 999, fontSize: 16 },
   section: { fontFamily: fontFamily.semibold, paddingVertical: 12 }, card: { borderWidth: 1.5, borderRadius: Atlas.radius.large, padding: 16, marginBottom: 10 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -888,7 +888,7 @@ const s = StyleSheet.create({
   links: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 10 },
   link: { flexGrow: 1, flexShrink: 1, minWidth: 140 },
   previewPane: { flex: 1, paddingTop: 8 },
-  body: { flex: 1, fontSize: 17, lineHeight: 26, paddingTop: 14 },
+  body: { flex: 1, fontSize: 17, lineHeight: 26, paddingTop: 16 },
   bodyInZone: { flex: 0, minHeight: 320 },
   hint: { fontSize: 12, paddingTop: 8 },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
@@ -897,9 +897,9 @@ const s = StyleSheet.create({
   staticTitle: { fontSize: 20, fontFamily: fontFamily.semibold },
   staticKpis: { flexDirection: 'row', gap: 16 },
   staticBlock: { gap: 4 },
-  staticHeading: { fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.4, paddingBottom: 4 },
+  staticHeading: { fontSize: 12, fontFamily: fontFamily.medium, paddingBottom: 4 },
   staticRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 10, borderRadius: Atlas.radius.medium },
   staticTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, paddingLeft: 14, borderRadius: Atlas.radius.large, marginTop: 4, marginBottom: 8 },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, paddingLeft: 16, borderRadius: Atlas.radius.large, marginTop: 4, marginBottom: 8 },
   bannerClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

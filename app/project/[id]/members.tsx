@@ -539,7 +539,7 @@ export default function ProjectMembersScreen() {
         )}
 
         {transferring && (
-          <View style={[st.linkCard, { backgroundColor: tk.surface.card, marginBottom: 14 }]}>
+          <View style={[st.linkCard, { backgroundColor: tk.surface.card, marginBottom: 12 }]}>
             <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, marginBottom: 10 }}>{tr.projectMembersTransferOwnershipHint}</Text>
             {members.filter(m => m.role !== 'owner').length === 0 ? (
               <Text style={{ color: c.sub, fontSize: 12, marginBottom: 10 }}>{tr.projectMembersTransferOwnershipNoMembers}</Text>
@@ -565,7 +565,7 @@ export default function ProjectMembersScreen() {
         )}
 
         {loading && members.length === 0 ? (
-          <ActivityIndicator color={c.sub} style={{ marginTop: 30 }} />
+          <ActivityIndicator color={c.sub} style={{ marginTop: 32 }} />
         ) : loadError && members.length === 0 ? (
           // Порожній список малюється ЛИШЕ після успішної відповіді:
           // «нікого немає» і «не вдалося дізнатись» — різні стани.
@@ -638,7 +638,7 @@ export default function ProjectMembersScreen() {
             </View>
 
             <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.projectMembersLinkExpiry}</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               {EXPIRY_OPTIONS.map(opt => (
                 <TouchableOpacity
                   key={opt.hours}
@@ -653,7 +653,7 @@ export default function ProjectMembersScreen() {
             {/* Один рядок без переносу: «Без обмежень» отримує ширшу комірку
                 (flex 2), підписи — в один рядок; висота й вирівнювання ті самі,
                 що в рядках «Роль» і «Термін дії» (st.segment). */}
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               {MAX_USES_OPTIONS.map(opt => {
                 const on = inviteMaxUses === opt;
                 const label = opt === null ? tr.projectMembersInviteMaxUsesUnlimited : String(opt);
@@ -680,10 +680,10 @@ export default function ProjectMembersScreen() {
             <TouchableOpacity
               onPress={handleCreateLink}
               disabled={creatingLink}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: tk.action.primary, borderRadius: radius.pill, minHeight: 48, paddingVertical: 12, marginBottom: 14, opacity: creatingLink ? 0.7 : 1 }}>
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: tk.action.primary, borderRadius: radius.pill, minHeight: 48, paddingVertical: 12, marginBottom: 12, opacity: creatingLink ? 0.7 : 1 }}>
               {creatingLink ? <ActivityIndicator color={tk.text.onAction} /> : (
                 <>
-                  <IconSymbol name="link" size={15} color={tk.text.onAction} />
+                  <IconSymbol name="link" size={16} color={tk.text.onAction} />
                   <Text style={{ color: tk.text.onAction, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.projectMembersCreateLink}</Text>
                 </>
               )}
@@ -709,7 +709,7 @@ export default function ProjectMembersScreen() {
             )}
 
             {invites.length > 0 && (
-              <View style={{ marginBottom: 14 }}>
+              <View style={{ marginBottom: 12 }}>
                 <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.projectMembersActiveLinks}</Text>
                 {invites.map(invite => (
                   <View key={invite.id} style={[st.memberRow, { backgroundColor: tk.surface.card }]}>
@@ -753,7 +753,7 @@ export default function ProjectMembersScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={tr.projectMembersSendInvite}
                 accessibilityState={{ disabled: !email.trim() || sendingEmail, busy: sendingEmail }}
-                style={{ minHeight: 44, borderRadius: radius.pill, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: email.trim() ? tk.action.primary : tk.state.disabledBg }}>
+                style={{ minHeight: 44, borderRadius: radius.pill, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: email.trim() ? tk.action.primary : tk.state.disabledBg }}>
                 {sendingEmail ? <ActivityIndicator color={tk.text.onAction} size="small" /> : (
                   <Text style={{ color: email.trim() ? tk.text.onAction : tk.state.disabledText, fontFamily: fontFamily.semibold, fontSize: 13 }}>{tr.projectMembersSendInvite}</Text>
                 )}
@@ -820,7 +820,7 @@ export default function ProjectMembersScreen() {
                             accessibilityRole="button"
                             accessibilityLabel={`${tr.projectMembersInviteCancel}: ${invite.email ?? ''}`}
                             style={st.iconBtn}>
-                            <IconSymbol name="xmark" size={15} color={tk.status.danger} />
+                            <IconSymbol name="xmark" size={16} color={tk.status.danger} />
                           </TouchableOpacity>
                         </>
                       )}
@@ -838,13 +838,13 @@ export default function ProjectMembersScreen() {
 }
 
 const st = StyleSheet.create({
-  hint: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, padding: 14 },
-  memberRow: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, padding: 14, marginBottom: 8 },
+  hint: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, padding: 16 },
+  memberRow: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, padding: 16, marginBottom: 8 },
   roleBadge: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
   // 44 pt мін. висота й центр по обох осях — усі три ряди сегментів
   // (роль / термін / ліміт) однакові навіть коли підпис довший за комірку.
-  segment: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, paddingVertical: 9, paddingHorizontal: 6 },
-  linkCard: { borderRadius: radius.cardCompact, padding: 20, marginBottom: 14 },
+  segment: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, paddingVertical: 8, paddingHorizontal: 6 },
+  linkCard: { borderRadius: radius.cardCompact, padding: 20, marginBottom: 12 },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  smallBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, minHeight: 44, paddingVertical: 9 },
+  smallBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, minHeight: 44, paddingVertical: 8 },
 });

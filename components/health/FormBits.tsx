@@ -99,5 +99,5 @@ export function Segment<T extends string>({ label, options, value, onChange, col
 const s = StyleSheet.create({
   label: { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 14 },
   input: { fontSize: 15, fontFamily: fontFamily.regular, borderRadius: radius.control, paddingHorizontal: 14, paddingVertical: 12, minHeight: 44 },
-  seg:   { textAlign: 'center', borderRadius: radius.pill, minHeight: 44, paddingVertical: 11, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  seg:   { textAlign: 'center', borderRadius: radius.pill, minHeight: 44, paddingVertical: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
 });

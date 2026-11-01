@@ -273,7 +273,7 @@ export function TimeGrid({
                         width: pct((1 / p.cols) * 100),
                       }]}>
                       <View style={{
-                        flex: 1, borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2, overflow: 'hidden',
+                        flex: 1, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 2, overflow: 'hidden',
                         backgroundColor: m.color + (sel ? '55' : '2E'), borderLeftWidth: 3, borderLeftColor: m.color,
                       }}>
                         {/* Рядки рахуються від реальної висоти: 45-хвилинна

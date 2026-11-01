@@ -298,7 +298,7 @@ export default function ProgramEditorScreen() {
               accessibilityRole="button"
               accessibilityLabel={`${b.name || b.exerciseId}, ${b.sets}×${b.reps}`}
               style={{ flex: 1, paddingVertical: 8 }}>
-              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }}>{`${i + 1}. ${b.name || b.exerciseId}`}</Text>
+              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{`${i + 1}. ${b.name || b.exerciseId}`}</Text>
               <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
                 {`${b.sets}×${b.reps} · ${formatKg(b.weightG)} ${tr.tgUnitKg}${b.restSec ? ` · ${b.restSec} s` : ''} · ${progressionSummary(tr, b.progression)}`}
               </Text>
@@ -307,15 +307,15 @@ export default function ProgramEditorScreen() {
               <>
                 <TouchableOpacity onPress={() => updateDay(moveBlock(day, i, -1))} disabled={i === 0} accessibilityRole="button" accessibilityLabel={tr.tgMoveUp}
                   style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: i === 0 ? 0.3 : 1 }}>
-                  <IconSymbol name="arrow.up" size={15} color={c.sub} />
+                  <IconSymbol name="arrow.up" size={16} color={c.sub} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => updateDay(moveBlock(day, i, 1))} disabled={i === blocks.length - 1} accessibilityRole="button" accessibilityLabel={tr.tgMoveDown}
                   style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: i === blocks.length - 1 ? 0.3 : 1 }}>
-                  <IconSymbol name="arrow.down" size={15} color={c.sub} />
+                  <IconSymbol name="arrow.down" size={16} color={c.sub} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => updateDay(removeBlock(day, i))} accessibilityRole="button" accessibilityLabel={`${tr.tgRemove}: ${b.name}`}
                   style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name="xmark" size={15} color={TG_ERR} />
+                  <IconSymbol name="xmark" size={16} color={TG_ERR} />
                 </TouchableOpacity>
               </>
             ) : null}
@@ -361,7 +361,7 @@ export default function ProgramEditorScreen() {
               <Card key={a.id} c={c} style={{ marginBottom: 8 }} accent={stale ? TG_WARN : undefined}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }}>{memberName(Number(a.userId))}</Text>
+                    <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{memberName(Number(a.userId))}</Text>
                     <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
                       {`${a.startDate} · ${fmt(tr.tgWeeks, { n: a.weekCount })}${a.sessionCount ? ` · ${a.sessionCount}` : ''}`}
                     </Text>

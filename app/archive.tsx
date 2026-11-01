@@ -131,7 +131,7 @@ const ArchiveCard = React.memo(function ArchiveCard({
       ) : null}
       <View style={{ flex: 1 }}>
         {/* Title row */}
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 7 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
           <AnimatedCheck
             checked={true}
             size={18}
@@ -140,7 +140,7 @@ const ArchiveCard = React.memo(function ArchiveCard({
             /* read-only: no onPress */
           />
           <Text
-            style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.medium, flex: 1, marginLeft: 9, textDecorationLine: 'line-through', lineHeight: 18 }}
+            style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.medium, flex: 1, marginLeft: 8, textDecorationLine: 'line-through', lineHeight: 18 }}
             numberOfLines={2}>
             {task.title}
           </Text>
@@ -148,11 +148,11 @@ const ArchiveCard = React.memo(function ArchiveCard({
 
         {/* Badge row: мета зліва, пріоритет — у правому нижньому куті
             (рішення власника, п. 4 — як в особистих картках списку). */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginLeft: 27 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginLeft: 26 }}>
           {task.subtasks.length > 0 && (
             <View style={[ar.badge, { backgroundColor: c.dim }]}>
               <IconSymbol name="list.bullet" size={10} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginLeft: 3 }}>
+              <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginLeft: 4 }}>
                 {task.subtasks.filter(s => s.done).length}/{task.subtasks.length}
               </Text>
             </View>
@@ -160,7 +160,7 @@ const ArchiveCard = React.memo(function ArchiveCard({
           {task.deadline && (
             <View style={[ar.badge, { backgroundColor: c.dim }]}>
               <IconSymbol name="calendar" size={10} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginLeft: 3 }}>
+              <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginLeft: 4 }}>
                 {deadlineLabel(task.deadline)}
               </Text>
             </View>
@@ -460,7 +460,7 @@ export default function ArchiveScreen() {
                 onPress={clearAll}
                 accessibilityLabel={tr.clearArchive}
                 style={{ backgroundColor: c.card, borderColor: 'transparent' }}>
-                <IconSymbol name="trash" size={14} color={c.danger} />
+                <IconSymbol name="trash" size={18} color={c.danger} />
               </HeaderButton>
             </>
           ) : undefined}>
@@ -503,7 +503,7 @@ export default function ArchiveScreen() {
               accessibilityRole="button"
               accessibilityState={{ selected: sort === opt.key }}
               style={[ar.chip, { backgroundColor: sort === opt.key ? tk.action.primary : c.card }]}>
-              <IconSymbol name={opt.icon as any} size={11} color={sort === opt.key ? tk.text.onAction : c.sub} />
+              <IconSymbol name={opt.icon as any} size={12} color={sort === opt.key ? tk.text.onAction : c.sub} />
               <Text style={{ color: sort === opt.key ? tk.text.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 4 }}>
                 {opt.label}
               </Text>
@@ -543,7 +543,7 @@ export default function ArchiveScreen() {
             <View style={{ alignItems: 'center', paddingVertical: 72 }}>
               <AccentIcon isDark={isDark} icon="archivebox.fill" accent="lavender" size="lg" style={ar.emptyIcon} />
               <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontFamily: fontFamily.semibold }}>{tr.archiveEmpty}</Text>
-              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, marginTop: 5 }}>{tr.completedTasksAppear}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, marginTop: 4 }}>{tr.completedTasksAppear}</Text>
             </View>
           )}
         />
@@ -568,6 +568,6 @@ const ar = StyleSheet.create({
   chip:       { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, minHeight: 36, paddingHorizontal: 14, paddingVertical: 6 },
   emptyIcon:  { width: 80, height: 80, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   card:       { borderRadius: radius.nested, padding: 16, flexDirection: 'row', alignItems: 'center' },
-  badge:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  badge:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 4 },
   iconBtn:    { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

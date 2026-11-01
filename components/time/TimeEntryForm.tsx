@@ -200,7 +200,7 @@ export function TimeEntryForm({
           accessibilityRole="button"
           accessibilityLabel={tr.cancel}
           style={s.closeBtn}>
-          <IconSymbol name="xmark" size={17} color={c.sub} />
+          <IconSymbol name="xmark" size={16} color={c.sub} />
         </TouchableOpacity>
       </View>
 
@@ -229,7 +229,7 @@ export function TimeEntryForm({
               accessibilityRole="button"
               accessibilityLabel={`${tr.timeEntryPickTask}: ${task.title}`}
               style={s.suggestRow}>
-              <IconSymbol name="checklist" size={13} color={c.sub} />
+              <IconSymbol name="checklist" size={12} color={c.sub} />
               <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium, marginLeft: 8, flex: 1 }}>
                 {task.title}
               </Text>
@@ -381,7 +381,7 @@ export function TimeEntryForm({
         <Text style={{ color: c.danger, fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 10 }}>{error}</Text>
       )}
 
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 22 }}>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 24 }}>
         <TouchableOpacity onPress={onClose} style={[s.btn, { ...c.gl.subtle, flex: 1 }]}>
           <Text style={{ ...dsType.label, color: c.t.action.secondaryText }}>{tr.cancel}</Text>
         </TouchableOpacity>
@@ -391,7 +391,7 @@ export function TimeEntryForm({
           accessibilityRole="button"
           accessibilityState={{ disabled: !canSave }}
           style={[s.btn, { flex: 2, backgroundColor: canSave ? c.t.action.primary : c.t.state.disabledBg }]}>
-          <IconSymbol name="checkmark" size={15} color={canSave ? c.t.text.onAction : c.t.state.disabledText} />
+          <IconSymbol name="checkmark" size={16} color={canSave ? c.t.text.onAction : c.t.state.disabledText} />
           <Text style={{ ...dsType.label, color: canSave ? c.t.text.onAction : c.t.state.disabledText, marginLeft: 6 }}>
             {tr.save}
           </Text>
@@ -405,12 +405,12 @@ const s = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   closeBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -10 },
   sheetTitle: { fontSize: 20, lineHeight: 26, fontFamily: fontFamily.semibold, marginBottom: 4 },
-  label: { fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 16 },
+  label: { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 16 },
   input: { borderRadius: radius.control, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 12, fontSize: 15, fontFamily: fontFamily.regular, ...dsType.numeric },
   suggestBox: { borderRadius: radius.nestedCompact, marginTop: 6, overflow: 'hidden' },
   suggestRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, minHeight: 44 },
   linkedRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 14, minHeight: 36 },
+  chip: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 16, minHeight: 36 },
   durBlock: { flexDirection: 'row', borderRadius: radius.nested, padding: 16, alignItems: 'flex-start' },
   // Тривалість — display-цифри: тонкі, великі, табличні.
   durInput: { ...dsType.display, fontSize: 44, lineHeight: 50, textAlign: 'center', alignSelf: 'stretch' },

@@ -637,7 +637,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             accessibilityRole="button"
             accessibilityLabel={tr.add}
             style={[st.inlineAdd, { backgroundColor: c.action }]}>
-            <IconSymbol name="plus" size={15} color={c.onAction} />
+            <IconSymbol name="plus" size={16} color={c.onAction} />
             <Text style={{ ...dsType.label, color: c.onAction }}>{tr.budgetAddManually}</Text>
           </TouchableOpacity>
         ) : null}
@@ -694,7 +694,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
               accessibilityRole="button"
               accessibilityLabel={tr.budgetShowMonth}
               style={[st.inlineAdd, { ...c.gl.card, marginBottom: 0 }]}>
-              <IconSymbol name="calendar" size={15} color={c.text} />
+              <IconSymbol name="calendar" size={16} color={c.text} />
               <Text style={{ ...dsType.label, color: c.text }}>{tr.budgetShowMonth}</Text>
             </TouchableOpacity>
           </View>
@@ -714,7 +714,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             accessibilityLiveRegion="polite"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 12,
               ...c.gl.card, borderRadius: radius.nestedCompact, marginBottom: 12 }}>
-            <IconSymbol name="exclamationmark.triangle.fill" size={15} color={c.coral} />
+            <IconSymbol name="exclamationmark.triangle.fill" size={16} color={c.coral} />
             <Text style={{ flex: 1, fontSize: 12, color: c.text, lineHeight: 17 }}>{tr.budgetSaveFailed}</Text>
           </View>
         ) : null}
@@ -723,7 +723,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         {otherCurrencyCount > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 12,
             ...c.gl.card, borderRadius: radius.nestedCompact, marginBottom: 12 }}>
-            <IconSymbol name="info.circle" size={15} color={c.t.status.info} />
+            <IconSymbol name="info.circle" size={16} color={c.t.status.info} />
             <Text style={{ flex: 1, fontSize: 12, color: c.sub, lineHeight: 17 }}>
               {tr.budgetOtherCurrenciesHint.replace('{n}', String(otherCurrencyCount))}
             </Text>
@@ -946,7 +946,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
                   <TouchableOpacity
                     onPress={() => { setShowEditModal(false); deleteCategory(editItem.category); }}
                     style={[st.btn, { backgroundColor: c.red + '14', marginTop: 8 }]}>
-                    <IconSymbol name="trash" size={15} color={c.red} />
+                    <IconSymbol name="trash" size={16} color={c.red} />
                     <Text style={{ color: c.red, fontSize: 15, fontFamily: fontFamily.semibold }}>{tr.budgetDeleteAction}</Text>
                   </TouchableOpacity>
                 )}
@@ -1099,19 +1099,23 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
               Показуємо ПІД прогресом, щоб не заважати читати сам ліміт, але
               в межах тієї ж картки — інакше зв'язок із категорією губиться. */}
           {uncounted ? (
-            <Text style={{ fontSize: 11, color: c.sub }}>
-              ⚠ {uncounted} {uncountedLabel}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <IconSymbol name="exclamationmark.triangle.fill" size={12} color={c.sub} />
+              <Text style={{ fontSize: 12, color: c.sub }}>{uncounted} {uncountedLabel}</Text>
+            </View>
           ) : null}
           {!item.syncable ? (
-            <Text style={{ fontSize: 11, color: c.red }}>⚠ {unsyncableLabel}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <IconSymbol name="exclamationmark.triangle.fill" size={12} color={c.red} />
+              <Text style={{ fontSize: 12, color: c.red }}>{unsyncableLabel}</Text>
+            </View>
           ) : null}
           {item.limit > 0 ? (
             <View style={[st.progressTrack, { backgroundColor: c.t.surface.subtle }]}>
               <View style={[st.progressFill, { backgroundColor: barColor, width: `${pct * 100}%` as `${number}%` }]} />
             </View>
           ) : (
-            <Text style={{ fontSize: 11, color: c.sub, fontStyle: 'italic' }}>
+            <Text style={{ fontSize: 12, color: c.sub }}>
               {tapHint}
             </Text>
           )}
@@ -1137,7 +1141,7 @@ const st = StyleSheet.create({
   overlay:      { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheetWrapper: { width: '100%', flexShrink: 1 },
   sheet:        { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: space.cardPadding, paddingBottom: 36 },
-  input:        { borderRadius: radius.control, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 13, fontSize: 18, fontFamily: fontFamily.medium, marginBottom: 8, fontVariant: ['tabular-nums'] },
+  input:        { borderRadius: radius.control, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 14, fontSize: 18, fontFamily: fontFamily.medium, marginBottom: 8, fontVariant: ['tabular-nums'] },
   spentRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: radius.nestedCompact, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16 },
   preset:       { paddingHorizontal: 16, minHeight: 36, justifyContent: 'center', borderRadius: radius.pill },
   btn:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.pill, minHeight: 52, paddingHorizontal: 24 },

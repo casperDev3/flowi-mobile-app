@@ -220,7 +220,7 @@ export function PickerField({
         accessibilityLabel={`${label}: ${selected?.label ?? emptyOption?.label ?? ''}`}
         style={[st.trigger, { backgroundColor: glassOf(t).surfaceSubtle, borderColor: open ? t.focus.ring : 'transparent' }]}>
         {selected?.icon
-          ? <IconSymbol name={selected.icon} size={15} color={selected.color ?? c.sub} />
+          ? <IconSymbol name={selected.icon} size={16} color={selected.color ?? c.sub} />
           : selected?.color ? <View style={[st.dot, { backgroundColor: selected.color }]} /> : null}
         <Text
           numberOfLines={1}
@@ -296,19 +296,19 @@ export function PickerField({
                 opacity: draftError ? 0.5 : 1,
               }]}>
               <IconSymbol name="plus" size={14} color={draftError ? c.sub : c.accent} />
-              <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.bold, color: draftError ? c.sub : c.accent }}>
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.semibold, color: draftError ? c.sub : c.accent }}>
                 {createRowText}
               </Text>
             </TouchableOpacity>
           )}
 
           {draftError && (
-            <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>
+            <Text style={{ color: c.sub, fontSize: 12, marginTop: 8 }}>
               {draftError}
             </Text>
           )}
 
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ marginTop: 10 }}>
+          <ScrollView keyboardShouldPersistTaps="handled" style={{ marginTop: 12 }}>
             {emptyOption && !query.trim() && (
               <Row
                 label={emptyOption.label}
@@ -370,11 +370,11 @@ function Row({ label, color, icon, active, colors: c, isDark, onPress }: {
           backgroundColor: active ? accent + '14' : glassOf(t).surfaceSubtle,
         }]}>
         {icon
-          ? <IconSymbol name={icon} size={15} color={active ? accent : c.sub} />
+          ? <IconSymbol name={icon} size={16} color={active ? accent : c.sub} />
           : color ? <View style={[st.dot, { backgroundColor: color }]} /> : null}
         <Text
           numberOfLines={1}
-          style={{ flex: 1, fontSize: 14, fontFamily: active ? fontFamily.bold : fontFamily.medium, color: active ? accent : c.text }}>
+          style={{ flex: 1, fontSize: 14, fontFamily: active ? fontFamily.semibold : fontFamily.medium, color: active ? accent : c.text }}>
           {label}
         </Text>
         {/* Галочка, а не лише колір: вибраний стан не має триматись
@@ -386,9 +386,9 @@ function Row({ label, color, icon, active, colors: c, isDark, onPress }: {
 }
 
 const st = StyleSheet.create({
-  labelRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 7 },
-  label:      { fontSize: 11, fontFamily: fontFamily.bold, letterSpacing: 0.5, textTransform: 'uppercase' },
-  trigger:    { flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: radius.control, borderWidth: 2, paddingHorizontal: 14, gap: 9 },
+  labelRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  label:      { fontSize: 12, fontFamily: fontFamily.medium },
+  trigger:    { flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: radius.control, borderWidth: 2, paddingHorizontal: 12, gap: 8 },
   dot:        { width: 10, height: 10, borderRadius: 5 },
   backdrop:   { ...StyleSheet.absoluteFillObject },
   sheet: {
@@ -398,13 +398,13 @@ const st = StyleSheet.create({
     borderTopLeftRadius: radius.card,
     borderTopRightRadius: radius.card,
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 12,
   },
   handle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
-  sheetTitle: { fontSize: 17, fontFamily: fontFamily.bold, marginBottom: 12 },
-  search:     { fontFamily: fontFamily.regular, borderRadius: radius.control, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14 },
+  sheetTitle: { fontSize: 17, fontFamily: fontFamily.semibold, marginBottom: 12 },
+  search:     { fontFamily: fontFamily.regular, borderRadius: radius.control, paddingHorizontal: 12, paddingVertical: 12, fontSize: 14 },
   create:     { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: radius.nestedCompact,
-                borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 13, gap: 9, marginBottom: 7 },
-  rowWrap:    { marginBottom: 7 },
-  row:        { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: radius.nestedCompact, borderWidth: 1, paddingHorizontal: 14, gap: 9, overflow: 'hidden' },
+                borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 12, gap: 8, marginBottom: 8 },
+  rowWrap:    { marginBottom: 8 },
+  row:        { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: radius.nestedCompact, borderWidth: 1, paddingHorizontal: 12, gap: 8, overflow: 'hidden' },
 });

@@ -68,7 +68,7 @@ export function WeekStrip({ days, todayKey, selectedKey, tasksByDay, meetingsByD
 const st = StyleSheet.create({
   // Omni: день — вертикальна капсула; вибраний — чорна pill (c.select).
   day: { flex: 1, alignItems: 'center', paddingTop: 8, paddingBottom: 4, borderRadius: radius.pill, minHeight: 64, overflow: 'hidden' },
-  marks: { flexDirection: 'row', gap: 3, height: 6, marginTop: 4 },
+  marks: { flexDirection: 'row', gap: 4, height: 6, marginTop: 4 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   square: { width: 6, height: 6, borderRadius: 1.5 },
   sprint: { height: 3, alignSelf: 'stretch', marginTop: 4, marginHorizontal: 4, borderRadius: 2 },

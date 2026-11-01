@@ -148,7 +148,7 @@ export default function LoginScreen() {
             accessibilityRole="button"
             accessibilityLabel={tr.back}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="chevron.left" size={22} color={c.text} />
+            <IconSymbol name="chevron.left" size={24} color={c.text} />
           </TouchableOpacity>
         </View>
 
@@ -169,7 +169,7 @@ export default function LoginScreen() {
               {/* Email */}
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
                 <Text style={[st.fieldLabel, { color: c.sub }]}>
-                  {tr.authEmail.toUpperCase()}{" "}
+                  {tr.authEmail}{" "}
                   <Text style={{ color: c.red }}>*</Text>
                 </Text>
                 <TextInput
@@ -202,7 +202,7 @@ export default function LoginScreen() {
               {/* Password */}
               <View style={[st.fieldWrap, { borderTopColor: emailError ? c.border : 'transparent' }]}>
                 <Text style={[st.fieldLabel, { color: c.sub }]}>
-                  {tr.authPassword.toUpperCase()}{" "}
+                  {tr.authPassword}{" "}
                   <Text style={{ color: c.red }}>*</Text>
                 </Text>
                 <View style={st.passwordRow}>
@@ -291,7 +291,7 @@ export default function LoginScreen() {
 const st = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 16,
     paddingBottom: 4,
   },
   scroll: {
@@ -306,17 +306,16 @@ const st = StyleSheet.create({
     marginBottom: 24,
   },
   card: {
-    borderRadius: 24,
+    borderRadius: 16,
     overflow: 'hidden',
   },
   fieldWrap: {
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 16,
   },
   fieldLabel: {
     fontSize: 12,
     fontFamily: fontFamily.medium,
-    letterSpacing: 0.3,
     marginBottom: 4,
   },
   fieldError: {

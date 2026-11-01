@@ -194,13 +194,13 @@ export function ProjectScreenShell({
                 <Avatar person={{ id: user.id, name: displayName }} size={36} ringColor="transparent" />
               ) : (
                 <View style={[st.guest, { backgroundColor: c.dim }]}>
-                  <IconSymbol name="person.fill" size={16} color={c.sub} />
+                  <IconSymbol name="person.fill" size={18} color={c.sub} />
                 </View>
               )}
               {isWide ? (
                 <>
                   <Text numberOfLines={1} style={[st.accountName, { color: c.text }]}>{displayName}</Text>
-                  <IconSymbol name="chevron.down" size={11} color={c.sub} />
+                  <IconSymbol name="chevron.down" size={12} color={c.sub} />
                 </>
               ) : null}
             </Pressable>
@@ -231,7 +231,7 @@ export function ProjectScreenShell({
           </View>
         ) : undefined}>
         {(subtitle || kpis || tabs || headerChildren) ? (
-          <View style={{ gap: 14 }}>
+          <View style={{ gap: 12 }}>
             {subtitle ? <Text numberOfLines={2} style={[st.subtitle, { color: c.sub }]}>{subtitle}</Text> : null}
             {kpis ? <PageHeader kpis={kpis} bleed={isWide ? 0 : sidePad} /> : null}
             {tabs}

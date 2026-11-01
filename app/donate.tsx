@@ -128,14 +128,14 @@ export default function DonateScreen() {
               accessibilityLabel="PayPal: натисніть, щоб скопіювати email"
               headerRight={
                 <View style={[st.actionBtn, { backgroundColor: k.action.primary }]}>
-                  <IconSymbol name="doc.on.clipboard" size={15} color={k.text.onAction} />
+                  <IconSymbol name="doc.on.clipboard" size={16} color={k.text.onAction} />
                 </View>
               }>
               <Text style={[st.cardSub, { color: c.sub }]}>Натисніть, щоб скопіювати email</Text>
             </BentoCard>
           </BentoGrid>
 
-          <Text style={[st.thankYou, { color: c.sub }]}>Дякуємо за вашу підтримку 🙏</Text>
+          <Text style={[st.thankYou, { color: c.sub }]}>Дякуємо за підтримку</Text>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -154,11 +154,11 @@ const st = StyleSheet.create({
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
-  heroTitle:    { fontSize: 20, fontFamily: fontFamily.semibold, letterSpacing: -0.4, marginBottom: 8, textAlign: 'center' },
+  heroTitle:    { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 8, textAlign: 'center' },
   heroSub:      { fontSize: 14, lineHeight: 20, textAlign: 'center', fontFamily: fontFamily.regular },
   cardSub:      { fontSize: 13, fontFamily: fontFamily.regular },
-  actionBtn:    { width: 36, height: 36, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  actionBtn:    { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   thankYou:     { textAlign: 'center', fontSize: 13, marginTop: 28, fontFamily: fontFamily.medium },
 });

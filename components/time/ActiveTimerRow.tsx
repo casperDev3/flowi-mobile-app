@@ -178,7 +178,7 @@ const st = StyleSheet.create({
   stop:  { backgroundColor: STOP_COLOR, alignItems: 'center', justifyContent: 'center' },
   meta:    { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
   metaTag: { flexShrink: 1, marginTop: 1 },
-  tag:     { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0 },
+  tag:     { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0 },
   tagDot:  { width: 7, height: 7, borderRadius: 4 },
   tagText: { fontFamily: fontFamily.medium, flexShrink: 1 },
 });

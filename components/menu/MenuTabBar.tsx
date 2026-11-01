@@ -79,7 +79,7 @@ export function MenuTabBar({
 
 const st = StyleSheet.create({
   // Omni SectionTabs: окремі pill (активна — чорна), без скляної смуги-підкладки.
-  bar: { flexDirection: 'row', borderRadius: 999, paddingVertical: 3, gap: 6 },
+  bar: { flexDirection: 'row', borderRadius: 999, paddingVertical: 4, gap: 6 },
   seg: {
     flexDirection: 'row',
     minHeight: 40,
@@ -90,6 +90,6 @@ const st = StyleSheet.create({
     gap: 6,
   },
   segStretch: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: 6 },
-  count: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
+  count: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   countText: { fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });

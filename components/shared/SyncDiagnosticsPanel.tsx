@@ -110,7 +110,7 @@ export function SyncDiagnosticsPanel({
           <Text style={[st.headTitle, { color: c.text }]}>Чому не поїхало саме</Text>
           <Text style={[st.headHint, { color: c.sub }]} numberOfLines={open ? 3 : 2}>{verdict}</Text>
         </View>
-        <IconSymbol name={open ? 'chevron.up' : 'chevron.down'} size={13} color={c.sub} />
+        <IconSymbol name={open ? 'chevron.up' : 'chevron.down'} size={12} color={c.sub} />
       </TouchableOpacity>
 
       {open && live && <PanelBody live={live} c={c}
@@ -142,7 +142,7 @@ function PanelBody({ live, c, uiOnline, uiAuthStatus, uiSyncState }: {
   return (
     <View style={[st.body, { borderTopColor: c.border }]}>
 
-      <Section title="ПРОВОДКА" c={c}>
+      <Section title="Проводка" c={c}>
         <Row c={c} label="Реєстр планувальника" value={schedulerText} tone={schedulerTone} />
         <Row c={c} label="Підключень / знять"
           value={`${scheduler.installs} / ${scheduler.uninstalls}${
@@ -163,7 +163,7 @@ function PanelBody({ live, c, uiOnline, uiAuthStatus, uiSyncState }: {
           tone={instanceMismatch || diag.storageEvalCount > 1 ? c.orange : undefined} />
       </Section>
 
-      <Section title="ДЕБАУНС-ТАЙМЕР" c={c}>
+      <Section title="Дебаунс-таймер" c={c}>
         <Row c={c} label="Зараз"
           value={flags.debounceArmed
             ? `зведений${dueIn != null ? `, лишилось ${secs(Math.max(0, dueIn))}` : ''}`
@@ -184,7 +184,7 @@ function PanelBody({ live, c, uiOnline, uiAuthStatus, uiSyncState }: {
             + ` · повний ${debounce.byCaller.fullSync} · відкат ${debounce.byCaller.rollback}`} />
       </Section>
 
-      <Section title="ВИКЛИКИ doSync" c={c}>
+      <Section title="Виклики doSync" c={c}>
         <Row c={c} label="Спроб / увійшло"
           value={`${attempts.total} / ${attempts.entered}`}
           tone={attempts.total > attempts.entered ? c.orange : undefined} />
@@ -207,7 +207,7 @@ function PanelBody({ live, c, uiOnline, uiAuthStatus, uiSyncState }: {
           tone={attempts.lastOutcome === 'error' ? c.red : undefined} />
       </Section>
 
-      <Section title="ГЕЙТ ЗАРАЗ (рушій проти екрана)" c={c}>
+      <Section title="Гейт зараз (рушій проти екрана)" c={c}>
         <Row c={c} label="Мережа"
           value={`рушій ${flags.online ? 'онлайн' : 'офлайн'} · екран ${uiOnline ? 'онлайн' : 'офлайн'}`
             + ` · сховище ${live.storedMode}`}
@@ -223,7 +223,7 @@ function PanelBody({ live, c, uiOnline, uiAuthStatus, uiSyncState }: {
           tone={flags.syncing !== (uiSyncState === 'syncing') ? c.orange : undefined} />
       </Section>
 
-      <Section title="ЧЕРГА, RETRY, СОКЕТ" c={c}>
+      <Section title="Черга, retry, сокет" c={c}>
         <Row c={c} label="Outbox"
           value={live.pending === 0
             ? 'порожній'
@@ -241,7 +241,7 @@ function PanelBody({ live, c, uiOnline, uiAuthStatus, uiSyncState }: {
             + ` · з фону ${appState.toForeground}`} />
       </Section>
 
-      <Section title="ЖУРНАЛ" c={c}>
+      <Section title="Журнал" c={c}>
         {diag.events.length === 0
           ? <Text style={[st.rowValue, { color: c.sub }]}>порожній</Text>
           : diag.events.slice(-14).map((event, index) => (
@@ -311,16 +311,16 @@ function ago(at: number, now: number): string {
 const st = StyleSheet.create({
   // DS v2: вкладений блок — без рамки, тло задає картка-батько.
   wrap:         { borderRadius: Atlas.radius.large, marginBottom: 16, overflow: 'hidden' },
-  head:         { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 14, paddingVertical: 12 },
-  headTitle:    { fontSize: 13, fontFamily: fontFamily.bold },
-  headHint:     { fontFamily: fontFamily.regular, fontSize: 11, marginTop: 2, lineHeight: 15 },
-  body:         { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 },
+  head:         { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
+  headTitle:    { fontSize: 13, fontFamily: fontFamily.semibold },
+  headHint:     { fontFamily: fontFamily.regular, fontSize: 12, marginTop: 2, lineHeight: 16 },
+  body:         { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   section:      { marginBottom: 12 },
-  sectionTitle: { fontSize: 10, fontFamily: fontFamily.bold, letterSpacing: 0.7, marginBottom: 5 },
-  row:          { marginBottom: 6 },
-  rowLabel:     { fontSize: 10, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
+  sectionTitle: { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 4 },
+  row:          { marginBottom: 8 },
+  rowLabel:     { fontSize: 11, fontFamily: fontFamily.medium },
   rowValue:     { fontSize: 12, fontFamily: fontFamily.semibold, lineHeight: 16 },
-  logRow:       { flexDirection: 'row', gap: 8, marginBottom: 3 },
+  logRow:       { flexDirection: 'row', gap: 8, marginBottom: 4 },
   logTime:      { fontSize: 10, fontFamily: fontFamily.semibold, width: 66, fontVariant: ['tabular-nums'] },
   logText:      { fontSize: 11, fontFamily: fontFamily.medium, flex: 1 },
 });

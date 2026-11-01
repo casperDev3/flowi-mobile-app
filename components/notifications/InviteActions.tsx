@@ -78,7 +78,7 @@ export function InviteActions({ inviteId, accent: _accent, text, sub, border: _b
           <TouchableOpacity
             onPress={() => router.push({ pathname: '/project/[id]/overview', params: { id: state.projectId! } } as never)}
             accessibilityRole="button"
-            style={[st.btn, { backgroundColor: t.action.primary, flex: 0, paddingHorizontal: 18 }]}>
+            style={[st.btn, { backgroundColor: t.action.primary, flex: 0, paddingHorizontal: 20 }]}>
             <Text style={[st.btnPrimaryText, { color: t.text.onAction }]}>{tr.inviteJoinedOpenProject}</Text>
           </TouchableOpacity>
         ) : null}

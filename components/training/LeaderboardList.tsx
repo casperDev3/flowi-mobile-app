@@ -13,8 +13,6 @@ import { Avatar } from './TrainingBits';
 import { fmt, TG_ACCENT, type TrainingColors } from './theme';
 import { fontFamily } from '@/constants/theme';
 
-const MEDALS = ['🥇', '🥈', '🥉'];
-
 export function LeaderboardRowView({ c, row }: { c: TrainingColors; row: LeaderboardRow }) {
   const { tr } = useI18n();
   const name = row.user?.name || row.user?.email || '—';
@@ -26,16 +24,16 @@ export function LeaderboardRowView({ c, row }: { c: TrainingColors; row: Leaderb
         flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingHorizontal: 10, borderRadius: 16,
         backgroundColor: row.is_me ? c.chip : 'transparent',
       }}>
-      <Text style={{ width: 28, textAlign: 'center', color: c.sub, fontFamily: fontFamily.semibold, fontSize: row.rank <= 3 ? 18 : 14 }}>
-        {row.rank <= 3 ? MEDALS[row.rank - 1] : row.rank}
+      <Text style={{ width: 28, textAlign: 'center', color: row.rank <= 3 ? c.text : c.sub, fontFamily: row.rank <= 3 ? fontFamily.semibold : fontFamily.medium, fontSize: 15, fontVariant: ['tabular-nums'] }}>
+        {row.rank}
       </Text>
       <Avatar name={name} color={row.is_me ? TG_ACCENT : c.sub} size={32} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }} numberOfLines={1}>
+        <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }} numberOfLines={1}>
           {row.is_me ? `${name} (${tr.tgYou})` : name}
         </Text>
         <Text style={{ color: c.sub, fontSize: 12 }}>
-          {`${fmt(tr.tgSessionsShort, { n: row.sessions })} · 🔥${row.streak_days}`}
+          {`${fmt(tr.tgSessionsShort, { n: row.sessions })} · ${tr.tgStreak} ${fmt(tr.tgStreakDays, { n: row.streak_days })}`}
         </Text>
       </View>
       <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{`${row.xp} XP`}</Text>

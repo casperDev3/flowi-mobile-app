@@ -118,7 +118,7 @@ export function MeetingDetailHeader({ meeting, original, onEdit, onClose, isExpa
           accessibilityRole="button"
           accessibilityLabel={tr.edit}
           style={st.headerBtn}>
-          <IconSymbol name="pencil" size={17} color={c.sub} />
+          <IconSymbol name="pencil" size={16} color={c.sub} />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={onClose}
@@ -126,7 +126,7 @@ export function MeetingDetailHeader({ meeting, original, onEdit, onClose, isExpa
           accessibilityRole="button"
           accessibilityLabel={tr.close}
           style={st.headerBtn}>
-          <IconSymbol name="xmark" size={17} color={c.sub} />
+          <IconSymbol name="xmark" size={16} color={c.sub} />
         </TouchableOpacity>
       </View>
     </View>
@@ -202,19 +202,19 @@ export function MeetingDetailBody({
 
       {/* Omni: вкладки деталі — pill-таби; активна — чорна pill. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist" style={{ marginBottom: 10 }} contentContainerStyle={{ gap: 6 }}>
-        {tabs.map(item => <TouchableOpacity key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} onPress={() => selectTab(item.id)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: tab === item.id ? t.action.primary : t.surface.subtle }}><Text style={{ color: tab === item.id ? t.text.onAction : t.text.secondary, fontFamily: fontFamily.semibold, fontSize: 13 }}>{item.label}</Text></TouchableOpacity>)}
+        {tabs.map(item => <TouchableOpacity key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} onPress={() => selectTab(item.id)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: tab === item.id ? t.action.primary : t.surface.subtle }}><Text style={{ color: tab === item.id ? t.text.onAction : t.text.secondary, fontFamily: fontFamily.semibold, fontSize: 13 }}>{item.label}</Text></TouchableOpacity>)}
       </ScrollView>
       <View style={{ display: tab === 'info' ? 'flex' : 'none' }}>
       {/* Date */}
       <View style={[st.row, { backgroundColor: c.dim }]}>
-        <IconSymbol name="calendar" size={15} color={c.sub} />
+        <IconSymbol name="calendar" size={16} color={c.sub} />
         <Text style={[st.rowText, { color: c.text }]}>{meetingDayLabel(meeting.date, new Date(), tr, locale)}</Text>
       </View>
 
       {/* Location */}
       {meeting.location ? (
         <View style={[st.row, { backgroundColor: c.dim }]}>
-          <IconSymbol name="mappin" size={15} color={c.sub} />
+          <IconSymbol name="mappin" size={16} color={c.sub} />
           <Text style={[st.rowText, { color: c.text, flex: 1 }]}>{meeting.location}</Text>
         </View>
       ) : null}
@@ -227,7 +227,7 @@ export function MeetingDetailBody({
           accessibilityLabel={tr.meetingOpenLink}
           activeOpacity={0.75}
           style={[st.row, { backgroundColor: c.dim }]}>
-          <IconSymbol name="link" size={15} color={ACCENT} />
+          <IconSymbol name="link" size={16} color={ACCENT} />
           <Text style={[st.rowText, { color: ACCENT, flex: 1, fontFamily: fontFamily.semibold }]} numberOfLines={1}>
             {meeting.link}
           </Text>
@@ -237,7 +237,7 @@ export function MeetingDetailBody({
       {/* Notes */}
       {meeting.notes ? (
         <View style={[st.row, { backgroundColor: c.dim, alignItems: 'flex-start', paddingTop: 12, paddingBottom: 12 }]}>
-          <IconSymbol name="note.text" size={15} color={c.sub} />
+          <IconSymbol name="note.text" size={16} color={c.sub} />
           <Text style={{ fontSize: 13, fontFamily: fontFamily.regular, color: c.sub, marginLeft: 10, flex: 1, lineHeight: 19 }}>{meeting.notes}</Text>
         </View>
       ) : null}
@@ -252,7 +252,7 @@ export function MeetingDetailBody({
           </Text>
           {recordings.map((uri, idx) => (
             <View key={uri} style={[st.row, { backgroundColor: c.dim, marginBottom: 6 }]}>
-              <IconSymbol name="waveform" size={15} color={ACCENT} />
+              <IconSymbol name="waveform" size={16} color={ACCENT} />
               <Text style={[st.rowText, { color: c.text, flex: 1, fontSize: 13 }]}>
                 {tr.meetingRecordingItem.replace('{n}', String(idx + 1))}
               </Text>
@@ -290,7 +290,7 @@ export function MeetingDetailBody({
       <View style={[st.row, {
         backgroundColor: c.dim,
       }]}>
-        <IconSymbol name="timer" size={15} color={timer ? GREEN : c.sub} />
+        <IconSymbol name="timer" size={16} color={timer ? GREEN : c.sub} />
         <View style={{ flex: 1, marginLeft: 10 }}>
           {timer ? (
             <ElapsedClock
@@ -315,10 +315,10 @@ export function MeetingDetailBody({
           accessibilityRole="button"
           accessibilityLabel={timer ? tr.meetingTimerStopA11y : tr.meetingTimerStartA11y}
           style={[st.btn, {
-            paddingHorizontal: 14, gap: 6,
+            paddingHorizontal: 16, gap: 6,
             backgroundColor: timer ? t.surface.card : t.action.primary,
           }]}>
-          <IconSymbol name={timer ? 'stop.fill' : 'play.fill'} size={13} color={timer ? RED : t.text.onAction} />
+          <IconSymbol name={timer ? 'stop.fill' : 'play.fill'} size={12} color={timer ? RED : t.text.onAction} />
           <Text style={{ color: timer ? t.action.secondaryText : t.text.onAction, fontSize: 13, fontFamily: fontFamily.semibold }}>
             {timer ? tr.meetingTimerStop : tr.meetingTimerStart}
           </Text>
@@ -350,16 +350,16 @@ export function MeetingDetailBody({
 }
 
 const st = StyleSheet.create({
-  headerWrap:   { paddingBottom: 14 },
+  headerWrap:   { paddingBottom: 16 },
   handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
   headerRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
   colorChip:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  title:        { fontSize: 20, fontFamily: fontFamily.semibold, letterSpacing: -0.4 },
+  title:        { fontSize: 20, fontFamily: fontFamily.semibold },
   timeRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   headerBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.nestedCompact, marginBottom: 8 },
+  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.nestedCompact, marginBottom: 8 },
   rowText:      { fontSize: 14, fontFamily: fontFamily.regular, marginLeft: 10 },
   sectionLabel: { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 6 },
   smallBtn:     { width: 30, height: 30, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  btn:          { minHeight: 44, paddingVertical: 11, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  btn:          { minHeight: 44, paddingVertical: 12, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

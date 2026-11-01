@@ -89,7 +89,7 @@ export function DayAgenda({
 
       {empty ? (
         <View style={[st.emptyBox, { backgroundColor: c.card }]}>
-          <IconSymbol name="calendar.badge.checkmark" size={26} color={c.sub} />
+          <IconSymbol name="calendar.badge.checkmark" size={24} color={c.sub} />
           <Text style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.semibold, marginTop: 8 }}>{tr.calNothingPlanned}</Text>
           <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 4, textAlign: 'center' }}>{tr.calNothingPlannedHint}</Text>
         </View>
@@ -106,7 +106,7 @@ export function DayAgenda({
               accessibilityLabel={`${tr.calSprintA11y} ${bar.number} · ${bar.sprint.name} · ${bar.project.name}`}
               style={[st.row, { backgroundColor: c.card }]}>
               <View style={[st.sprintChip, { backgroundColor: c.dim }]}>
-                <IconSymbol name="flag.fill" size={13} color={bar.project.color} />
+                <IconSymbol name="flag.fill" size={12} color={bar.project.color} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }} numberOfLines={1}>
@@ -136,7 +136,7 @@ export function DayAgenda({
                 name={item.done ? 'checkmark.circle.fill' : 'circle'}
                 size={18}
                 color={item.done ? dsTokens(isDark).status.success : item.color} />
-              <View style={{ flex: 1, gap: 3 }}>
+              <View style={{ flex: 1, gap: 4 }}>
                 <Text
                   style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium, textDecorationLine: item.done ? 'line-through' : 'none' }}
                   numberOfLines={2}>
@@ -199,7 +199,7 @@ function SectionHead({ icon, label, count, c }: {
 const st = StyleSheet.create({
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 28 },
   sectionChip: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  countPill: { minWidth: 22, height: 20, paddingHorizontal: 7, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  countPill: { minWidth: 22, height: 20, paddingHorizontal: 8, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   sprintChip: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 32 },
   addBtn: { width: MIN_TOUCH, height: MIN_TOUCH, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },

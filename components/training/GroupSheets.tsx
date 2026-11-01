@@ -93,13 +93,13 @@ export function CreateGroupSheet({ visible, onClose, onCreated, c, scope }: {
         required
         c={c} label={tr.tgGroupName} value={name} onChangeText={setName} placeholder={tr.tgGroupNamePlaceholder} maxLength={200} autoFocus />
       <Field c={c} label={tr.tgGroupDescription} value={description} onChangeText={setDescription} placeholder={tr.tgGroupDescriptionPlaceholder} maxLength={500} />
-      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, marginBottom: 6 }}>{tr.tgColor}</Text>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginBottom: 6 }}>{tr.tgColor}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         {PROGRAM_COLORS.map(col => (
           <Chip key={col} c={c} label="●" color={col} active={color === col} onPress={() => setColor(col)} accessibilityLabel={`${tr.tgColor} ${col}`} />
         ))}
       </View>
-      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, marginBottom: 6 }}>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginBottom: 6 }}>
         {tr.tgWeekStart}
       </Text>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
@@ -216,7 +216,7 @@ export function JoinInvitePanel({ c, initial, onJoined }: {
               {fmt(tr.tgInviteFrom, { name: preview.invited_by.name })}
             </Text>
           ) : null}
-          <PrimaryButton label={tr.tgInviteJoin} onPress={join} busy={busy} style={{ marginTop: 14 }} />
+          <PrimaryButton label={tr.tgInviteJoin} onPress={join} busy={busy} style={{ marginTop: 16 }} />
         </Card>
       )}
     </View>

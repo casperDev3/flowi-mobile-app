@@ -76,7 +76,7 @@ function BellButton() {
   const router = useRouter();
   return (
     <HeaderButton onPress={() => router.push('/notifications' as Href)} accessibilityLabel={tr.notifications}>
-      <IconSymbol name="bell" size={17} color={t.text.primary} />
+      <IconSymbol name="bell" size={18} color={t.text.primary} />
       <NotificationBadge variant="dot" style={st.bellDot} />
     </HeaderButton>
   );
@@ -97,7 +97,7 @@ function TimerPill() {
       accessibilityLabel={`${tr.activeTimers}: ${activeTimers.length}`}
       hitSlop={HEADER_BUTTON_HIT_SLOP}
       style={({ pressed }) => [st.timer, { backgroundColor: a.tint, opacity: pressed ? 0.7 : 1 }]}>
-      <IconSymbol name="timer" size={15} color={a.ink} />
+      <IconSymbol name="timer" size={16} color={a.ink} />
       <Text style={[st.timerText, { color: t.text.primary }]}>{activeTimers.length}</Text>
     </Pressable>
   );
@@ -145,7 +145,7 @@ export function AppHeader({
       {withName ? (
         <>
           <Text numberOfLines={1} style={[st.accountName, { color: t.text.primary }]}>{displayName}</Text>
-          <IconSymbol name="chevron.down" size={11} color={t.text.secondary} />
+          <IconSymbol name="chevron.down" size={12} color={t.text.secondary} />
         </>
       ) : null}
     </Pressable>
@@ -160,7 +160,7 @@ export function AppHeader({
 
   const kpiBlock = kpis && !kpisInRow ? <PageHeader kpis={kpis} bleed={isCompact ? sidePad : 0} /> : null;
   const below = (subtitle || children || kpiBlock) ? (
-    <View style={{ gap: 14 }}>
+    <View style={{ gap: 16 }}>
       {subtitle ? <Text numberOfLines={2} style={[st.subtitle, { color: t.text.secondary }]}>{subtitle}</Text> : null}
       {kpiBlock}
       {children}
@@ -179,7 +179,7 @@ export function AppHeader({
       <View style={st.toolbar}>
         {showMenu && !back ? (
           <HeaderButton onPress={() => setDrawer(true)} accessibilityLabel={tr.navSidebarExpand}>
-            <IconSymbol name="sidebar.left" size={17} color={t.text.primary} />
+            <IconSymbol name="sidebar.left" size={18} color={t.text.primary} />
           </HeaderButton>
         ) : null}
         <View style={{ flex: 1 }} />
@@ -187,7 +187,7 @@ export function AppHeader({
           {/* Layout System v2.4: телефон — [☰] заголовок [пошук]. */}
           {onSearch ? (
             <HeaderButton onPress={onSearch} accessibilityLabel={searchLabel ?? tr.searchPlaceholder}>
-              <IconSymbol name="magnifyingglass" size={17} color={t.text.primary} />
+              <IconSymbol name="magnifyingglass" size={18} color={t.text.primary} />
             </HeaderButton>
           ) : null}
           {actions}
@@ -230,7 +230,7 @@ export function AppHeader({
             st.search,
             { backgroundColor: reduceTransparency ? t.surface.card : g.surfaceStrong, borderColor: g.rim, opacity: pressed ? 0.8 : 1 },
           ]}>
-          <IconSymbol name="magnifyingglass" size={15} color={t.text.secondary} />
+          <IconSymbol name="magnifyingglass" size={16} color={t.text.secondary} />
           <Text numberOfLines={1} style={[st.searchText, { color: t.text.secondary }]}>{searchLabel ?? tr.searchPlaceholder}</Text>
         </Pressable>
       ) : <View style={{ flex: 1 }} />}
@@ -271,12 +271,12 @@ const KPI_ROW_MIN_WIDTH = 860;
 
 const st = StyleSheet.create({
   kpiRow: { flexDirection: 'row', alignItems: 'center', gap: 28 },
-  bellDot: { position: 'absolute', top: 6, right: 7 },
+  bellDot: { position: 'absolute', top: 8, right: 8 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   toolbarRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
   search: {
     flex: 1, maxWidth: 360, minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth,
   },
   searchText: { flex: 1, fontSize: 14, fontFamily: fontFamily.regular },
   timer: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 12, borderRadius: radius.pill },

@@ -101,7 +101,7 @@ export type GlassSurfaceProps = ViewProps & {
    * true — акцент модуля з контексту (<GlassScreen module>), рядок — явний.
    */
   tint?: boolean | GlassAccent;
-  /** М'яке світіння акцентом (активний пункт, головна KPI). */
+  /** Застаріле (unslop): кольорового світіння немає, лише нейтральна тінь скла. Рядок досі задає акцент контексту для tint. */
   glow?: boolean | GlassAccent;
   /** Примусово блюрити/не блюрити (за замовчуванням: card/strong/pill на iOS — так). */
   blur?: boolean;
@@ -127,7 +127,6 @@ export function GlassSurface({
   const { t, g, isDark, scheme, reduceTransparency } = useDS();
   const ctxAccent = useResolvedAccent(typeof tint === 'string' ? tint : typeof glow === 'string' ? glow : null);
   const tintAccent: GlassAccent | null = tint ? (typeof tint === 'string' ? tint : ctxAccent) : null;
-  const glowAccent: GlassAccent | null = glow ? (typeof glow === 'string' ? glow : ctxAccent) : null;
 
   const subtle = variant === 'subtle';
   const r = radius ?? (variant === 'pill' ? R.pill : subtle ? R.nested : R.card);
@@ -137,9 +136,8 @@ export function GlassSurface({
 
   const shadowStyle: ViewStyle | null = !wantShadow
     ? null
-    : glowAccent && Platform.OS !== 'android'
-      ? { shadowColor: g.accent[glowAccent].glow, shadowOpacity: isDark ? 0.55 : 0.35, shadowRadius: 18, shadowOffset: { width: 0, height: 6 } }
-      : g.shadow;
+    // Unslop: кольорового світіння немає — `glow` дає ту саму нейтральну тінь скла.
+    : g.shadow;
 
   // 1. Зменшена прозорість — суцільна поверхня.
   if (reduceTransparency) {

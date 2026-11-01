@@ -73,6 +73,6 @@ export function SegmentedProgress({
 const st = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 6, gap: 8 },
   value: { fontFamily: fontFamily.semibold, fontSize: 13, fontVariant: ['tabular-nums'] },
-  row: { flexDirection: 'row', gap: 3 },
+  row: { flexDirection: 'row', gap: 4 },
   seg: { flex: 1 },
 });

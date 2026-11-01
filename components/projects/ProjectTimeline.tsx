@@ -92,14 +92,14 @@ export const ProjectTimeline = React.memo(function ProjectTimeline({
 });
 
 const st = StyleSheet.create({
-  chart:      { height: 34, flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
+  chart:      { height: 34, flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
   column:     { flex: 1, height: '100%', justifyContent: 'flex-end', alignItems: 'center' },
   bar:        { width: '100%', borderRadius: 3, overflow: 'hidden' },
   // Приглушення, а не інший колір: стовпчик читається як «стільки було,
   // стільки закрито», і палітра лишається одна на картку.
   barDone:    { width: '100%', opacity: 0.6 },
   emptyTick:  { width: '100%', height: 2, borderRadius: 1 },
-  markerRow:  { height: 5, flexDirection: 'row', gap: 3, marginTop: 3 },
+  markerRow:  { height: 5, flexDirection: 'row', gap: 4, marginTop: 4 },
   marker:     { width: 4, height: 4, borderRadius: 2 },
   labels:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   labelText:  { fontSize: 10, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },

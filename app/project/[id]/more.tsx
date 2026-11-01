@@ -76,7 +76,7 @@ export default function ProjectMoreScreen() {
               // Omni: суцільна картка з круглою icon-chip ліворуч.
               style={[{
                 flexDirection: 'row', alignItems: 'center', gap: 12,
-                minHeight: 64, paddingHorizontal: 14,
+                minHeight: 64, paddingHorizontal: 16,
                 borderRadius: radius.cardCompact,
                 backgroundColor: tk.surface.card,
               }, shadow[isDark ? 'dark' : 'light'].card]}>

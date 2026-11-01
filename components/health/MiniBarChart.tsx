@@ -55,7 +55,7 @@ export function MiniBarChart({ values, color, goal, height = 52 }: MiniBarChartP
 
   // DS v2: поточний (активний) стовпець — лайм, історія — тонований колір метрики.
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, height }}>
       {values.map((v, i) => {
         const targetH = Math.max(3, (v / max) * height);
         const barColor = i === values.length - 1 ? t.accent.lime : color + '55';

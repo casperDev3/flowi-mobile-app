@@ -134,7 +134,7 @@ export default function SettingsModulesScreen() {
                     key={item.module}
                     style={[st.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
                     <View style={[st.iconBox, { backgroundColor: c.dim }]}>
-                      <IconSymbol name={item.icon} size={17} color={c.text} />
+                      <IconSymbol name={item.icon} size={16} color={c.text} />
                     </View>
                     <View style={{ flex: 1 }}><Text style={[st.rowLabel, { color: c.text }]}>{label}</Text>{item.module === 'integrations' && <Text style={{ color: c.sub, fontSize: 12, marginTop: 4 }}>{tr.integrationsModuleHint}</Text>}</View>
                     {/* Ім'я — на самому Switch, а не на обгортці: обгортка з
@@ -167,8 +167,8 @@ export default function SettingsModulesScreen() {
 const st = StyleSheet.create({
   intro:        { fontSize: 13, lineHeight: 19, marginTop: 4, marginBottom: 4 },
   card:         { marginTop: 16 },
-  cardHead:     { paddingHorizontal: 16, paddingTop: 14, marginBottom: -4 },
-  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 12 },
+  cardHead:     { paddingHorizontal: 16, paddingTop: 16, marginBottom: -4 },
+  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, gap: 12 },
   iconBox:      { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   rowLabel:     { fontSize: 14, fontFamily: fontFamily.medium },
   note:         { fontSize: 12, lineHeight: 17, marginTop: 16, paddingHorizontal: 4 },

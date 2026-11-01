@@ -194,7 +194,7 @@ export function CommentsSection({
           const deletable = !readOnly && !!currentUserId && canDeleteComment(comment, currentUserId, isOwner);
           const when = new Date(comment.createdAt);
           return (
-            <View key={comment.id} style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+            <View key={comment.id} style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
               <View style={{
                 width: 26, height: 26, borderRadius: 13, backgroundColor: c.accent + '26',
                 alignItems: 'center', justifyContent: 'center', marginTop: 2,
@@ -203,12 +203,12 @@ export function CommentsSection({
               </View>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                  <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.bold }}>{nameFor(comment.authorId)}</Text>
-                  <Text style={{ color: c.sub, fontSize: 10 }}>
+                  <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold }}>{nameFor(comment.authorId)}</Text>
+                  <Text style={{ color: c.sub, fontSize: 11 }}>
                     {when.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}{' '}
                     {when.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
                   </Text>
-                  {comment.editedAt ? <Text style={{ color: c.sub, fontSize: 10 }}>{tr.commentsEdited}</Text> : null}
+                  {comment.editedAt ? <Text style={{ color: c.sub, fontSize: 11 }}>{tr.commentsEdited}</Text> : null}
                 </View>
                 {editingId === comment.id ? (
                   <View style={{ marginTop: 4 }}>
@@ -219,11 +219,11 @@ export function CommentsSection({
                       maxLength={COMMENT_BODY_MAX_LENGTH}
                       style={{
                         color: c.text, fontSize: 13, fontFamily: fontFamily.regular, backgroundColor: glassOf(t).surfaceSubtle,
-                        borderRadius: Atlas.radius.medium, padding: 10, minHeight: 44,
+                        borderRadius: Atlas.radius.medium, padding: 12, minHeight: 44,
                       }}
                     />
                     <View style={{ flexDirection: 'row', gap: 12, marginTop: 6 }}>
-                      <TouchableOpacity onPress={saveEdit}><Text style={{ color: c.accent, fontSize: 12, fontFamily: fontFamily.bold }}>{tr.commentsSaveEdit}</Text></TouchableOpacity>
+                      <TouchableOpacity onPress={saveEdit}><Text style={{ color: c.accent, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.commentsSaveEdit}</Text></TouchableOpacity>
                       <TouchableOpacity onPress={cancelEdit}><Text style={{ color: c.sub, fontSize: 12 }}>{tr.commentsCancelEdit}</Text></TouchableOpacity>
                     </View>
                   </View>
@@ -232,14 +232,14 @@ export function CommentsSection({
                     <Text style={{ color: c.text, fontSize: 13, marginTop: 2, lineHeight: 18 }}>
                       {renderCommentBody(comment.body).map((seg, i) => (
                         seg.mentionUserId ? (
-                          <Text key={i} style={{ color: c.accent, fontFamily: fontFamily.bold }}>@{seg.text}</Text>
+                          <Text key={i} style={{ color: c.accent, fontFamily: fontFamily.semibold }}>@{seg.text}</Text>
                         ) : (
                           <Text key={i}>{seg.text}</Text>
                         )
                       ))}
                     </Text>
                     {(editable || deletable) ? (
-                      <View style={{ flexDirection: 'row', gap: 14, marginTop: 4 }}>
+                      <View style={{ flexDirection: 'row', gap: 16, marginTop: 4 }}>
                         {editable ? (
                           <TouchableOpacity onPress={() => startEdit(comment)}>
                             <Text style={{ color: c.sub, fontSize: 11 }}>{tr.commentsEditAction}</Text>
@@ -287,7 +287,7 @@ export function CommentsSection({
           maxLength={COMMENT_BODY_MAX_LENGTH}
           style={{
             flex: 1, color: c.text, fontSize: 13, fontFamily: fontFamily.regular, backgroundColor: glassOf(t).surfaceSubtle,
-            borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, minHeight: 44, maxHeight: 120,
+            borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, minHeight: 44, maxHeight: 120,
           }}
         />
         <TouchableOpacity

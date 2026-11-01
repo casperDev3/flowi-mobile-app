@@ -67,7 +67,9 @@ export function TasksTodayPane({
 }: TasksTodayPaneProps) {
   const t = dsTokensForText(c.text);
   const units = { hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute };
-  const dateLabel = today.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
+  // Велика лише перша літера: textTransform 'capitalize' давав «1 Листопада».
+  const dateRaw = today.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
+  const dateLabel = dateRaw.charAt(0).toUpperCase() + dateRaw.slice(1);
   const now = useMinuteClock(fixedNow);
 
   const { tasks: srcTasks, meetings: srcMeetings, timers } = activitySources;
@@ -238,10 +240,10 @@ function PaneMeetings({ meetings, locale, units, onOpenMeeting, tr, nowColor }: 
             <View style={[st.meetingBar, { backgroundColor: meeting.color }]} />
             <Text style={[st.meetingTime, { color: b.text }]}>{meeting.time || '--:--'}</Text>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 {phase === 'current' && <View style={[st.nowDot, { backgroundColor: nowColor }]} />}
                 <Text numberOfLines={1} style={{ flex: 1, color: b.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{meeting.title}</Text>
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.copyText} onPress={event => { event.stopPropagation(); void copyMeeting(meeting, locale.startsWith('en')); }} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><IconSymbol name="doc.on.doc" size={15} color={b.textSecondary} /></TouchableOpacity>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.copyText} onPress={event => { event.stopPropagation(); void copyMeeting(meeting, locale.startsWith('en')); }} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><IconSymbol name="doc.on.doc" size={16} color={b.textSecondary} /></TouchableOpacity>
               </View>
               <Text numberOfLines={1} style={[type.caption, type.numeric, { color: b.textSecondary, marginTop: 2 }]}>
                 {duration}{meeting.location ? ` · ${meeting.location}` : ''}
@@ -264,7 +266,7 @@ function CalendarCta({ label, onPress }: { label: string; onPress: () => void })
       accessibilityRole="button"
       accessibilityLabel={label}
       style={[st.calendarBtn, { backgroundColor: b.actionBg }]}>
-      <IconSymbol name="calendar" size={15} color={b.actionText} />
+      <IconSymbol name="calendar" size={16} color={b.actionText} />
       <Text style={{ color: b.actionText, fontSize: 14, fontFamily: fontFamily.semibold }}>{label}</Text>
     </TouchableOpacity>
   );
@@ -275,7 +277,7 @@ const st = StyleSheet.create({
   root:        { flex: 1, alignSelf: 'stretch' },
   content:     { paddingBottom: 40 },
   title:       { fontSize: 28, fontFamily: fontFamily.medium, letterSpacing: -0.4 },
-  date:        { fontSize: 13, fontFamily: fontFamily.regular, marginTop: 2, marginBottom: 6, textTransform: 'capitalize' },
+  date:        { fontSize: 13, fontFamily: fontFamily.regular, marginTop: 2, marginBottom: 6 },
   card:        { marginTop: 16, borderRadius: radius.cardCompact, padding: 16 },
   cardHead:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, minHeight: 36 },
   cardChip:    { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

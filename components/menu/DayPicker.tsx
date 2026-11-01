@@ -156,17 +156,16 @@ export function DayList({
               <Text
                 style={{
                   color: isToday ? c.text : c.sub,
-                  fontSize: 11,
-                  fontFamily: fontFamily.semibold,
-                  textTransform: 'uppercase',
+                  fontSize: 12,
+                  fontFamily: fontFamily.medium,
                 }}>
-                {weekdayLabel(d, 'short')}
+                {cap(weekdayLabel(d, 'short'))}
               </Text>
               <Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'] }}>
                 {Number(d.slice(-2))}
               </Text>
             </View>
-            <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+            <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flexShrink: 1 }}>
                   {cap(weekdayLabel(d, 'long'))}
@@ -180,7 +179,7 @@ export function DayList({
                   .filter((l) => l.titles.length)
                   .map((l) => (
                     <View key={l.meal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <IconSymbol name={MEAL_META[l.meal].icon} size={11} color={MEAL_META[l.meal].color} />
+                      <IconSymbol name={MEAL_META[l.meal].icon} size={12} color={MEAL_META[l.meal].color} />
                       <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12, flex: 1 }}>
                         {l.titles.join(', ')}
                       </Text>

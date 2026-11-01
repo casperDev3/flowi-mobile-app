@@ -96,6 +96,6 @@ export function SprintVelocity({
 
 const st = StyleSheet.create({
   note:  { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.regular },
-  row:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, borderTopWidth: StyleSheet.hairlineWidth },
+  row:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
   num:   { fontSize: 12, fontFamily: fontFamily.regular, textAlign: 'right', fontVariant: ['tabular-nums'], minWidth: 58 },
 });

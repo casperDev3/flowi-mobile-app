@@ -14,11 +14,12 @@
  */
 import React, { useEffect, useState } from 'react';
 import { BackHandler, Modal, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import Animated, { FadeOutDown } from 'react-native-reanimated';
 
 import { OverlayScrim, OverlaySurface } from '@/components/ds/OverlaySurface';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useDSTheme } from '@/components/shared/useDSTheme';
+import { riseIn } from '@/constants/motion';
 import { fontFamily, radius, zone } from '@/constants/theme';
 import { useMotion } from '@/hooks/use-motion';
 import { useI18n } from '@/store/i18n';
@@ -64,7 +65,7 @@ export function BulkActionBar({ count, actions, onClear, bottom = 16, style, tes
   return (
     <>
       <Animated.View
-        entering={motion.entering(FadeInDown.duration(160))}
+        entering={motion.entering(riseIn(0, 180))}
         exiting={motion.entering(FadeOutDown.duration(120))}
         pointerEvents="box-none"
         style={[st.wrap, { bottom }, style]}>
@@ -129,13 +130,13 @@ export function BulkActionBar({ count, actions, onClear, bottom = 16, style, tes
 
 const st = StyleSheet.create({
   wrap: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
-  bar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: zone.bulkBar, paddingLeft: 18, paddingRight: 6, maxWidth: 520 },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: zone.bulkBar, paddingLeft: 16, paddingRight: 8, maxWidth: 520 },
   count: { flexShrink: 1, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginRight: 4 },
   actionsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill },
   actionsText: { fontSize: 14, fontFamily: fontFamily.semibold },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   menuWrap: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
-  menu: { minWidth: 240, paddingVertical: 6 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingHorizontal: 18 },
+  menu: { minWidth: 240, paddingVertical: 8 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingHorizontal: 16 },
   menuText: { fontSize: 15, fontFamily: fontFamily.medium },
 });

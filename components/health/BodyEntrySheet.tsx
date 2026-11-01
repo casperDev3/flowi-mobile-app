@@ -88,7 +88,7 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
                 <View style={[s.handle, { backgroundColor: c.border }]} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
                   <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.cancel} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                    <IconSymbol name="xmark" size={17} color={c.sub} />
+                    <IconSymbol name="xmark" size={18} color={c.sub} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -148,7 +148,7 @@ const s = StyleSheet.create({
   title:     { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 12 },
   grid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   cell:      { width: '47%' },
-  label:        { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 5 },
+  label:        { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 4 },
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 14 },
   btn:          { minHeight: 48, paddingVertical: 14, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
 });

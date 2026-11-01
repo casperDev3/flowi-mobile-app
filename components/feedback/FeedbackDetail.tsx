@@ -50,8 +50,8 @@ export function FeedbackDetailHeader({
   return (
     <View style={st.header}>
       <View style={[st.kindChip, { backgroundColor: kindColor + '18' }]}>
-        <IconSymbol name={entry.kind === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={11} color={kindColor} />
-        <Text style={{ color: kindColor, fontSize: 12, fontFamily: fontFamily.bold }}>{entry.kind === 'bug' ? tr.fbTypeBug : tr.fbTypeIdea}</Text>
+        <IconSymbol name={entry.kind === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={12} color={kindColor} />
+        <Text style={{ color: kindColor, fontSize: 12, fontFamily: fontFamily.semibold }}>{entry.kind === 'bug' ? tr.fbTypeBug : tr.fbTypeIdea}</Text>
       </View>
       <View style={{ flex: 1 }} />
       <TouchableOpacity onPress={onEdit} accessibilityRole="button" accessibilityLabel={tr.edit} style={[st.iconBtn, { backgroundColor: c.dim }]}>
@@ -83,7 +83,7 @@ export interface FeedbackDetailBodyProps {
 
 function Block({ label, text, colors: c }: { label: string; text: string; colors: FeedbackDetailColors }) {
   return (
-    <View style={{ marginTop: 14 }}>
+    <View style={{ marginTop: 16 }}>
       <Text style={[st.label, { color: c.sub }]}>{label}</Text>
       <Text style={{ color: c.text, fontSize: 14, lineHeight: 20 }} selectable>{text}</Text>
     </View>
@@ -109,7 +109,7 @@ export function FeedbackDetailBody({
       <Text style={[st.title, { color: c.text }]} selectable>{item.title}</Text>
       <View style={st.chips}>
         <View style={[st.chip, { backgroundColor: ws.color + '18' }]}>
-          <Text style={{ color: ws.color, fontSize: 12, fontFamily: fontFamily.bold }}>{weightLabel(tr, entry.kind, weight)}</Text>
+          <Text style={{ color: ws.color, fontSize: 12, fontFamily: fontFamily.semibold }}>{weightLabel(tr, entry.kind, weight)}</Text>
         </View>
         <View style={[st.chip, { backgroundColor: c.dim }]}>
           <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{moduleLabel(tr, item.module)}</Text>
@@ -165,11 +165,11 @@ export function FeedbackDetailBody({
       {bug?.actual ? <Block label={tr.fbFieldActual} text={bug.actual} colors={c} /> : null}
 
       {item.attachments?.length ? (
-        <View style={{ marginTop: 14 }}>
+        <View style={{ marginTop: 16 }}>
           <Text style={[st.label, { color: c.sub }]}>{tr.fbFieldAttachments}</Text>
           {item.attachments.map(att => (
             <View key={att.uid} style={[st.attRow, { backgroundColor: c.dim }]}>
-              <IconSymbol name={att.kind === 'video' ? 'play.circle.fill' : 'camera.fill'} size={15} color={c.sub} />
+              <IconSymbol name={att.kind === 'video' ? 'play.circle.fill' : 'camera.fill'} size={16} color={c.sub} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }} numberOfLines={1}>{att.name}</Text>
                 <Text style={{ color: c.sub, fontSize: 11 }}>
@@ -182,7 +182,7 @@ export function FeedbackDetailBody({
       ) : null}
 
       {item.context ? (
-        <View style={{ marginTop: 14 }}>
+        <View style={{ marginTop: 16 }}>
           <Text style={[st.label, { color: c.sub }]}>{tr.fbContext}</Text>
           {contextRows(tr, item.context).map(row => (
             <View key={row.label} style={[st.ctxRow, { borderBottomColor: c.border }]}>
@@ -212,15 +212,15 @@ export function FeedbackDetailBody({
 
 const st = StyleSheet.create({
   header:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 8 },
-  kindChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  kindChip:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   iconBtn:     { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   title:       { fontSize: 20, fontFamily: fontFamily.semibold, lineHeight: 26 },
   chips:       { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 8 },
   chip:        { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  stateBox:    { borderRadius: Atlas.radius.large, padding: 16, marginTop: 14 },
-  primary:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 999, paddingVertical: 11, marginTop: 10, minHeight: 44 },
+  stateBox:    { borderRadius: Atlas.radius.large, padding: 16, marginTop: 16 },
+  primary:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 999, paddingVertical: 12, marginTop: 10, minHeight: 44 },
   primaryText: { fontSize: 14, fontFamily: fontFamily.semibold },
   label:       { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 6 },
   attRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, padding: 10, marginBottom: 6 },
-  ctxRow:      { flexDirection: 'row', gap: 8, paddingVertical: 5, borderBottomWidth: StyleSheet.hairlineWidth },
+  ctxRow:      { flexDirection: 'row', gap: 8, paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth },
 });

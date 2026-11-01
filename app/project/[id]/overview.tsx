@@ -285,7 +285,7 @@ export default function ProjectOverviewScreen() {
             як прихована помилка, а не свідома роль. */}
         {role === 'viewer' ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.pill, backgroundColor: t.surface.card, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16, alignSelf: 'flex-start' }}>
-            <IconSymbol name="eye" size={13} color={c.sub} />
+            <IconSymbol name="eye" size={12} color={c.sub} />
             <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.viewerReadOnlyNotice}</Text>
           </View>
         ) : null}
@@ -300,7 +300,7 @@ export default function ProjectOverviewScreen() {
             icon="chart.bar.fill"
             accent="lavender"
             headerRight={project.deadline ? <BentoPeriodPill label={`${tr.projectDeadline}: ${deadlineLabel}`} /> : undefined}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginBottom: 12 }}>
               <DisplayNumber value={pct} unit="%" size="lg" />
               <Text style={[type.caption, type.numeric, { color: c.sub, marginBottom: 8, flexShrink: 1 }]}>
                 {stats?.done ?? 0}/{stats?.total ?? 0} {tr.projectDone}
@@ -432,7 +432,7 @@ function OverviewMeetings({ next, rest, when, onOpen, openLabel }: {
   const bc = useBentoColors();
   return (
     <View>
-      <Text numberOfLines={2} style={{ color: bc.text, fontSize: 22, lineHeight: 28, fontFamily: fontFamily.semibold, letterSpacing: -0.3 }}>
+      <Text numberOfLines={2} style={{ color: bc.text, fontSize: 22, lineHeight: 28, fontFamily: fontFamily.semibold }}>
         {next.meeting.title}
       </Text>
       <Text style={[type.caption, type.numeric, { color: bc.textSecondary, marginTop: 4 }]}>{when(next.date, next.time)}</Text>
@@ -441,12 +441,12 @@ function OverviewMeetings({ next, rest, when, onOpen, openLabel }: {
         accessibilityRole="button"
         accessibilityLabel={`${openLabel}: ${next.meeting.title}`}
         activeOpacity={0.8}
-        style={{ marginTop: 16, minHeight: 44, borderRadius: radius.pill, backgroundColor: bc.actionBg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 18 }}>
-        <IconSymbol name="calendar" size={15} color={bc.actionText} />
+        style={{ marginTop: 16, minHeight: 44, borderRadius: radius.pill, backgroundColor: bc.actionBg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 20 }}>
+        <IconSymbol name="calendar" size={16} color={bc.actionText} />
         <Text style={{ color: bc.actionText, fontSize: 14, fontFamily: fontFamily.semibold }}>{openLabel}</Text>
       </TouchableOpacity>
       {rest.length > 0 ? (
-        <View style={{ gap: 6, marginTop: 14 }}>
+        <View style={{ gap: 6, marginTop: 16 }}>
           {rest.map(({ meeting, date, time }) => (
             <TouchableOpacity
               key={`${meeting.id}_${date}`}
@@ -454,13 +454,13 @@ function OverviewMeetings({ next, rest, when, onOpen, openLabel }: {
               accessibilityRole="button"
               accessibilityLabel={`${meeting.title}, ${when(date, time)}`}
               activeOpacity={0.75}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, backgroundColor: bc.nestedBg, paddingHorizontal: 14, paddingVertical: 10, minHeight: 44 }}>
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, backgroundColor: bc.nestedBg, paddingHorizontal: 16, paddingVertical: 10, minHeight: 44 }}>
               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: meeting.color }} />
               <View style={{ flex: 1 }}>
                 <Text numberOfLines={1} style={{ color: bc.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{meeting.title}</Text>
                 <Text style={[type.caption, type.numeric, { color: bc.textSecondary, marginTop: 2 }]}>{when(date, time)}</Text>
               </View>
-              <IconSymbol name="chevron.right" size={13} color={bc.textSecondary} />
+              <IconSymbol name="chevron.right" size={12} color={bc.textSecondary} />
             </TouchableOpacity>
           ))}
         </View>

@@ -122,16 +122,16 @@ export function BodyTab({ h }: HealthTabProps) {
                 const delta = latestWeight - prevWeight; const up = delta > 0;
                 return (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                    <IconSymbol name={up ? 'arrow.up.right' : 'arrow.down.right'} size={11} color={up ? ACCENT_PULSE : ACCENT} />
-                    <Text style={{ color: up ? ACCENT_PULSE : ACCENT, fontSize: 11, fontFamily: fontFamily.bold, marginLeft: 2 }}>
+                    <IconSymbol name={up ? 'arrow.up.right' : 'arrow.down.right'} size={12} color={up ? ACCENT_PULSE : ACCENT} />
+                    <Text style={{ color: up ? ACCENT_PULSE : ACCENT, fontSize: 11, fontFamily: fontFamily.semibold, marginLeft: 2 }}>
                       {up ? '+' : ''}{delta.toFixed(1)} кг/тиж
                     </Text>
                   </View>
                 );
               })()}
               <MiniBarChart values={h.charts.weight} color={ACCENT_WEIGHT} height={40} />
-              <View style={{ flexDirection: 'row', marginTop: 3 }}>
-                {labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{l}</Text>)}
+              <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                {labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{l}</Text>)}
               </View>
             </>
           ) : (
@@ -180,7 +180,7 @@ export function BodyTab({ h }: HealthTabProps) {
                 ].map((z, i) => (
                   <View key={i} style={{ flex: z.flex, alignItems: 'center' }}>
                     <View style={{ height: 5, width: '100%', borderRadius: 3, backgroundColor: z.active ? z.color : z.color + '28' }} />
-                    <Text style={{ color: z.active ? z.color : c.sub, fontSize: 9, fontFamily: z.active ? fontFamily.bold : fontFamily.medium, marginTop: 4 }}>{z.range}</Text>
+                    <Text style={{ color: z.active ? z.color : c.sub, fontSize: 10, fontFamily: z.active ? fontFamily.semibold : fontFamily.medium, marginTop: 4 }}>{z.range}</Text>
                   </View>
                 ))}
               </View>
@@ -190,7 +190,7 @@ export function BodyTab({ h }: HealthTabProps) {
             <TouchableOpacity onPress={() => setModal('pulse')} accessibilityRole="button" accessibilityLabel={tr.recordPulse}
               style={[s.empty, { backgroundColor: c.dim }]}>
               <IconSymbol name="waveform.path.ecg" size={18} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 9, flex: 1 }}>{tr.recordPulse}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 8, flex: 1 }}>{tr.recordPulse}</Text>
               <IconSymbol name="plus" size={14} color={c.sub} />
             </TouchableOpacity>
           )}
@@ -223,7 +223,7 @@ export function BodyTab({ h }: HealthTabProps) {
             <TouchableOpacity onPress={() => setSheet(true)} accessibilityRole="button" accessibilityLabel={tr.addBodyEntry}
               style={[s.empty, { backgroundColor: c.dim }]}>
               <IconSymbol name="ruler.fill" size={18} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 9, flex: 1 }}>{tr.noMeasurements}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 8, flex: 1 }}>{tr.noMeasurements}</Text>
               <IconSymbol name="plus" size={14} color={c.sub} />
             </TouchableOpacity>
           ) : measured.map((t, i) => {
@@ -232,12 +232,12 @@ export function BodyTab({ h }: HealthTabProps) {
             return (
               <View key={t} style={[s.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.bold }}>{tr[labelKey[t]]}</Text>
+                  <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr[labelKey[t]]}</Text>
                   <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.semibold, marginTop: 1 }}>
                     {lv(t)}<Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}> {unitOf(t)}</Text>
                   </Text>
                   {delta != null && delta !== 0 && (
-                    <Text style={{ color: delta < 0 ? ACCENT : ACCENT_MOOD, fontSize: 11, fontFamily: fontFamily.bold, marginTop: 1 }}>
+                    <Text style={{ color: delta < 0 ? ACCENT : ACCENT_MOOD, fontSize: 11, fontFamily: fontFamily.semibold, marginTop: 1 }}>
                       {delta > 0 ? '+' : ''}{delta.toFixed(1)} {unitOf(t)}
                     </Text>
                   )}
@@ -299,7 +299,7 @@ export function BodyTab({ h }: HealthTabProps) {
             «сьогодні» (ВАДА-2): видаляти мовчки не можна — кажемо підсумок. */}
         {h.weightCleanupRemoved != null && h.weightCleanupRemoved > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 16, backgroundColor: ACCENT_WEIGHT + '14', padding: 16, marginBottom: 12 }}>
-            <IconSymbol name="scalemass.fill" size={15} color={ACCENT_WEIGHT} />
+            <IconSymbol name="scalemass.fill" size={16} color={ACCENT_WEIGHT} />
             <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 8 }}>
               {tr.hautoWeightCleanup.replace('{n}', String(h.weightCleanupRemoved))}
             </Text>
@@ -326,7 +326,7 @@ function Stat({ label, value, color, sub, badge }: {
     <View style={{ width: '33.3%', paddingVertical: 6 }}>
       <Text style={{ color, fontSize: 17, fontFamily: fontFamily.semibold }}>{value}</Text>
       <Text style={{ color: sub, fontSize: 10, fontFamily: fontFamily.semibold, marginTop: 1 }} numberOfLines={1}>{label}</Text>
-      {badge && <Text style={{ color, fontSize: 9, fontFamily: fontFamily.bold, marginTop: 1 }}>{badge}</Text>}
+      {badge && <Text style={{ color, fontSize: 11, fontFamily: fontFamily.semibold, marginTop: 1 }}>{badge}</Text>}
     </View>
   );
 }

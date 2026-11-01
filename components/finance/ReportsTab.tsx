@@ -231,7 +231,7 @@ export function ReportsTab(props: ReportsTabProps) {
               accessibilityState={{ expanded: open }}
               style={{ minHeight: 40, justifyContent: 'center' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <IconSymbol name={open ? 'chevron.down' : 'chevron.right'} size={11} color={c.sub} />
+                <IconSymbol name={open ? 'chevron.down' : 'chevron.right'} size={12} color={c.sub} />
                 <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 }}>
                   {categoryGroupLabel(g.group, tr)}
                   <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold }}> · {costKindLabel(g.cost, tr)}</Text>
@@ -276,7 +276,7 @@ export function ReportsTab(props: ReportsTabProps) {
     <BentoCard compact style={st.card}>
       <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
         <View style={[st.warnChip, { backgroundColor: c.g.accent.coral.tint }]}>
-          <IconSymbol name="exclamationmark.triangle.fill" size={15} color={c.g.accent.coral.ink} />
+          <IconSymbol name="exclamationmark.triangle.fill" size={16} color={c.g.accent.coral.ink} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
@@ -479,7 +479,7 @@ const st = StyleSheet.create({
   reportsCell: { flex: 1, minWidth: 0 },
   card: { marginBottom: space.cardGapCompact },
   warnChip: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 3 },
+  segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 4 },
   segmentBtn: { minHeight: 34, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   bar: { height: 6, borderRadius: radius.pill, marginTop: 6, overflow: 'hidden' },
   hint: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.nestedCompact, padding: 12, marginTop: 8 },

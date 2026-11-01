@@ -163,10 +163,10 @@ function uniqueColors(tasks: readonly CalendarTaskItem[]): string[] {
 }
 
 const st = StyleSheet.create({
-  cell: { flex: 1, alignItems: 'center', paddingTop: 3, borderRadius: radius.control },
+  cell: { flex: 1, alignItems: 'center', paddingTop: 4, borderRadius: radius.control },
   dateBox: { width: DATE_BOX, height: DATE_BOX, borderRadius: DATE_BOX / 2, alignItems: 'center', justifyContent: 'center' },
-  dots: { position: 'absolute', flexDirection: 'row', gap: 3, alignSelf: 'center' },
+  dots: { position: 'absolute', flexDirection: 'row', gap: 4, alignSelf: 'center' },
   dot: { width: 6, height: 6, borderRadius: 3 },
   dotSquare: { width: 6, height: 6, borderRadius: 1.5 },
-  label: { fontSize: 10, fontFamily: fontFamily.semibold, paddingHorizontal: 3, paddingVertical: 1, borderLeftWidth: 2, borderRadius: 3, overflow: 'hidden' },
+  label: { fontSize: 10, fontFamily: fontFamily.semibold, paddingHorizontal: 4, paddingVertical: 1, borderLeftWidth: 2, borderRadius: 3, overflow: 'hidden' },
 });

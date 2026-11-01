@@ -32,9 +32,9 @@ export const ContainerTile = React.memo(function ContainerTile({
   const hasCover = !!con.photoIds?.length;
   const title = (
     <>
-      <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, letterSpacing: -0.2 }} numberOfLines={2}>{con.name}</Text>
+      <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold }} numberOfLines={2}>{con.name}</Text>
       {placeLabel ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
           <IconSymbol name="location.fill" size={10} color={c.sub} />
           <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, flexShrink: 1 }} numberOfLines={1}>{placeLabel}</Text>
         </View>
@@ -54,10 +54,10 @@ export const ContainerTile = React.memo(function ContainerTile({
           <View>
             <MediaImage asset={cover} style={{ width: '100%', height: 96 }} pendingLabel={tr.ctrPhotoPending} placeholderColor={color + '20'} />
             <View style={{ height: 3, backgroundColor: color }} />
-            <View style={{ paddingTop: 10, paddingHorizontal: 14, paddingBottom: 8 }}>{title}</View>
+            <View style={{ paddingTop: 10, paddingHorizontal: 16, paddingBottom: 8 }}>{title}</View>
           </View>
         ) : (
-          <View style={{ paddingTop: 16, paddingHorizontal: 14, paddingBottom: 12 }}>
+          <View style={{ paddingTop: 16, paddingHorizontal: 16, paddingBottom: 12 }}>
             <View style={{ width: 40, height: 40, borderRadius: radius.pill, backgroundColor: color + '24', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
               <IconSymbol name="shippingbox.fill" size={20} color={color} />
             </View>
@@ -65,7 +65,7 @@ export const ContainerTile = React.memo(function ContainerTile({
           </View>
         )}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6,
-          paddingHorizontal: 14, paddingVertical: 10,
+          paddingHorizontal: 16, paddingVertical: 10,
           borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border,
           backgroundColor: selected ? color + '1A' : 'transparent' }}>
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -79,7 +79,7 @@ export const ContainerTile = React.memo(function ContainerTile({
             ) : null}
           </View>
           <View style={{ width: 22, height: 22, borderRadius: radius.pill, backgroundColor: color + '25', alignItems: 'center', justifyContent: 'center' }}>
-            <IconSymbol name="chevron.right" size={11} color={color} />
+            <IconSymbol name="chevron.right" size={12} color={color} />
           </View>
         </View>
       </View>

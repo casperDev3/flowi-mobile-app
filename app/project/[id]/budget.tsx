@@ -279,7 +279,7 @@ export default function ProjectBudgetScreen() {
           {budget ? (
             <>
               {/* DS v2: витрачене — display-цифри, прогрес — amber (перевитрата — coral). */}
-              <Text style={[type.caption, { color: c.sub, marginTop: 18 }]}>{tr.overviewBudgetSpent}</Text>
+              <Text style={[type.caption, { color: c.sub, marginTop: 20 }]}>{tr.overviewBudgetSpent}</Text>
               <Text style={[type.displaySm, { color: c.text, marginTop: 4 }]} numberOfLines={1} adjustsFontSizeToFit>
                 {formatSubscriptionMoney(spent, currency, allCurrencies, locale)}
                 <Text style={[type.displayUnit, { color: c.sub }]}> / {formatSubscriptionMoney(budget.amount, currency, allCurrencies, locale)}</Text>
@@ -313,7 +313,7 @@ export default function ProjectBudgetScreen() {
           accessibilityRole="button"
           accessibilityLabel={tr.finProjectAddTx}
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, borderRadius: radius.pill, backgroundColor: tk.action.primary, marginBottom: 20 }}>
-          <IconSymbol name="plus" size={15} color={tk.text.onAction} />
+          <IconSymbol name="plus" size={16} color={tk.text.onAction} />
           <Text style={{ color: tk.text.onAction, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.finProjectAddTx}</Text>
         </TouchableOpacity>
 
@@ -349,7 +349,7 @@ export default function ProjectBudgetScreen() {
                   key={sub.id}
                   onPress={() => router.push({ pathname: '/subscriptions', params: { open: sub.id } } as never)}
                   activeOpacity={0.75}
-                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: tk.surface.subtle, padding: 14, marginBottom: 8, minHeight: 44 }}>
+                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: tk.surface.subtle, padding: 16, marginBottom: 8, minHeight: 44 }}>
                   <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: sub.color || (project?.color ?? c.accent), marginRight: 10 }} />
                   <View style={{ flex: 1 }}>
                     <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{sub.name}</Text>
@@ -372,7 +372,7 @@ export default function ProjectBudgetScreen() {
         {projectTx.length === 0 ? (
           <Text style={[type.body, { color: c.sub, fontSize: 13 }]}>{tr.projectBudgetNoTransactions}</Text>
         ) : projectTx.map(tx => (
-          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: tk.surface.subtle, padding: 14, marginBottom: 8 }}>
+          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: tk.surface.subtle, padding: 16, marginBottom: 8 }}>
             <View style={{ flex: 1 }}>
               <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tx.category || tx.note || '—'}</Text>
               <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
@@ -391,7 +391,7 @@ export default function ProjectBudgetScreen() {
         {projectIncome.length === 0 ? (
           <Text style={[type.body, { color: c.sub, fontSize: 13 }]}>{tr.finProjectNoIncome}</Text>
         ) : projectIncome.map(tx => (
-          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: tk.surface.subtle, padding: 14, marginBottom: 8 }}>
+          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: tk.surface.subtle, padding: 16, marginBottom: 8 }}>
             <View style={{ flex: 1 }}>
               <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tx.category || tx.note || '—'}</Text>
               <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>

@@ -123,7 +123,7 @@ export function FieldTrigger({
           borderColor: danger ? t.accent.coral : 'transparent',
           backgroundColor: danger ? t.accent.coral + '1F' : on ? t.action.primary : c.dim,
         }]}>
-        {dotColor ? <View style={[st.dot, { backgroundColor: dotColor }]} /> : <IconSymbol name={icon} size={13} color={danger ? t.accent.coral : fg} />}
+        {dotColor ? <View style={[st.dot, { backgroundColor: dotColor }]} /> : <IconSymbol name={icon} size={14} color={danger ? t.accent.coral : fg} />}
         <Text numberOfLines={1} style={{ color: fg, fontSize: 13, fontFamily: fontFamily.semibold, maxWidth: 150 }}>
           {on ? value : label}
         </Text>
@@ -143,7 +143,7 @@ export function FieldTrigger({
           {shown}
         </Text>
       </View>
-      {onPress ? <IconSymbol name="chevron.right" size={13} color={c.sub} /> : <View style={{ width: 13 }} />}
+      {onPress ? <IconSymbol name="chevron.right" size={14} color={c.sub} /> : <View style={{ width: 13 }} />}
     </>
   );
 
@@ -278,7 +278,7 @@ export function OptionRow({ label, active, onPress, color, icon, colors: c, sub 
       accessibilityLabel={label}
       style={[st.option, { borderColor: active ? t.action.primary : 'transparent', backgroundColor: active ? glassOf(t).surface : c.dim }]}>
       {icon
-        ? <IconSymbol name={icon} size={15} color={active ? tint : c.sub} />
+        ? <IconSymbol name={icon} size={16} color={active ? tint : c.sub} />
         : color ? <View style={[st.dot, { backgroundColor: color }]} /> : null}
       <View style={{ flex: 1 }}>
         <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: active ? fontFamily.semibold : fontFamily.medium, color: c.text }}>{label}</Text>
@@ -332,7 +332,7 @@ export const cardStyles = StyleSheet.create({
 
 const st = StyleSheet.create({
   groupWrap:  { marginTop: 14 },
-  groupTitle: { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 7, marginLeft: 2 },
+  groupTitle: { fontSize: 13, fontFamily: fontFamily.medium, marginBottom: 8, marginLeft: 4 },
   group:      { borderRadius: radius.nested, overflow: 'hidden' },
   sep:        { borderTopWidth: StyleSheet.hairlineWidth },
   row:        { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingHorizontal: 14, gap: 10 },

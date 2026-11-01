@@ -63,8 +63,8 @@ export function TaskSubtasks({
     {task.subtasks.length > 0 && (
       <View style={{ marginBottom: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-          <IconSymbol name="list.bullet" size={13} color={c.sub} />
-          <Text style={[st.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0, flex: 1 }]}>
+          <IconSymbol name="list.bullet" size={14} color={c.sub} />
+          <Text style={[st.label, { color: c.sub, marginLeft: 4, marginTop: 0, marginBottom: 0, flex: 1 }]}>
             {tr.subtasks} · {task.subtasks.filter(x => x.done).length}/{task.subtasks.length}
           </Text>
           <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{progressPercent}%</Text>
@@ -77,8 +77,8 @@ export function TaskSubtasks({
 
     {!task.subtasks.length && (
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-        <IconSymbol name="list.bullet" size={13} color={c.sub} />
-        <Text style={[st.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0 }]}>{tr.subtasks}</Text>
+        <IconSymbol name="list.bullet" size={14} color={c.sub} />
+        <Text style={[st.label, { color: c.sub, marginLeft: 4, marginTop: 0, marginBottom: 0 }]}>{tr.subtasks}</Text>
       </View>
     )}
 
@@ -89,7 +89,7 @@ export function TaskSubtasks({
       const hasMore = !!onOpenAll && sortedSubs.length > LIMIT;
       const displaySubs = hasMore ? sortedSubs.slice(0, LIMIT) : sortedSubs;
       return (
-        <View style={{ gap: 7 }}>
+        <View style={{ gap: 8 }}>
           {displaySubs.map((sub) => {
             const originalIdx = task.subtasks.findIndex(item => item.id === sub.id);
             if (editingId === sub.id) {
@@ -128,7 +128,7 @@ export function TaskSubtasks({
                   accessibilityRole="button"
                   accessibilityLabel={`${tr.copySubtask}: ${sub.title}`}
                   style={{ marginRight: 14 }}>
-                  <IconSymbol name="doc.on.doc" size={13} color={c.sub} />
+                  <IconSymbol name="doc.on.doc" size={14} color={c.sub} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => onShowActions(sub, originalIdx)} hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}>
                   <IconSymbol name="ellipsis" size={14} color={c.sub} />
@@ -150,7 +150,7 @@ export function TaskSubtasks({
           )}
 
           <View style={[st.addSubRow, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
-            <IconSymbol name="plus" size={15} color={c.sub} />
+            <IconSymbol name="plus" size={16} color={c.sub} />
             <TextInput
               placeholder={tr.addSubtask}
               placeholderTextColor={t.text.muted}
@@ -176,7 +176,7 @@ export function TaskSubtasks({
 }
 
 const st = StyleSheet.create({
-  label:        { fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
+  label:        { fontSize: 13, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 16 },
   progressBg:   { height: 6, borderRadius: radius.pill, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: radius.pill },
   subRow:       { flexDirection: 'row', alignItems: 'center', borderRadius: radius.control, borderWidth: 1.5, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10 },
@@ -184,5 +184,5 @@ const st = StyleSheet.create({
   subTitle:     { fontSize: 13, fontFamily: fontFamily.medium },
   subInput:     { fontSize: 13, fontFamily: fontFamily.regular, paddingVertical: 0 },
   addSubRow:    { flexDirection: 'row', alignItems: 'center', borderRadius: radius.control, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10 },
-  viewAllBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, minHeight: 44, paddingHorizontal: 16, paddingVertical: 11 },
+  viewAllBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, minHeight: 44, paddingHorizontal: 16, paddingVertical: 12 },
 });

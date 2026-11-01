@@ -63,7 +63,7 @@ import { orderTodaySections } from '@/components/today/sectionOrder';
 import { masonryColumnCount } from '@/utils/masonry';
 import { fontFamily, radius, type, type GlassAccent } from '@/constants/theme';
 import {
-  BentoArrowButton, BentoCard, HatchedBars, KpiCounter, MeshBackground, SegmentedProgress, useBentoColors,
+  BentoArrowButton, BentoCard, KpiCounter, MeshBackground, SegmentedProgress, useBentoColors,
 } from '@/components/ds';
 import { useDS } from '@/hooks/use-ds';
 
@@ -290,16 +290,6 @@ export default function TodayScreen() {
    * оновлення, що й колишній `dayKey`.
    */
   const today = useToday();
-  // Година — окремо й на кожен рендер: привітання залежить від ЧАСУ доби, а
-  // не від дати, і не має застигати на момент, коли доба почалась.
-  const hour  = new Date().getHours();
-  const greet = hour < 6
-    ? tr.todayGreetNight
-    : hour < 12
-      ? tr.todayGreetMorning
-      : hour < 18
-        ? tr.todayGreetDay
-        : tr.todayGreetEvening;
   const dateStr = today.toLocaleDateString(locale, {
     weekday: 'long', day: 'numeric', month: 'long',
   });
@@ -375,21 +365,6 @@ export default function TodayScreen() {
     .filter(e => isSameDay(new Date(e.date), today))
     .reduce((s, e) => s + (e.duration || 0), 0);
 
-  /**
-   * Omni: штриховані стовпці «Час» — відстежене за останні 7 днів (сьогодні
-   * — активний стовпець із градієнтом). Ті самі записи, що й trackedSec.
-   */
-  const trackedWeek = useMemo(() => {
-    const days: { label: string; value: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
-      const sec = time
-        .filter(e => isSameDay(new Date(e.date), day))
-        .reduce((acc, e) => acc + (e.duration || 0), 0);
-      days.push({ label: day.toLocaleDateString(locale, { weekday: 'short' }).slice(0, 2), value: sec });
-    }
-    return days;
-  }, [time, today, locale]);
   const habitsDone = habits.filter(h => habitDoneToday(h)).length;
 
   // Today's meetings — разом із екземплярами повторюваних (як секція на
@@ -570,14 +545,14 @@ export default function TodayScreen() {
                 <View
                   accessible
                   accessibilityLabel={tr.unassignedTxWarning.replace('{n}', String(overview.unassigned.count))}>
-                  <IconSymbol name="exclamationmark.triangle.fill" size={11} color={t.status.warning} />
+                  <IconSymbol name="exclamationmark.triangle.fill" size={12} color={t.status.warning} />
                 </View>
               )}
             </View>
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
-              style={{ ...type.displaySm, fontSize: 32, lineHeight: 36, letterSpacing: -0.8, color: headlineValue >= 0 ? t.text.primary : t.status.danger, marginTop: 6 }}>
+              style={{ ...type.displaySm, fontSize: 32, lineHeight: 36, letterSpacing: -0.32, color: headlineValue >= 0 ? t.text.primary : t.status.danger, marginTop: 6 }}>
               {fmtMoney(headlineValue)}
             </Text>
             {hasPrimaryAccounts && (
@@ -596,20 +571,10 @@ export default function TodayScreen() {
             icon="timer" accent="amber"
             title={tr.quickTimer}
             onPress={() => router.push('/time')}>
-            <Text numberOfLines={1} adjustsFontSizeToFit style={{ ...type.displaySm, fontSize: 32, lineHeight: 36, letterSpacing: -0.8, color: t.text.primary }}>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={{ ...type.displaySm, fontSize: 32, lineHeight: 36, letterSpacing: -0.32, color: t.text.primary }}>
               {fmtTime(trackedSec)}
             </Text>
             <Text style={{ color: t.text.secondary, fontSize: 12, marginTop: 2 }}>{tr.todayTracked}</Text>
-            {/* Omni: тиждень штрихованими стовпцями, сьогодні — градієнтом.
-                Вузька плитка — без pill-підказки; число вже стоїть вище. */}
-            <HatchedBars
-              data={trackedWeek}
-              activeIndex={trackedWeek.length - 1}
-              showTooltip={false}
-              height={44}
-              accessibilityLabel={`${tr.todayTracked}: ${fmtTime(trackedSec)}`}
-              style={{ marginTop: 10 }}
-            />
           </StatTile>
           )}
         </View>
@@ -654,9 +619,10 @@ export default function TodayScreen() {
                     />
                     <Text style={[s.habitTitle, { color: c.text }, done && { textDecorationLine: 'line-through', color: t.text.secondary }]} numberOfLines={1}>{h.title}</Text>
                     {streak > 0 && (
-                      <Text style={[s.streakBadge, { color: g.accent.coral.ink }]}>
-                        🔥{streak}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <IconSymbol name="flame.fill" size={12} color={g.accent.coral.ink} />
+                        <Text style={[s.streakBadge, { color: g.accent.coral.ink }]}>{streak}</Text>
+                      </View>
                     )}
                   </View>
                 </PressableScale>
@@ -689,7 +655,7 @@ export default function TodayScreen() {
                   accessible
                   accessibilityLabel={`${overdueCount} ${tr.todayOverdue}`}
                   style={[s.badge, { backgroundColor: g.accent.coral.tint, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-                  <IconSymbol name="exclamationmark.triangle.fill" size={11} color={g.accent.coral.ink} />
+                  <IconSymbol name="exclamationmark.triangle.fill" size={12} color={g.accent.coral.ink} />
                   <Text style={{ color: g.accent.coral.ink, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
                     {overdueCount}
                   </Text>
@@ -877,7 +843,8 @@ export default function TodayScreen() {
         <AppHeader
           title={dateStr.charAt(0).toUpperCase() + dateStr.slice(1)}
           titleStyle={s.title}
-          eyebrow={<Text style={{ color: t.text.secondary, fontSize: 13, fontFamily: fontFamily.medium }}>{greet}</Text>}
+          // Unslop: замість привітання за часом доби — назва контексту.
+          eyebrow={<Text style={{ color: t.text.secondary, fontSize: 13, fontFamily: fontFamily.medium }}>{tr.tabToday}</Text>}
           actions={<SyncBadge />}
           kpis={kpis}
           paddingBottom={14}
@@ -1003,7 +970,7 @@ function MeetingsCta({ label, onPress }: { label: string; onPress: () => void })
       accessibilityRole="button"
       accessibilityLabel={label}
       style={[s.cta, { backgroundColor: bc.actionBg }]}>
-      <IconSymbol name="calendar" size={15} color={bc.actionText} />
+      <IconSymbol name="calendar" size={16} color={bc.actionText} />
       <Text style={{ color: bc.actionText, fontSize: 14, fontFamily: fontFamily.semibold }}>{label}</Text>
     </TouchableOpacity>
   );
@@ -1019,7 +986,7 @@ const s = StyleSheet.create({
   card:  { borderRadius: Atlas.radius.xlarge, padding: 20, overflow: 'hidden' },
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   groupRow:   { flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 4 },
-  groupDot:   { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
+  groupDot:   { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   groupName:  { flex: 1, fontSize: 12, fontFamily: fontFamily.semibold },
   groupCount: { fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
   meetingRow: {
@@ -1072,7 +1039,7 @@ function ShowAllRow({ label, color, c, onPress }: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 5,
+        gap: 4,
         marginTop: 2,
       }}>
       <Text style={{ color, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>

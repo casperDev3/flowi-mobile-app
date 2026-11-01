@@ -191,7 +191,7 @@ export function ActionChip({ label, selected, onPress, icon, count, colors, acce
         st.chip,
         { backgroundColor: selected ? t.action.primary : glassOf(t).surfaceSubtle, opacity: pressed ? 0.7 : 1 },
       ]}>
-      {icon ? <IconSymbol name={icon} size={13} color={selected ? t.text.onAction : c.sub} /> : null}
+      {icon ? <IconSymbol name={icon} size={12} color={selected ? t.text.onAction : c.sub} /> : null}
       <Text numberOfLines={1} style={[st.chipLabel, { color: fg }]}>{label}</Text>
       {count !== undefined ? <Text style={[st.chipCount, type.numeric, { color: selected ? t.text.onAction : c.sub }]}>{count}</Text> : null}
     </Pressable>
@@ -210,9 +210,9 @@ const st = StyleSheet.create({
   label: { fontSize: ACTION.fontSize, fontFamily: fontFamily.semibold, flexShrink: 1 },
   icon:  { width: ACTION.height, height: ACTION.height, borderRadius: ACTION.radius, alignItems: 'center', justifyContent: 'center' },
   chip:  {
-    minHeight: ACTION.chipHeight, borderRadius: ACTION.radius, paddingHorizontal: 14,
+    minHeight: ACTION.chipHeight, borderRadius: ACTION.radius, paddingHorizontal: 16,
     flexDirection: 'row', alignItems: 'center', gap: 6,
   },
   chipLabel: { fontSize: 13, fontFamily: fontFamily.semibold },
-  chipCount: { fontSize: 12, fontFamily: fontFamily.bold },
+  chipCount: { fontSize: 12, fontFamily: fontFamily.semibold },
 });

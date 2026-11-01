@@ -343,7 +343,7 @@ export default function ContainersScreen() {
       ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
       ListHeaderComponent={
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, ...dsType.numeric }}
+          <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, ...dsType.numeric }}
             accessibilityLiveRegion="polite">
             {matches.length > 0 ? fill(tr.ctrFound, { n: matches.length }) : tr.ctrNothingFound}
           </Text>
@@ -382,7 +382,7 @@ export default function ContainersScreen() {
   } else if (data.status === 'failed') {
     // ERR-01: «не прочиталось» ≠ «порожньо»; запис вимкнено, доки не прочитаємо.
     body = (
-      <View style={{ alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24, gap: 14 }}>
+      <View style={{ alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24, gap: 12 }}>
         <IconSymbol name="exclamationmark.triangle" size={28} color={c.t.status.warning} />
         <Text style={{ ...dsType.body, fontSize: 15, color: c.text, textAlign: 'center' }}>{tr.ctrReadFailed}</Text>
         <TouchableOpacity onPress={() => void data.retry()} accessibilityRole="button"
@@ -452,12 +452,12 @@ export default function ContainersScreen() {
             actions={
               <>
                 <HeaderButton onPress={() => setScanning(true)} accessibilityLabel={tr.ctrScan}>
-                  <IconSymbol name="viewfinder" size={17} color={c.text} />
+                  <IconSymbol name="viewfinder" size={18} color={c.text} />
                 </HeaderButton>
                 {/* Головна дія екрана — pill action.primary. */}
                 <HeaderButton onPress={openNew} accessibilityLabel={tr.add}
                   style={{ backgroundColor: c.t.action.primary, borderColor: 'transparent', borderRadius: radius.pill }}>
-                  <IconSymbol name="plus" size={17} color={c.t.text.onAction} />
+                  <IconSymbol name="plus" size={18} color={c.t.text.onAction} />
                 </HeaderButton>
               </>
             }>
@@ -466,7 +466,7 @@ export default function ContainersScreen() {
               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill,
                 paddingHorizontal: 16, gap: 8, minHeight: 44, backgroundColor: c.t.surface.card,
                 borderWidth: 1, borderColor: c.t.border.hairline }}>
-                <IconSymbol name="magnifyingglass" size={15} color={c.accent} />
+                <IconSymbol name="magnifyingglass" size={16} color={c.sub} />
                 <TextInput placeholder={tr.searchItems} placeholderTextColor={c.muted} value={search} onChangeText={setSearch}
                   accessibilityLabel={tr.searchItems} returnKeyType="search"
                   style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.regular, color: c.text, paddingVertical: 10 }} />

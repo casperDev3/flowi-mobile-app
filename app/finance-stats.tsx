@@ -588,7 +588,7 @@ export default function FinanceStatsScreen() {
                 borderColor:     'transparent',
                 borderRadius:    radius.pill,
               }}>
-              <IconSymbol name="calendar" size={17} color={hasCustomRange ? c.onAction : c.text} />
+              <IconSymbol name="calendar" size={18} color={hasCustomRange ? c.onAction : c.text} />
             </HeaderButton>
           }>
           {/* Omni: KPI періоду — великі тонкі числа (колишній ряд із чотирьох
@@ -628,7 +628,7 @@ export default function FinanceStatsScreen() {
                 {' — '}
                 {rangeEnd!.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}
               </Text>
-              <IconSymbol name="xmark" size={11} color={c.onAction} />
+              <IconSymbol name="xmark" size={12} color={c.onAction} />
             </TouchableOpacity>
           )}
 
@@ -723,7 +723,7 @@ export default function FinanceStatsScreen() {
                     <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: 120 }}>
                       {/* Amount label for tallest bar */}
                       {(m.income > 0 || m.expense > 0) && (
-                        <Text style={{ color: c.sub, fontSize: 9, fontFamily: fontFamily.semibold, marginBottom: 2, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
+                        <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 2, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
                           {fmtShort(Math.max(m.income, m.expense))}
                         </Text>
                       )}
@@ -737,7 +737,7 @@ export default function FinanceStatsScreen() {
                           : <View style={{ flex: 1 }} />
                         }
                       </View>
-                      <Text style={{ color: c.sub, fontSize: 9, fontFamily: fontFamily.semibold, marginTop: 5 }}>{m.label}</Text>
+                      <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginTop: 4 }}>{m.label}</Text>
                     </View>
                   ))}
                 </View>
@@ -754,18 +754,11 @@ export default function FinanceStatsScreen() {
             <>
               <StatCard title="Доходи / Витрати" icon="chart.pie.fill">
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
-                  {/* Donut */}
-                  <View style={{ position: 'relative' }}>
-                    <DonutChart data={balanceDonutData} size={130} holeRatio={0.58} holeBg={c.hole} />
-                    <View style={{
-                      position: 'absolute',
-                      top: (130 - 130 * 0.58) / 2, left: (130 - 130 * 0.58) / 2,
-                      width: 130 * 0.58, height: 130 * 0.58,
-                      alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <Text style={{ color: c.sub, fontSize: 9, fontFamily: fontFamily.semibold }}>збереж.</Text>
-                      <Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.light, letterSpacing: -0.44, fontVariant: ['tabular-nums'] }}>{savingsPct}%</Text>
-                    </View>
+                  {/* Unslop: друга кільцева діаграма поруч зі стовпцями лише
+                      дублювала список праворуч — лишаємо одне велике тонке число. */}
+                  <View style={{ minWidth: 96 }}>
+                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium }}>Заощаджено</Text>
+                    <Text style={{ color: c.text, fontSize: 32, lineHeight: 36, fontFamily: fontFamily.light, letterSpacing: -0.32, fontVariant: ['tabular-nums'], marginTop: 4 }}>{savingsPct}%</Text>
                   </View>
                   {/* Stats */}
                   <View style={{ flex: 1, gap: 10 }}>
@@ -775,7 +768,7 @@ export default function FinanceStatsScreen() {
                       { label: 'Баланс',  value: balance, color: balance >= 0 ? c.green : c.red },
                     ].map(item => (
                       <View key={item.label}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: item.color }} />
                           <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, flex: 1 }}>{item.label}</Text>
                           <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{fmt(item.value)}</Text>
@@ -819,16 +812,16 @@ export default function FinanceStatsScreen() {
           {accountStats.length > 0 && (
             <>
               <StatCard title={tr.accounts} icon="creditcard.fill">
-                <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
+                <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.medium, marginBottom: 12 }}>
                   {tr.expenses}
                 </Text>
                 {accountStats.map((row, i) => (
                   <View key={row.account.id} style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }, i > 0 && { marginTop: 12 }]}>
                     <View style={[s.catIcon, { backgroundColor: c.limeTint }]}>
-                      <IconSymbol name={ACCOUNT_KIND_ICONS[row.account.kind]} size={15} color={c.lime} />
+                      <IconSymbol name={ACCOUNT_KIND_ICONS[row.account.kind]} size={16} color={c.lime} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                         <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }} numberOfLines={1}>
                           {row.account.name}
                         </Text>
@@ -891,7 +884,7 @@ export default function FinanceStatsScreen() {
                 />
                 <View style={{ flex: 1, gap: 6 }}>
                   {categoryStats.slice(0, 5).map(item => (
-                    <View key={item.cat} style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                    <View key={item.cat} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: item.color, flexShrink: 0 }} />
                       <Text style={{ color: c.sub, fontSize: 11, flex: 1 }} numberOfLines={1}>{item.cat}</Text>
                       <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{item.pct.toFixed(0)}%</Text>
@@ -918,10 +911,10 @@ export default function FinanceStatsScreen() {
                     {idx > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border, marginVertical: 12 }} />}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <View style={[s.catIcon, { backgroundColor: item.color + '20' }]}>
-                        <IconSymbol name={icon} size={15} color={item.color} />
+                        <IconSymbol name={icon} size={16} color={item.color} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                           <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }}>{item.cat}</Text>
                           <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{fmt(item.amt)}</Text>
                         </View>
@@ -995,10 +988,10 @@ export default function FinanceStatsScreen() {
                       }]}>
                       <IconSymbol
                         name={isActive ? 'calendar' : isDone ? 'checkmark.circle.fill' : 'circle'}
-                        size={13}
+                        size={12}
                         color={isActive ? c.onAction : isDone ? c.green : c.sub}
                       />
-                      <View style={{ marginLeft: 7 }}>
+                      <View style={{ marginLeft: 8 }}>
                         <Text style={{ color: isActive ? c.onAction : c.sub, fontSize: 11, fontFamily: fontFamily.semibold }}>{label}</Text>
                         <Text style={{ color: isActive ? c.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
                           {dateVal ? dateVal.toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '—'}
@@ -1019,7 +1012,7 @@ export default function FinanceStatsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={monthLabelsFull[(calMonth + 11) % 12]}
                   style={s.navBtn}>
-                  <IconSymbol name="chevron.left" size={19} color={c.sub} />
+                  <IconSymbol name="chevron.left" size={20} color={c.sub} />
                 </TouchableOpacity>
                 <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>
                   {monthLabelsFull[calMonth]} {calYear}
@@ -1029,7 +1022,7 @@ export default function FinanceStatsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={monthLabelsFull[(calMonth + 1) % 12]}
                   style={s.navBtn}>
-                  <IconSymbol name="chevron.right" size={19} color={c.sub} />
+                  <IconSymbol name="chevron.right" size={20} color={c.sub} />
                 </TouchableOpacity>
               </View>
 
@@ -1042,7 +1035,7 @@ export default function FinanceStatsScreen() {
 
               {/* Calendar days */}
               {calWeeks.map((week, wi) => (
-                <View key={wi} style={{ flexDirection: 'row', marginBottom: 3 }}>
+                <View key={wi} style={{ flexDirection: 'row', marginBottom: 4 }}>
                   {week.map((day, di) => {
                     if (!day) return <View key={di} style={{ flex: 1 }} />;
                     const date       = new Date(calYear, calMonth, day);
@@ -1063,7 +1056,7 @@ export default function FinanceStatsScreen() {
                           isToday ? tr.today : null,
                         ].filter(Boolean).join(', ')}
                         accessibilityState={{ selected: !!(isStart || isEnd), disabled: isFuture }}
-                        style={{ flex: 1, alignItems: 'center', paddingVertical: 3 }}
+                        style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}
                         activeOpacity={isFuture ? 1 : 0.7}>
                         <View style={[
                           s.dayCell,
@@ -1092,13 +1085,13 @@ export default function FinanceStatsScreen() {
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                 {hasCustomRange && (
                   <TouchableOpacity onPress={clearRange} style={[s.calBtn, { ...c.gl.subtle, flex: 1 }]}>
-                    <IconSymbol name="xmark" size={13} color={c.t.action.secondaryText} />
-                    <Text style={{ color: c.t.action.secondaryText, fontFamily: fontFamily.semibold, marginLeft: 5 }}>Скинути</Text>
+                    <IconSymbol name="xmark" size={14} color={c.t.action.secondaryText} />
+                    <Text style={{ color: c.t.action.secondaryText, fontFamily: fontFamily.semibold, marginLeft: 4 }}>Скинути</Text>
                   </TouchableOpacity>
                 )}
                 {pickStep === 'end' && rangeStart && (
                   <View style={[s.calBtn, { backgroundColor: c.dim, flex: 2 }]}>
-                    <IconSymbol name="calendar" size={13} color={c.sub} />
+                    <IconSymbol name="calendar" size={14} color={c.sub} />
                     <Text style={{ color: c.text, fontFamily: fontFamily.semibold, marginLeft: 6 }}>Оберіть кінець діапазону</Text>
                   </View>
                 )}
@@ -1140,7 +1133,7 @@ const QuickStat = React.memo(function QuickStat({ icon, label, value, color, bor
       {/* Icon-chip: тонований акцентом кружок на суцільній підкладці. */}
       <View style={{ width: 36, height: 36, borderRadius: radius.pill, backgroundColor: t.surface.card, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         <View style={[StyleSheet.absoluteFill, { backgroundColor: color + '24' }]} />
-        <IconSymbol name={icon} size={15} color={color} />
+        <IconSymbol name={icon} size={16} color={color} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ ...dsType.caption, color: t.text.secondary, marginBottom: 2 }}>{label}</Text>
@@ -1152,7 +1145,7 @@ const QuickStat = React.memo(function QuickStat({ icon, label, value, color, bor
 
 const LegendDot = React.memo(function LegendDot({ color, label, sub }: { color: string; label: string; sub: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
       <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
       <Text style={{ color: sub, fontSize: 11, fontFamily: fontFamily.semibold }}>{label}</Text>
     </View>

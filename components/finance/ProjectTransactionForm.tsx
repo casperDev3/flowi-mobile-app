@@ -229,7 +229,7 @@ function ChipRow({ items, value, onChange, c }: {
 const st = StyleSheet.create({
   sheet: { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: space.cardPadding, paddingBottom: 36 },
   handle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
-  segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 3 },
+  segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 4 },
   segmentBtn: { flex: 1, minHeight: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 16, marginBottom: 6 },
   input: { minHeight: 48, borderRadius: radius.control, paddingHorizontal: space[4], fontSize: 18, fontFamily: fontFamily.medium, borderWidth: 1, ...dsType.numeric },

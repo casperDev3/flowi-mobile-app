@@ -85,7 +85,7 @@ export default function CheckupsScreen() {
     let notifId: string | undefined;
     if (nextDate) {
       const dt = new Date(nextDate + 'T09:00:00');
-      const r = await scheduleDateReminder(`checkup_${id}`, dt, `🩺 ${title.trim()}`, tr.checkups);
+      const r = await scheduleDateReminder(`checkup_${id}`, dt, title.trim(), tr.checkups);
       notifId = r ?? undefined;
     }
     const item: Checkup = {
@@ -168,7 +168,7 @@ export default function CheckupsScreen() {
                     options={[{ key: 'analysis', label: tr.kindAnalysis }, { key: 'visit', label: tr.kindVisit }, { key: 'procedure', label: tr.kindProcedure }]} />
                   <Field label={tr.title} value={title} onChange={setTitle} placeholder="Загальний аналіз крові" autoFocus c={c} />
                   <Field label={tr.date} value={date} onChange={setDate} placeholder="2026-06-29" c={c} />
-                  <Field label={tr.result} value={result} onChange={setResult} placeholder="Гемоглобін 145 г/л…" multiline c={c} />
+                  <Field label={tr.result} value={result} onChange={setResult} placeholder="Гемоглобін 145 г/л" multiline c={c} />
                   <Field label={`${tr.nextDate} (${tr.upcoming.toLowerCase()})`} value={nextDate} onChange={setNextDate} placeholder="2026-12-29" c={c} />
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
                     <TouchableOpacity onPress={() => setAdd(false)} style={[s.btn, { ...gs.subtle, flex: 1 }]}>
@@ -200,20 +200,20 @@ const CheckupCard = React.memo(function CheckupCard({ item, onRemove, isDark, c,
     <BentoCard compact style={s.card}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: ACCENT_PULSE + '20', alignItems: 'center', justifyContent: 'center' }}>
-          <IconSymbol name="cross.case.fill" size={17} color={ACCENT_PULSE} />
+          <IconSymbol name="cross.case.fill" size={18} color={ACCENT_PULSE} />
         </View>
         <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{item.title}</Text>
           <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{kindLabel} · {fmtD(item.date)}</Text>
         </View>
         <TouchableOpacity onPress={() => onRemove(item)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${item.title}`} style={s.removeBtn}>
-          <IconSymbol name="trash" size={15} color={c.sub} />
+          <IconSymbol name="trash" size={16} color={c.sub} />
         </TouchableOpacity>
       </View>
       {item.result ? <Text style={{ color: c.text, fontSize: 13, marginTop: 8 }}>{item.result}</Text> : null}
       {item.nextDate ? (
         <View style={[s.next, { backgroundColor: ACCENT_PULSE + '1F' }]}>
-          <IconSymbol name="bell.fill" size={11} color={ACCENT_PULSE} />
+          <IconSymbol name="bell.fill" size={12} color={ACCENT_PULSE} />
           <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginLeft: 6 }}>{tr.upcoming}: {fmtD(item.nextDate)}</Text>
         </View>
       ) : null}
@@ -228,7 +228,7 @@ const s = StyleSheet.create({
   card:      { marginBottom: 12 },
   // 44×44 — мінімальна ціль дотику; від'ємне поле лишає іконку на старому місці.
   removeBtn: { width: 44, height: 44, marginRight: -12, alignItems: 'center', justifyContent: 'center' },
-  next:      { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, marginTop: 10 },
+  next:      { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, marginTop: 10 },
   overlay:   { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)' /* surface.overlay */, justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти — числом із useSheetSurface(); відсоток тут не працював

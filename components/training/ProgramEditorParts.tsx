@@ -111,7 +111,7 @@ export function BlockEditorSheet({ c, visible, block, onClose, onSave }: {
         />
       </View>
 
-      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, marginBottom: 6 }}>{tr.tgProgression}</Text>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginBottom: 6 }}>{tr.tgProgression}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         {modes.map(m => (
           <Chip key={m.key} c={c} label={m.label} active={mode === m.key} onPress={() => setP({ mode: m.key })} />
@@ -201,7 +201,7 @@ export function ProgressionPreview({ c, program, day }: { c: TrainingColors; pro
   return (
     <View style={{ gap: 6 }}>
       <View style={{ flexDirection: 'row' }}>
-        <Text style={{ flex: 2, color: c.faint, fontSize: 12, fontFamily: fontFamily.bold }} />
+        <Text style={{ flex: 2, color: c.faint, fontSize: 12, fontFamily: fontFamily.semibold }} />
         {weeks.map(w => (
           <Text key={w} style={{ flex: 1, color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, textAlign: 'right' }}>
             {fmt(tr.tgWeekN, { n: w + 1 })}
@@ -283,7 +283,7 @@ export function AssignSheet({ c, visible, onClose, program, members, today, busy
         {fmt(tr.tgAssignSessions, { n: sessionCount(program, weeks) })}
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold }}>{tr.tgSelectMembers}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.tgSelectMembers}</Text>
         <Chip
           c={c}
           label={tr.tgSelectAll}

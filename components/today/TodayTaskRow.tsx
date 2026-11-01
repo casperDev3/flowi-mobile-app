@@ -146,7 +146,7 @@ export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle, onOpen, proj
       {relevant.map((task, i) => (
         <Animated.View
           key={task.id}
-          entering={animate ? motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40)) : undefined}>
+          entering={animate ? motion.entering(FadeInDown.duration(200).delay(Math.min(i, 6) * 40)) : undefined}>
           <TodayTaskItem
             task={task}
             isDark={isDark}
@@ -179,5 +179,5 @@ const s = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  overdueText: { fontSize: 12, fontFamily: fontFamily.bold },
+  overdueText: { fontSize: 12, fontFamily: fontFamily.semibold },
 });

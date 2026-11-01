@@ -59,7 +59,7 @@ export function BudgetMonthsTable({ rows, monthsShort, fmt, c, title, hint, empt
                   const tick = ratio > 1 ? t.accent.coral : ratio >= 0.8 ? t.accent.amber : null;
                   return (
                     <View key={cell.month} style={{ width: CELL_W, paddingVertical: 8 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
                         {tick ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: tick }} /> : null}
                         <Text style={{ color: t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold, textAlign: 'right', ...dsType.numeric }}>{fmt(cell.spent)}</Text>
                       </View>

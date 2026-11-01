@@ -118,7 +118,7 @@ export function DotsDial({ startedAt, size, colors, material: m }: DialRenderPro
 
   return (
     <View style={dialStyles.stack}>
-      <View style={{ width: gridWidth, minHeight: dot, flexDirection: 'row', flexWrap: 'wrap', gap: 3 }}>
+      <View style={{ width: gridWidth, minHeight: dot, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
         {minutes <= MAX_PIPS
           ? Array.from({ length: minutes }, (_, i) => (
               <View key={i} style={{ width: 3, height: dot * 0.8, borderRadius: 1, backgroundColor: colors.accent }} />

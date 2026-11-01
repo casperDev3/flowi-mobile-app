@@ -819,7 +819,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                   accessibilityRole="button"
                   accessibilityLabel={tr.subNew}
                   style={{ width: 44, height: 44, borderRadius: radius.pill, backgroundColor: c.action, alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name="plus" size={17} color={c.onAction} />
+                  <IconSymbol name="plus" size={18} color={c.onAction} />
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -862,7 +862,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                 showsHorizontalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 style={{ marginBottom: 12 }}
-                contentContainerStyle={{ gap: 7 }}>
+                contentContainerStyle={{ gap: 8 }}>
                 {[
                   { id: ALL, label: tr.all, color: undefined as string | undefined },
                   ...filterOptions.list,
@@ -920,7 +920,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                   accessibilityState={{ expanded: showArchive }}
                   style={st.archiveToggle}>
                   <IconSymbol name={showArchive ? 'chevron.down' : 'chevron.right'} size={12} color={c.sub} />
-                  <IconSymbol name="archivebox" size={13} color={c.sub} />
+                  <IconSymbol name="archivebox" size={14} color={c.sub} />
                   <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold }}>
                     {tr.subArchiveCount.replace('{count}', String(archived.length))}
                   </Text>
@@ -992,14 +992,14 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                   accessibilityRole="button"
                   accessibilityLabel={tr.close}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <IconSymbol name="xmark" size={17} color={c.sub} />
+                  <IconSymbol name="xmark" size={18} color={c.sub} />
                 </TouchableOpacity>
               </View>
             </View>
 
             {paySub ? (
               <>
-                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+                <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.medium }}>
                   {tr.payTitle}
                 </Text>
                 <Text numberOfLines={2} style={{ color: c.text, fontSize: 20, lineHeight: 26, fontFamily: fontFamily.semibold, marginTop: 4 }}>
@@ -1123,7 +1123,7 @@ const st = StyleSheet.create({
   sheet:         { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, paddingHorizontal: space.cardPadding, paddingTop: 10, paddingBottom: 28 },
   handleRow:     { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   handle:        { width: 38, height: 4, borderRadius: 2 },
-  payInput:      { borderWidth: 1, borderRadius: radius.control, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 11, fontSize: 20, fontFamily: fontFamily.medium, marginTop: 6, fontVariant: ['tabular-nums'] },
+  payInput:      { borderWidth: 1, borderRadius: radius.control, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 12, fontSize: 20, fontFamily: fontFamily.medium, marginTop: 6, fontVariant: ['tabular-nums'] },
   payBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, minHeight: 48 },
   addBtn:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, minHeight: 52, borderRadius: radius.pill },
   archiveToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 14, marginTop: 8 },

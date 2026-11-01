@@ -209,7 +209,7 @@ function ListChip({ label, count, selected, onPress, accent, sub, dim, border }:
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36,
         // DS v2: pill-чип; вибраний — action.primary + text.onAction.
-        paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.pill,
+        paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.pill,
         backgroundColor: selected ? t.action.primary : t.surface.card,
       }}>
       <Text style={{ color: selected ? t.text.onAction : t.text.primary, fontFamily: fontFamily.semibold, fontSize: 13 }}>{label}</Text>
@@ -415,7 +415,7 @@ export const ProjectCard = React.memo(function ProjectCard({
               <View
                 style={[st.metaChip, { backgroundColor: t.surface.subtle }]}
                 accessibilityLabel={`${tr.projectDeadline}: ${shortDate(project.deadline, locale)}`}>
-                <IconSymbol name="flag" size={11} color={stats.projectOverdue ? overdueColor : subColor} />
+                <IconSymbol name="flag" size={12} color={stats.projectOverdue ? overdueColor : subColor} />
                 {/* Червоним лише коли ВЛАСНИЙ термін минув при незакритій
                     роботі. Прострочена задача червонить свій лічильник, а не
                     термін проєкту — інакше два різні факти зливаються в один. */}
@@ -428,7 +428,7 @@ export const ProjectCard = React.memo(function ProjectCard({
               <View
                 style={[st.metaChip, { backgroundColor: t.surface.subtle }]}
                 accessibilityLabel={`${tr.projectNearest}: ${shortDate(stats.upcomingDeadline, locale)}`}>
-                <IconSymbol name="calendar" size={11} color={subColor} />
+                <IconSymbol name="calendar" size={12} color={subColor} />
                 <Text style={{ color: subColor, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>
                   {shortDate(stats.upcomingDeadline, locale)}
                 </Text>
@@ -446,7 +446,7 @@ export const ProjectCard = React.memo(function ProjectCard({
               label={tr.projectSortProgress}
               showValue
               accessibilityLabel={`${project.name}: ${pct}%`}
-              style={{ marginTop: 14 }}
+              style={{ marginTop: 16 }}
             />
 
             {/* Ряд 4 (воронка) і ряд 5 (ознаки відкритих) — різні бази, тож
@@ -511,7 +511,7 @@ export const ProjectCard = React.memo(function ProjectCard({
         )}
 
         {onOpen ? (
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 14 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
             <OpenProjectButton name={project.name} onPress={() => onOpen(project)} testID={`project-open-${project.id}`} />
           </View>
         ) : null}
@@ -1080,7 +1080,7 @@ export default function ProjectsScreen() {
         лишається саме рішення про стрілку: useHeaderLead ховає її на
         планшеті, де «Проєкти» відкриваються прямо з сайдбара.
       */}
-      <View style={{ marginTop: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ marginTop: 16, marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
         {lead === 'back' ? (
           <TouchableOpacity
             onPress={() => router.back()}
@@ -1088,7 +1088,7 @@ export default function ProjectsScreen() {
             accessibilityLabel={tr.back}
             hitSlop={HEADER_BUTTON_HIT_SLOP}
             style={[st.headerBtn, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
-            <IconSymbol name="chevron.left" size={17} color={c.text} />
+            <IconSymbol name="chevron.left" size={16} color={c.text} />
           </TouchableOpacity>
         ) : null}
         <Text accessibilityRole="header" style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: lead === 'back' ? 12 : 0 }]}>{tr.projects}</Text>
@@ -1098,7 +1098,7 @@ export default function ProjectsScreen() {
           accessibilityRole="button"
           accessibilityLabel={tr.newProject}
           style={[isWide ? st.headerPill : st.headerBtn, { backgroundColor: tk.action.primary }]}>
-          <IconSymbol name="plus" size={17} color={tk.text.onAction} />
+          <IconSymbol name="plus" size={16} color={tk.text.onAction} />
           {isWide ? <Text style={{ color: tk.text.onAction, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.newProject}</Text> : null}
         </TouchableOpacity>
       </View>
@@ -1108,7 +1108,7 @@ export default function ProjectsScreen() {
       {kpi.projects > 0 && !staticBeside ? (
         <PageHeader
           bleed={isWide ? 0 : 20}
-          style={{ marginBottom: 18 }}
+          style={{ marginBottom: 16 }}
           kpis={
             <>
               <KpiCounter value={kpi.projects} label={tr.portfolioProjects} />
@@ -1134,19 +1134,19 @@ export default function ProjectsScreen() {
           value={showArchived ? 'archive' : 'live'}
           onChange={key => setShowArchived(key === 'archive')}
           bleed={isWide ? 0 : 20}
-          style={{ marginBottom: 14 }}
+          style={{ marginBottom: 12 }}
         />
       )}
 
       {/* Сортування й фільтр статусу — лише коли в зрізі є що сортувати. */}
       {scopedStats.length > 0 && (
-        <View style={{ marginBottom: 18, gap: 8 }}>
+        <View style={{ marginBottom: 16, gap: 8 }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             accessibilityLabel={tr.projectSortLabel}
-            contentContainerStyle={{ gap: 7, alignItems: 'center' }}>
+            contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
             <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginRight: 2 }}>{tr.projectSortLabel}</Text>
             {PROJECT_SORT_KEYS.map(key => (
               <ListChip
@@ -1163,7 +1163,7 @@ export default function ProjectsScreen() {
             showsHorizontalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             accessibilityLabel={tr.projectListFilterLabel}
-            contentContainerStyle={{ gap: 7, alignItems: 'center' }}>
+            contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
             {PROJECT_LIST_STATUSES.map(status => (
               <ListChip
                 key={status}
@@ -1231,7 +1231,7 @@ export default function ProjectsScreen() {
   ) : (
     <BentoCard style={{ alignItems: 'center', paddingVertical: 48 }}>
       <AccentIcon isDark={isDark} icon="folder" accent="lavender" size="lg" style={st.emptyIcon} />
-      <Text style={[type.h2, { color: c.text, marginTop: 18 }]}>{tr.noProjects}</Text>
+      <Text style={[type.h2, { color: c.text, marginTop: 20 }]}>{tr.noProjects}</Text>
       <Text style={[type.body, { color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center' }]}>
         {tr.pressToAdd}
       </Text>
@@ -1239,8 +1239,8 @@ export default function ProjectsScreen() {
         onPress={openAdd}
         accessibilityRole="button"
         accessibilityLabel={tr.newProject}
-        style={{ marginTop: 18, minHeight: 48, paddingHorizontal: 22, borderRadius: radius.pill, backgroundColor: tk.action.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <IconSymbol name="plus" size={15} color={tk.text.onAction} />
+        style={{ marginTop: 20, minHeight: 48, paddingHorizontal: 24, borderRadius: radius.pill, backgroundColor: tk.action.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <IconSymbol name="plus" size={16} color={tk.text.onAction} />
         <Text style={{ color: tk.text.onAction, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.newProject}</Text>
       </TouchableOpacity>
     </BentoCard>
@@ -1367,7 +1367,7 @@ export default function ProjectsScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={tr.close}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                      <IconSymbol name="xmark" size={17} color={c.sub} />
+                      <IconSymbol name="xmark" size={16} color={c.sub} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1456,14 +1456,14 @@ export default function ProjectsScreen() {
                   <TouchableOpacity
                     onPress={() => { const target = editing; closeModal(); toggleArchive(target); }}
                     accessibilityRole="button"
-                    style={[st.btn, { marginTop: 18, backgroundColor: glassOf(tk).surfaceSubtle, ...glassRim(tk, 'subtle') }]}>
+                    style={[st.btn, { marginTop: 20, backgroundColor: glassOf(tk).surfaceSubtle, ...glassRim(tk, 'subtle') }]}>
                     <Text style={{ color: tk.action.secondaryText, fontFamily: fontFamily.semibold }}>
                       {editing.archivedAt ? tr.unarchiveProject : tr.archiveAccount}
                     </Text>
                   </TouchableOpacity>
                 )}
 
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 22, marginBottom: 4 }}>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 24, marginBottom: 4 }}>
                   <TouchableOpacity onPress={closeModal} style={[st.btn, { flex: 1, backgroundColor: glassOf(tk).surfaceSubtle, ...glassRim(tk, 'subtle') }]}>
                     <Text style={{ color: tk.action.secondaryText, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
                   </TouchableOpacity>
@@ -1488,11 +1488,11 @@ export default function ProjectsScreen() {
 // тепер завжди веде в окремий простір `app/project/[id]/*` (§3 плану).
 const st = StyleSheet.create({
   // Omni: футер-чипи картки (дата терміну, найближча задача) — тихі pill.
-  metaChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 28, paddingHorizontal: 10, borderRadius: radius.pill },
+  metaChip:    { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 28, paddingHorizontal: 10, borderRadius: radius.pill },
 
   pageTitle:   { ...type.h1 },
   headerBtn:   { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  headerPill:  { minHeight: 44, paddingHorizontal: 18, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerPill:  { minHeight: 44, paddingHorizontal: 20, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6 },
   emptyIcon:   { width: 72, height: 72, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   card:        { borderRadius: radius.card, borderWidth: 1.5, padding: 20 },
   colorBadge:  { width: 42, height: 42, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
@@ -1511,7 +1511,7 @@ const st = StyleSheet.create({
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
   sheetTitle:  { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 16 },
   input:       { borderRadius: radius.control, minHeight: 44, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, fontFamily: fontFamily.regular },
-  label:       { fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, marginTop: 16 },
+  label:       { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 10, marginTop: 16 },
   colorChip:   { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  btn:         { minHeight: 48, paddingVertical: 13, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  btn:         { minHeight: 48, paddingVertical: 12, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

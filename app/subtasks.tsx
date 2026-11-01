@@ -312,9 +312,9 @@ export default function SubtasksScreen() {
             ) : null}
             ListFooterComponent={
               <View style={[st.addSubRow, { backgroundColor: tk.surface.card, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, borderStyle: 'dashed', marginTop: sortedSubs.length > 0 ? 8 : 0 }]}>
-                <IconSymbol name="plus" size={15} color={c.sub} />
+                <IconSymbol name="plus" size={16} color={c.sub} />
                 <TextInput
-                  placeholder="Додати підзавдання..."
+                  placeholder="Додати підзавдання"
                   placeholderTextColor={tk.text.muted}
                   value={newSubtask}
                   onChangeText={setNewSubtask}
@@ -344,7 +344,7 @@ const st = StyleSheet.create({
   title:       { fontSize: 18, fontFamily: fontFamily.semibold, letterSpacing: -0.4 },
   progressBg:  { height: 8, borderRadius: radius.pill, overflow: 'hidden' },
   progressFill:{ height: '100%', borderRadius: radius.pill },
-  subRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, minHeight: 48, paddingHorizontal: 16, paddingVertical: 13 },
+  subRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, minHeight: 48, paddingHorizontal: 16, paddingVertical: 12 },
   subCheck:    { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  addSubRow:   { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, minHeight: 48, paddingHorizontal: 16, paddingVertical: 13 },
+  addSubRow:   { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, minHeight: 48, paddingHorizontal: 16, paddingVertical: 12 },
 });

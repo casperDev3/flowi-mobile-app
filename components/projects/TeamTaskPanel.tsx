@@ -220,7 +220,7 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
       {reviewBanner ? (
         // DS v2: банер — вкладений subtle-блок; стан — кольорова іконка, текст — text.primary.
         <View style={[st.banner, { backgroundColor: c.dim }]}>
-          <IconSymbol name={reviewBanner.icon} size={15} color={reviewBanner.color} />
+          <IconSymbol name={reviewBanner.icon} size={16} color={reviewBanner.color} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 14 }}>{reviewBanner.text}</Text>
             {task.reviewFeedback ? (
@@ -420,6 +420,6 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
 const st = StyleSheet.create({
   banner:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: radius.nested, padding: 16, marginBottom: 10 },
   error:     { marginTop: 10, fontSize: 13, fontFamily: fontFamily.medium },
-  input:     { borderRadius: radius.control, fontFamily: fontFamily.regular, paddingHorizontal: 14, paddingVertical: 11, minHeight: 56, fontSize: 14, textAlignVertical: 'top' },
+  input:     { borderRadius: radius.control, fontFamily: fontFamily.regular, paddingHorizontal: 16, paddingVertical: 12, minHeight: 56, fontSize: 14, textAlignVertical: 'top' },
   note:      { fontSize: 12, marginTop: 6, marginLeft: 2 },
 });

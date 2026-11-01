@@ -122,8 +122,8 @@ export function NutritionTab({ h }: HealthTabProps) {
           {/* Рядок лишається українським, як і був: окремого ключа під нього в
               словнику немає, а вигадувати його тут — міняти контракт i18n
               мимохідь (винесено в followups). */}
-          <Text style={{ color: c.sub, fontSize: 11 }}>
-            {today.protein < goals.protein ? `Залишилось ${Math.round(goals.protein - today.protein)} г білка` : 'Норму білка досягнуто 💪'}
+          <Text style={{ color: c.sub, fontSize: 12 }}>
+            {today.protein < goals.protein ? `Залишилось ${Math.round(goals.protein - today.protein)} г білка` : 'Норму білка досягнуто'}
           </Text>
         </HealthCard>
       ),
@@ -136,7 +136,7 @@ export function NutritionTab({ h }: HealthTabProps) {
             <Text style={{ color: c.text, fontSize: 32, lineHeight: 36, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.64 }}>
               {today.water >= 1000 ? `${(today.water / 1000).toFixed(1)} л` : `${today.water} мл`}
             </Text>
-            <Text style={{ color: c.sub, fontSize: 11, marginLeft: 5 }}>/ {goals.water} мл</Text>
+            <Text style={{ color: c.sub, fontSize: 11, marginLeft: 4 }}>/ {goals.water} мл</Text>
             <View style={{ flex: 1 }} />
             <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
               {today.water >= goals.water ? tr.target : `${Math.round(today.water / goals.water * 100)}%`}
@@ -195,10 +195,10 @@ export function NutritionTab({ h }: HealthTabProps) {
           {foodToday.map((e, i) => (
             <View key={e.id} style={[s.logRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
               <View style={{ width: 34, height: 34, borderRadius: 999, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
-                <IconSymbol name="flame.fill" size={15} color={ACCENT_CAL} />
+                <IconSymbol name="flame.fill" size={16} color={ACCENT_CAL} />
               </View>
               <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.bold }}>
+                <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>
                   {e.value} кк{e.protein ? ` · ${e.protein}${tr.proteinShort}` : ''}
                 </Text>
                 {e.note ? <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{e.note}</Text> : null}

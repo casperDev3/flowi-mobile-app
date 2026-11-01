@@ -28,6 +28,7 @@ import Animated, {
   FadeOutUp,
   LinearTransition,
 } from 'react-native-reanimated';
+import { Motion } from '@/constants/motion';
 import { useMotion } from '@/hooks/use-motion';
 import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/shared/MeetingFormSheet';
 import { SheetHandle, SheetModal } from '@/components/shared/SheetModal';
@@ -1738,8 +1739,8 @@ export default function TasksScreen() {
               onPress={() => deleteTask(selectedTask.id, selectedTask.title)}
               accessibilityRole="button"
               style={[s.btn, { flex: 1, backgroundColor: c.danger + '14' }]}>
-              <IconSymbol name="trash" size={15} color={c.danger} />
-              <Text style={{ color: c.danger, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{tr.delete}</Text>
+              <IconSymbol name="trash" size={16} color={c.danger} />
+              <Text style={{ color: c.danger, fontFamily: fontFamily.semibold, marginLeft: 4 }}>{tr.delete}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => toggleTask(selectedTask.id)}
@@ -2182,7 +2183,7 @@ export default function TasksScreen() {
                   }}>
                   <IconSymbol
                     name={hasActiveFilters ? 'arrow.counterclockwise' : 'line.3.horizontal.decrease'}
-                    size={17}
+                    size={16}
                     color={hasActiveFilters ? c.danger : c.sub}
                   />
                 </HeaderButton>
@@ -2190,7 +2191,7 @@ export default function TasksScreen() {
 
             {/* Search bar (Omni: під вкладками розділу) */}
             <View style={[s.searchBar, { marginTop: 10 }, { backgroundColor: c.card, ...glassRim(t, 'card') }]}>
-              <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
+              <IconSymbol name="magnifyingglass" size={16} color={c.sub} />
               <TextInput
                 placeholder={tr.searchPlaceholder}
                 placeholderTextColor={c.sub}
@@ -2220,8 +2221,8 @@ export default function TasksScreen() {
                     accessibilityState={{ checked: noDeadline }}
                     accessibilityLabel={`${tr.withoutDeadline}, ${scopeCounts.noDeadline}`}
                     accessibilityHint={tr.tasksNoDeadlineA11y}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minHeight: 36, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: noDeadline ? c.primary : c.card }}>
-                    <IconSymbol name="calendar" size={13} color={noDeadline ? c.onPrimary : c.sub} />
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, minHeight: 36, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: noDeadline ? c.primary : c.card }}>
+                    <IconSymbol name="calendar" size={14} color={noDeadline ? c.onPrimary : c.sub} />
                     <Text numberOfLines={1} style={{ color: noDeadline ? c.onPrimary : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 }}>{tr.withoutDeadline}</Text>
                     <Text style={{ color: noDeadline ? c.onPrimary : c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{scopeCounts.noDeadline}</Text>
                   </TouchableOpacity>
@@ -2234,7 +2235,7 @@ export default function TasksScreen() {
                 ховання — фільтр не скидався (CLAUDE.md, L3). */}
             {hasActiveFilters && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginTop: 10, marginBottom: 4 }}>
-                <View style={{ flexDirection: 'row', gap: 7, alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                   {filter !== 'active' && (
                     <TouchableOpacity
                       onPress={() => setFilter('active')}
@@ -2371,7 +2372,7 @@ export default function TasksScreen() {
               )}
               {dueTodayTasks.length === 0 && (
                 <View style={[s.subtaskStatRow, { backgroundColor: t.surface.card, justifyContent: 'center' }]}>
-                  <IconSymbol name="checkmark.seal" size={13} color={c.sub} />
+                  <IconSymbol name="checkmark.seal" size={14} color={c.sub} />
                   <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginLeft: 6 }}>{tr.noTasksToday}</Text>
                 </View>
               )}
@@ -2421,39 +2422,39 @@ export default function TasksScreen() {
                             <View style={{ width: 2.5, alignSelf: 'stretch', backgroundColor: mtg.color, borderRadius: 2, marginLeft: 0, minHeight: 36 }} />
                             {/* Time + day */}
                             <View style={{ alignItems: 'center', minWidth: 44 }}>
-                              <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, letterSpacing: -0.3, fontVariant: ['tabular-nums'] }}>{mtg.time || '--:--'}</Text>
+                              <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{mtg.time || '--:--'}</Text>
                               <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.medium, marginTop: 1 }}>{dFmt}</Text>
                             </View>
                             {/* Divider */}
                             <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: mtg.color + '30', marginVertical: 4 }} />
                             {/* Info */}
                             <View style={{ flex: 1, gap: 2 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                 {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color }} />}
-                                <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.bold, flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
-                                <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.copyText} onPress={event => { event.stopPropagation(); void copyMeeting(mtg, locale.startsWith('en')); }} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><IconSymbol name="doc.on.doc" size={15} color={c.sub} /></TouchableOpacity>
+                                <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
+                                <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.copyText} onPress={event => { event.stopPropagation(); void copyMeeting(mtg, locale.startsWith('en')); }} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><IconSymbol name="doc.on.doc" size={16} color={c.sub} /></TouchableOpacity>
                               </View>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                 <MeetingProjectChip project={meetingProject(mtg, projects)} textColor={c.text} maxWidth={120} />
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                  <IconSymbol name="clock" size={9} color={c.sub} />
+                                  <IconSymbol name="clock" size={10} color={c.sub} />
                                   <Text style={{ color: c.sub, fontSize: 10 }}>{dur}</Text>
                                 </View>
                                 {mtg.location ? (
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                    <IconSymbol name="mappin" size={9} color={c.sub} />
+                                    <IconSymbol name="mappin" size={10} color={c.sub} />
                                     <Text style={{ color: c.sub, fontSize: 10 }} numberOfLines={1}>{mtg.location}</Text>
                                   </View>
                                 ) : null}
                                 {mtg.link ? (
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                    <IconSymbol name="link" size={9} color={c.accent} />
-                                    <Text style={{ color: c.accent, fontSize: 10, fontFamily: fontFamily.semibold }}>Join</Text>
+                                    <IconSymbol name="link" size={10} color={c.accent} />
+                                    <Text style={{ color: c.accent, fontSize: 10, fontFamily: fontFamily.semibold }}>{tr.joinAction}</Text>
                                   </View>
                                 ) : null}
                                 {mtg.notes ? (
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                    <IconSymbol name="note.text" size={9} color={c.sub} />
+                                    <IconSymbol name="note.text" size={10} color={c.sub} />
                                     <Text style={{ color: c.sub, fontSize: 10 }} numberOfLines={1}>{mtg.notes}</Text>
                                   </View>
                                 ) : null}
@@ -2478,7 +2479,7 @@ export default function TasksScreen() {
                             ? tr.collapseList
                             : tr.showAllCount.replace('{count}', String(todayMeetings2.length))}
                         </Text>
-                        <IconSymbol name={showAllTodayMeetings ? 'chevron.up' : 'chevron.down'} size={11} color={c.text} />
+                        <IconSymbol name={showAllTodayMeetings ? 'chevron.up' : 'chevron.down'} size={12} color={c.text} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -2498,8 +2499,8 @@ export default function TasksScreen() {
                   onPress={() => selectScope(emptyTodayTarget.scope, emptyTodayTarget.noDeadline)}
                   accessibilityRole="button"
                   accessibilityLabel={`${emptyTodayTarget.label}, ${emptyTodayTarget.count}`}
-                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, minHeight: 44, borderRadius: 999, backgroundColor: glassOf(t).surfaceSubtle, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <IconSymbol name="list.bullet" size={15} color={c.text} />
+                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 12, minHeight: 44, borderRadius: 999, backgroundColor: glassOf(t).surfaceSubtle, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <IconSymbol name="list.bullet" size={16} color={c.text} />
                   <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 14, fontVariant: ['tabular-nums'] }}>{emptyTodayTarget.label} · {emptyTodayTarget.count}</Text>
                 </TouchableOpacity>
               </View>
@@ -2528,8 +2529,8 @@ export default function TasksScreen() {
                     onPress={clearAllFilters}
                     accessibilityRole="button"
                     accessibilityLabel={tr.resetAllFilters}
-                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, minHeight: 44, borderRadius: 999, backgroundColor: glassOf(t).surfaceSubtle, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <IconSymbol name="arrow.clockwise" size={15} color={c.text} />
+                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 12, minHeight: 44, borderRadius: 999, backgroundColor: glassOf(t).surfaceSubtle, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <IconSymbol name="arrow.clockwise" size={16} color={c.text} />
                     <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.resetAllFilters}</Text>
                   </TouchableOpacity>
                 ) : (
@@ -2537,8 +2538,8 @@ export default function TasksScreen() {
                     onPress={openAddTask}
                     accessibilityRole="button"
                     accessibilityLabel={tr.addTask}
-                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, minHeight: 44, borderRadius: 999, backgroundColor: c.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <IconSymbol name="plus" size={15} color={c.onPrimary} />
+                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 12, minHeight: 44, borderRadius: 999, backgroundColor: c.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <IconSymbol name="plus" size={16} color={c.onPrimary} />
                     <Text style={{ color: c.onPrimary, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.addTask}</Text>
                   </TouchableOpacity>
                 ))}
@@ -2554,9 +2555,9 @@ export default function TasksScreen() {
                     <TaskCardRow key={row.map(t => t.id).join('|')} columns={cardColumns}>
                       {row.map((task, j) => {
                         const i = r * cardColumns + j;
-                        const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
+                        const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 6) * 40));
                         const animExiting  = motion.entering(FadeOutUp.duration(150));
-                        const animLayout   = motion.entering(LinearTransition.springify());
+                        const animLayout   = motion.entering(LinearTransition.duration(Motion.duration.slow).easing(Motion.easing.out));
                         return (
                           <Animated.View
                             key={task.id}
@@ -2663,7 +2664,7 @@ export default function TasksScreen() {
                 onPress={() => setShowOptionsMenu(v => !v)}
                 accessibilityLabel={tr.a11yOptions}
                 style={{ backgroundColor: hasActiveFilters ? c.primary : c.card }}>
-                <IconSymbol name="ellipsis" size={17} color={hasActiveFilters ? c.onPrimary : c.sub} />
+                <IconSymbol name="ellipsis" size={18} color={hasActiveFilters ? c.onPrimary : c.sub} />
               </HeaderButton>
             </>
           }>
@@ -2810,7 +2811,7 @@ export default function TasksScreen() {
               accessibilityLabel={tr.calendar}
               style={s.menuItem}>
               <View style={[s.menuIconBox, { backgroundColor: c.accent + '20' }]}>
-                <IconSymbol name="calendar.circle.fill" size={15} color={c.accent} />
+                <IconSymbol name="calendar.circle.fill" size={16} color={c.accent} />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.calendar}</Text>
               {meetings.length > 0 && (
@@ -2830,7 +2831,7 @@ export default function TasksScreen() {
               accessibilityLabel={tr.archive}
               style={s.menuItem}>
               <View style={[s.menuIconBox, { backgroundColor: t.status.success + '20' }]}>
-                <IconSymbol name="archivebox.fill" size={15} color={t.status.success} />
+                <IconSymbol name="archivebox.fill" size={16} color={t.status.success} />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.archive}</Text>
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
@@ -2845,7 +2846,7 @@ export default function TasksScreen() {
               accessibilityLabel={tr.filtersAndSort}
               style={s.menuItem}>
               <View style={[s.menuIconBox, { backgroundColor: hasActiveFilters ? t.accent.amber + '26' : c.dim }]}>
-                <IconSymbol name="line.3.horizontal.decrease" size={15} color={hasActiveFilters ? t.accent.amber : c.sub} />
+                <IconSymbol name="line.3.horizontal.decrease" size={16} color={hasActiveFilters ? t.accent.amber : c.sub} />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.filtersAndSort}</Text>
               {hasActiveFilters
@@ -2862,7 +2863,7 @@ export default function TasksScreen() {
               accessibilityLabel={tr.projects}
               style={s.menuItem}>
               <View style={[s.menuIconBox, { backgroundColor: t.status.info + '20' }]}>
-                <IconSymbol name="folder.fill" size={15} color={t.status.info} />
+                <IconSymbol name="folder.fill" size={16} color={t.status.info} />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.projects}</Text>
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
@@ -2877,7 +2878,7 @@ export default function TasksScreen() {
               accessibilityLabel={tr.notes}
               style={s.menuItem}>
               <View style={[s.menuIconBox, { backgroundColor: t.accent.amber + '26' }]}>
-                <IconSymbol name="note.text" size={15} color={t.accent.amber} />
+                <IconSymbol name="note.text" size={16} color={t.accent.amber} />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.notes}</Text>
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
@@ -2900,7 +2901,7 @@ export default function TasksScreen() {
                     <TouchableOpacity onPress={() => setShowFilterSheet(false)}
                       accessibilityRole="button" accessibilityLabel={tr.close}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                      <IconSymbol name="xmark" size={17} color={c.sub} />
+                      <IconSymbol name="xmark" size={18} color={c.sub} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -2916,7 +2917,7 @@ export default function TasksScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={tr.resetAllFilters}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 32, paddingHorizontal: 12, borderRadius: 999, backgroundColor: c.danger + '14' }}>
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32, paddingHorizontal: 12, borderRadius: 999, backgroundColor: c.danger + '14' }}>
                       <IconSymbol name="arrow.counterclockwise" size={12} color={c.danger} />
                       <Text style={{ color: c.danger, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.resetAll}</Text>
                     </TouchableOpacity>
@@ -2928,7 +2929,7 @@ export default function TasksScreen() {
                 <TouchableOpacity
                   onPress={() => { setShowFilterSheet(false); setShowCal(true); }}
                   style={[s.filterActionBtn, { backgroundColor: c.dim, borderColor: dateFilter ? c.text : 'transparent' }]}>
-                  <IconSymbol name="calendar" size={15} color={dateFilter ? c.text : c.sub} />
+                  <IconSymbol name="calendar" size={16} color={dateFilter ? c.text : c.sub} />
                   <Text style={{ color: dateFilter ? c.text : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 10 }}>
                     {dateFilter
                       ? new Date(dateFilter).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -2978,7 +2979,7 @@ export default function TasksScreen() {
                     <Text style={[s.label, { color: c.sub }]}>{tr.project}</Text>
                     {/* Чипи замість повноширинних рядків: при 5 проєктах це
                         економить пів екрана і дає побачити всі варіанти одразу. */}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                       <TouchableOpacity
                         onPress={() => setFilterProject(null)}
                         accessibilityRole="button"
@@ -3006,7 +3007,7 @@ export default function TasksScreen() {
 
                 {/* Sort */}
                 <Text style={[s.label, { color: c.sub }]}>{tr.sorting}</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {SORT_OPTIONS.map(opt => {
                     const on = sort === opt.key;
                     return (
@@ -3016,7 +3017,7 @@ export default function TasksScreen() {
                         accessibilityRole="button"
                         accessibilityState={{ selected: on }}
                         style={[s.sortChip, { minHeight: 36, backgroundColor: on ? c.primary : c.dim }]}>
-                        <IconSymbol name={opt.icon as any} size={13} color={on ? c.onPrimary : c.sub} />
+                        <IconSymbol name={opt.icon as any} size={14} color={on ? c.onPrimary : c.sub} />
                         <Text style={{ color: on ? c.onPrimary : c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 6 }}>{opt.label}</Text>
                       </TouchableOpacity>
                     );
@@ -3053,7 +3054,7 @@ export default function TasksScreen() {
                     <TouchableOpacity onPress={() => setShowCal(false)}
                       accessibilityRole="button" accessibilityLabel={tr.close}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                      <IconSymbol name="xmark" size={17} color={c.sub} />
+                      <IconSymbol name="xmark" size={18} color={c.sub} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -3072,8 +3073,8 @@ export default function TasksScreen() {
                 />
                 {dateFilter && (
                   <TouchableOpacity onPress={() => { setDateFilter(null); setShowCal(false); }} style={[s.clearBtn, { backgroundColor: c.dim }]}>
-                    <IconSymbol name="xmark" size={13} color={c.sub} />
-                    <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{tr.resetFilter}</Text>
+                    <IconSymbol name="xmark" size={14} color={c.sub} />
+                    <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 4 }}>{tr.resetFilter}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -3151,9 +3152,9 @@ const TaskListItem = React.memo(function TaskListItem({
 }) {
   return (
     <Animated.View
-      entering={animate ? motion.entering(FadeInDown.duration(200).delay(Math.min(index, 10) * 40)) : undefined}
+      entering={animate ? motion.entering(FadeInDown.duration(200).delay(Math.min(index, 6) * 40)) : undefined}
       exiting={motion.entering(FadeOutUp.duration(150))}
-      layout={motion.entering(LinearTransition.springify())}>
+      layout={motion.entering(LinearTransition.duration(Motion.duration.slow).easing(Motion.easing.out))}>
       <SwipeRow actions={swipeActions ?? []} enabled={!!swipeActions} radius={radius.nested}>
         {a11y => (
           <TaskCompactCard
@@ -3278,7 +3279,7 @@ const s = StyleSheet.create({
   activeChip:     { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, minHeight: 32 },
   activeChipText: { fontSize: 11, fontFamily: fontFamily.semibold },
   subtaskStatRow: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.large, paddingHorizontal: 16, paddingVertical: 12, minHeight: 44, overflow: 'hidden' },
-  sortChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
+  sortChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
   sortLabel:      { fontSize: 12, fontFamily: fontFamily.semibold },
   groupHead:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 10, minHeight: 24 },
   groupRing:      { width: 12, height: 12, borderRadius: 6, borderWidth: 2 },
@@ -3291,11 +3292,11 @@ const s = StyleSheet.create({
   checkbox:       { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   dot:            { width: 8, height: 8, borderRadius: 4 },
   colorDot:       { width: 12, height: 12, borderRadius: 4 },
-  badge:          { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  badge:          { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   // tabular-nums: без них ширина «7%» і «71%» різна, і прогрес-рядок сіпається
   // при кожній зміні.
   pct:            { fontSize: 11, fontFamily: fontFamily.semibold, minWidth: 30, fontVariant: ['tabular-nums'] },
-  colLabel:       { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
+  colLabel:       { fontSize: 12, fontFamily: fontFamily.medium },
   emptyCol:       { borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 24, alignItems: 'center' },
   overlay:        { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)', justifyContent: 'flex-end' },
   sheetWrapper:   { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
@@ -3308,10 +3309,10 @@ const s = StyleSheet.create({
   sheetTitle:     { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 18 },
   detailTitle:    { fontSize: 20, fontFamily: fontFamily.semibold, lineHeight: 26 },
   detailDesc:     { fontFamily: fontFamily.regular, fontSize: 14, lineHeight: 20, marginBottom: 8 },
-  input:          { borderRadius: Atlas.radius.medium, minHeight: 44, padding: 13, fontSize: 14, fontFamily: fontFamily.regular },
+  input:          { borderRadius: Atlas.radius.medium, minHeight: 44, padding: 14, fontSize: 14, fontFamily: fontFamily.regular },
   label:          { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 16 },
-  priorityBtn:    { flex: 1, paddingVertical: 9, borderRadius: Atlas.radius.medium, borderWidth: 1.5, alignItems: 'center' },
-  btn:            { paddingVertical: 13, minHeight: 48, borderRadius: 999, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  priorityBtn:    { flex: 1, paddingVertical: 10, borderRadius: Atlas.radius.medium, borderWidth: 1.5, alignItems: 'center' },
+  btn:            { paddingVertical: 14, minHeight: 48, borderRadius: 999, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   subRow:         { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, padding: 10 },
   subCheck:       { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   subTitle:       { fontSize: 13, fontFamily: fontFamily.medium },
@@ -3320,23 +3321,23 @@ const s = StyleSheet.create({
   navBtn:         { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   dayCell:        { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   daydot:         { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
-  clearBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, minHeight: 44, borderRadius: 999 },
+  clearBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 12, minHeight: 44, borderRadius: 999 },
   // Filter sheet
-  filterActionBtn:{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1.5, minHeight: 44, paddingHorizontal: 14, paddingVertical: 11 },
-  filterSegBtn:   { paddingVertical: 11, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  viewAllBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 11 },
+  filterActionBtn:{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1.5, minHeight: 44, paddingHorizontal: 14, paddingVertical: 12 },
+  filterSegBtn:   { paddingVertical: 12, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  viewAllBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 12 },
   itemSeparator:  { height: 6 },
   cardRow:        { flexDirection: 'row', gap: 8, alignItems: 'stretch' },
   cardCell:       { flex: 1, minWidth: 0 },
   stickyFilters:  { paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  groupShowAll:   { flexDirection: 'row', alignItems: 'center', borderRadius: 999, minHeight: 44, paddingHorizontal: 14, paddingVertical: 11, marginTop: 6 },
-  dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, paddingHorizontal: 14, paddingVertical: 11 },
+  groupShowAll:   { flexDirection: 'row', alignItems: 'center', borderRadius: 999, minHeight: 44, paddingHorizontal: 14, paddingVertical: 12, marginTop: 6 },
+  dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, paddingHorizontal: 14, paddingVertical: 12 },
   dropdownList:   { borderRadius: Atlas.radius.medium, marginTop: 6, overflow: 'hidden' },
-  dropdownItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 11 },
-  menuItem:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, minHeight: 48 },
+  dropdownItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
+  menuItem:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, minHeight: 48 },
   menuIconBox:    { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   menuItemLabel:  { fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 },
-  menuPill:       { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  menuPill:       { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   menuPillText:   { fontSize: 11, fontFamily: fontFamily.semibold },
   menuDivider:    { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
 });

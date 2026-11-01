@@ -96,7 +96,7 @@ export function CalendarStaticPane({
 const st = StyleSheet.create({
   root: { gap: 12 },
   card: { borderRadius: radius.cardCompact, padding: 8 },
-  agenda: { padding: 14 },
+  agenda: { padding: 16 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   title: { flex: 1, textAlign: 'center', fontSize: 15, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   navBtn: { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },

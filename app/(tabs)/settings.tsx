@@ -564,7 +564,7 @@ export default function SettingsScreen() {
                 accessibilityLabel={tr.authLogout}
                 style={st.row}>
                 <View style={[st.iconBox, { backgroundColor: tk.status.danger + '20' }]}>
-                  <IconSymbol name="rectangle.portrait.and.arrow.right" size={17} color={tk.status.danger} />
+                  <IconSymbol name="rectangle.portrait.and.arrow.right" size={18} color={tk.status.danger} />
                 </View>
                 <Text style={[st.rowLabel, { color: tk.status.danger, flex: 1 }]}>{tr.authLogout}</Text>
               </TouchableOpacity>
@@ -676,7 +676,7 @@ export default function SettingsScreen() {
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       accessibilityRole="button"
                       accessibilityLabel={tr.close}>
-                      <IconSymbol name="xmark" size={17} color={c.sub} />
+                      <IconSymbol name="xmark" size={18} color={c.sub} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -723,7 +723,7 @@ export default function SettingsScreen() {
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       accessibilityRole="button"
                       accessibilityLabel={tr.close}>
-                      <IconSymbol name="xmark" size={17} color={c.sub} />
+                      <IconSymbol name="xmark" size={18} color={c.sub} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -796,7 +796,7 @@ const SettingRow = React.memo(function SettingRow(
       accessibilityLabel={label}
       style={[st.row, indent && st.rowIndent, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
-        <IconSymbol name={icon} size={17} color={iconColor} />
+        <IconSymbol name={icon} size={18} color={iconColor} />
       </View>
       {/* iPad portrait 2 колонки: довге значення («Синхронізовано 5 хв тому…»)
           раніше стискало підпис з flex:1 (basis 0) і «Синхронізація» ламалась
@@ -831,7 +831,7 @@ const ToggleRow = React.memo(function ToggleRow(
   return (
     <View style={[st.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
-        <IconSymbol name={icon} size={17} color={iconColor} />
+        <IconSymbol name={icon} size={18} color={iconColor} />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
       {/* A11Y-03: підпис і Switch — сусідні вузли, тож без імені друга зупинка
@@ -871,7 +871,7 @@ const StatusRow = React.memo(function StatusRow(
   return (
     <View style={[st.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
-        <IconSymbol name={icon} size={17} color={iconColor} />
+        <IconSymbol name={icon} size={18} color={iconColor} />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
     </View>
@@ -900,7 +900,7 @@ const NotifRow = React.memo(function NotifRow(
       onPress={handlePress}
       style={[st.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: '#F6B93B26' }]}>
-        <IconSymbol name="bell.badge" size={17} color="#F6B93B" />
+        <IconSymbol name="bell.badge" size={18} color="#F6B93B" />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -942,7 +942,7 @@ const DisclosureRow = React.memo(function DisclosureRow(
       accessibilityState={{ expanded: open }}
       style={[st.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
-        <IconSymbol name={icon} size={17} color={iconColor} />
+        <IconSymbol name={icon} size={18} color={iconColor} />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
       <IconSymbol name={open ? 'chevron.up' : 'chevron.down'} size={16} color={sub} />
@@ -973,7 +973,7 @@ const st = StyleSheet.create({
   rowValueBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, flexShrink: 1, minWidth: 0 },
   footerCard:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 28, marginBottom: 8 },
   footerLogo:  { width: 26, height: 26, borderRadius: 7 },
-  footerName:  { fontSize: 15, fontFamily: fontFamily.semibold, letterSpacing: -0.3 },
+  footerName:  { fontSize: 15, fontFamily: fontFamily.semibold },
   footerBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
   overlay:     { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },

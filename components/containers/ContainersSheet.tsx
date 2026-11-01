@@ -34,7 +34,7 @@ export function ContainersSheet({ visible, onClose, c, title, children, footer }
           <Text accessibilityRole="header" style={[styles.title, { color: c.text }]} numberOfLines={2}>{title}</Text>
           <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close}
             style={[styles.close, { backgroundColor: c.dim }]}>
-            <IconSymbol name="xmark" size={15} color={c.sub} />
+            <IconSymbol name="xmark" size={16} color={c.sub} />
           </TouchableOpacity>
         </View>
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -75,7 +75,7 @@ export function SheetLabel({ text, c,
   required?: boolean;
 }) {
   return (
-    <Text style={[styles.label, { color: c.sub }]}>{text.toUpperCase()}
+    <Text style={[styles.label, { color: c.sub }]}>{text}
       {required ? <Text style={{ color: c.t.status.danger }}> *</Text> : null}
     </Text>
   );
@@ -92,5 +92,5 @@ const styles = StyleSheet.create({
   close: { width: touchTarget, height: touchTarget, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   footer: { flexDirection: 'row', gap: 10, marginTop: 16 },
   btn: { minHeight: 48, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
-  label: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, marginBottom: 8, marginTop: 16 },
+  label: { fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8, marginTop: 16 },
 });

@@ -165,8 +165,8 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
                 onPress={() => setOpenTaskId(id)}
                 accessibilityRole="button"
                 accessibilityLabel={title}
-                style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderRadius: radius.nestedCompact, backgroundColor: c.dim, opacity: pressed ? 0.7 : 1 })}>
-                <IconSymbol name="checklist" size={15} color={c.sub} />
+                style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, borderRadius: radius.nestedCompact, backgroundColor: c.dim, opacity: pressed ? 0.7 : 1 })}>
+                <IconSymbol name="checklist" size={16} color={c.sub} />
                 <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{title}</Text>
                 <IconSymbol name="chevron.right" size={12} color={c.sub} />
               </Pressable>

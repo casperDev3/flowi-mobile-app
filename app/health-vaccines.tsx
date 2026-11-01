@@ -82,7 +82,7 @@ export default function VaccinesScreen() {
     const id = genId();
     let notifId: string | undefined;
     if (nextDate) {
-      const r = await scheduleDateReminder(`vaccine_${id}`, new Date(nextDate + 'T09:00:00'), `💉 ${name.trim()}`, tr.vaccines);
+      const r = await scheduleDateReminder(`vaccine_${id}`, new Date(nextDate + 'T09:00:00'), name.trim(), tr.vaccines);
       notifId = r ?? undefined;
     }
     const item: Vaccine = {
@@ -162,7 +162,7 @@ export default function VaccinesScreen() {
                 <OverlayMaterial isDark={isDark} radius={24} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addVaccine}</Text>
-                <Field label={tr.title} value={name} onChange={setName} placeholder="Грип / COVID-19…" autoFocus c={c} />
+                <Field label={tr.title} value={name} onChange={setName} placeholder="Грип / COVID-19" autoFocus c={c} />
                 <Field label={tr.date} value={date} onChange={setDate} placeholder="2026-06-29" c={c} />
                 <Field label={tr.doseNo} value={doseNo} onChange={setDoseNo} placeholder="1" keyboardType="number-pad" c={c} />
                 <Field label={tr.nextDate} value={nextDate} onChange={setNextDate} placeholder="2027-06-29" c={c} />
@@ -195,19 +195,19 @@ const VaccineCard = React.memo(function VaccineCard({ item, onRemove, isDark, c,
     <BentoCard compact style={s.card}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
-          <IconSymbol name="syringe" size={17} color={ACCENT_CAL} />
+          <IconSymbol name="syringe" size={18} color={ACCENT_CAL} />
         </View>
         <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{item.name}{item.doseNo ? ` · №${item.doseNo}` : ''}</Text>
           <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{fmtD(item.date)}</Text>
         </View>
         <TouchableOpacity onPress={() => onRemove(item)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${item.name}`} style={s.removeBtn}>
-          <IconSymbol name="trash" size={15} color={c.sub} />
+          <IconSymbol name="trash" size={16} color={c.sub} />
         </TouchableOpacity>
       </View>
       {item.nextDate ? (
         <View style={[s.next, { backgroundColor: ACCENT_CAL + '1F' }]}>
-          <IconSymbol name="bell.fill" size={11} color={ACCENT_CAL} />
+          <IconSymbol name="bell.fill" size={12} color={ACCENT_CAL} />
           <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginLeft: 6 }}>{tr.upcoming}: {fmtD(item.nextDate)}</Text>
         </View>
       ) : null}
@@ -222,7 +222,7 @@ const s = StyleSheet.create({
   card:      { marginBottom: 12 },
   // 44×44 — мінімальна ціль дотику; від'ємне поле лишає іконку на старому місці.
   removeBtn: { width: 44, height: 44, marginRight: -12, alignItems: 'center', justifyContent: 'center' },
-  next:      { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, marginTop: 10 },
+  next:      { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, marginTop: 10 },
   overlay:   { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)' /* surface.overlay */, justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти — числом із useSheetSurface(); відсоток тут не працював

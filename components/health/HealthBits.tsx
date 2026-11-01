@@ -62,7 +62,7 @@ export function HealthAddButton({ onPress, label }: { onPress: () => void; label
   return (
     <TouchableOpacity onPress={onPress} accessibilityRole="button" accessibilityLabel={label}
       style={[st.add, { backgroundColor: t.action.primary }]}>
-      <IconSymbol name="plus" size={17} color={t.text.onAction} />
+      <IconSymbol name="plus" size={18} color={t.text.onAction} />
     </TouchableOpacity>
   );
 }
@@ -75,7 +75,7 @@ export function SectionHeader({ title, icon, color, textColor, top = 22 }: {
   title: string; icon: any; color: string; textColor: string; top?: number;
 }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: top, marginBottom: 10, gap: 9 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: top, marginBottom: 10, gap: 8 }}>
       <View style={{ width: 28, height: 28, borderRadius: radius.pill, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
         <IconSymbol name={icon} size={14} color={color} />
       </View>
@@ -93,7 +93,7 @@ export function QuickStatCard({ value, label, icon, color, isDark, border, sub, 
       style={{ flex: 1, borderRadius: radius.nested, padding: 12, alignItems: 'center',
         ...ds.glass(isDark, 'subtle') }}>
       <View style={{ width: 32, height: 32, borderRadius: radius.pill, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-        <IconSymbol name={icon} size={15} color={color} />
+        <IconSymbol name={icon} size={16} color={color} />
       </View>
       <Text style={{ color: text, fontSize: 14, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], textAlign: 'center' }} numberOfLines={1}>{value}</Text>
       <Text style={{ color: sub, fontSize: 11, fontFamily: fontFamily.regular, marginTop: 2 }}>{label}</Text>

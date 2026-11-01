@@ -58,7 +58,7 @@ export function TasksMenuButton({ onPress, label, active, colors: c }: {
       accessibilityLabel={label}
       // DS v2: є активні фільтри — кнопка pill action.primary.
       style={{ backgroundColor: active ? t.action.primary : glassOf(t).surface, borderColor: 'transparent' }}>
-      <IconSymbol name="ellipsis" size={17} color={active ? t.text.onAction : c.text} />
+      <IconSymbol name="ellipsis" size={18} color={active ? t.text.onAction : c.text} />
     </HeaderButton>
   );
 }
@@ -101,7 +101,7 @@ export function TasksHeaderMenu({ visible, onClose, items, colors: c, isDark }: 
                   accessibilityLabel={item.badge ? `${item.label}, ${item.badge}` : item.label}
                   style={st.item}>
                   <View style={[st.iconBox, { backgroundColor: glassOf(t).surfaceSubtle }]}>
-                    <IconSymbol name={item.icon} size={15} color={item.color ?? c.sub} />
+                    <IconSymbol name={item.icon} size={16} color={item.color ?? c.sub} />
                   </View>
                   <Text numberOfLines={1} style={[st.label, { color: c.text, fontFamily: item.checked ? fontFamily.semibold : fontFamily.medium }]}>{item.label}</Text>
                   {item.badge ? (

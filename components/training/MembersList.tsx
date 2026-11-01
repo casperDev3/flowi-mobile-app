@@ -13,7 +13,7 @@ import type { CompletionStats } from '@/utils/trainingPrograms';
 import type { TrainingMember } from '@/utils/trainingTypes';
 
 import { Avatar, Badge } from './TrainingBits';
-import { TG_ACCENT, type TrainingColors } from './theme';
+import { fmt, TG_ACCENT, type TrainingColors } from './theme';
 import { fontFamily } from '@/constants/theme';
 
 export interface MemberRowStats {
@@ -52,12 +52,12 @@ export function MembersList({ c, members, stats, isCoach, selectedId, meId, onOp
               style={{ flex: 1, minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6 }}>
               <Avatar name={name} color={m.role === 'coach' ? TG_ACCENT : c.sub} />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }} numberOfLines={1}>
+                <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }} numberOfLines={1}>
                   {m.user.id === meId ? `${name} (${tr.tgYou})` : name}
                 </Text>
                 {isCoach && m.role === 'member' ? (
                   <Text style={{ color: c.sub, fontSize: 12 }}>
-                    {`🔥${m.streak_days} · `}
+                    {`${tr.tgStreak} ${fmt(tr.tgStreakDays, { n: m.streak_days })} · `}
                     <Text style={{ color: c.text, fontVariant: ['tabular-nums'] }}>{`${s?.weekXp ?? 0} ${tr.tgWeekXp}`}</Text>
                     {s?.completion?.percent != null ? (
                       <Text style={{ color: c.sub, fontVariant: ['tabular-nums'] }}>{` · ${s.completion.percent}% (${s.completion.completed}/${s.completion.due})`}</Text>

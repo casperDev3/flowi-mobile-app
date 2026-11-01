@@ -271,7 +271,7 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
               // згортати його за користувача не можна — він вийде сам.
               <View style={st.empty}>
                 <View style={[st.emptyIcon, { ...gs.card }]}>
-                  <IconSymbol name="timer" size={30} color={t.text.muted} />
+                  <IconSymbol name="timer" size={32} color={t.text.muted} />
                 </View>
                 <Text style={[st.emptyTitle, { color: c.text }]}>{tr.noActiveTimers}</Text>
                 <Text style={[st.emptyHint, { color: c.sub }]}>{tr.noActiveTimersHint}</Text>
@@ -323,7 +323,7 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                       <View style={[st.metaRow, { backgroundColor: dim }]}>
                         <IconSymbol
                           name="calendar"
-                          size={15}
+                          size={16}
                           color={isOverdue(expandedTask) ? t.status.danger : c.sub}
                         />
                         <Text style={[st.metaLabel, { color: c.sub }]}>{tr.deadline}</Text>
@@ -341,7 +341,7 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
 
 
                     {expandedTask.subtasks?.length ? (
-                      <View style={{ marginTop: 14 }}>
+                      <View style={{ marginTop: 16 }}>
                         <Text style={[st.sectionLabel, { color: c.sub }]}>{tr.subtasks}</Text>
                         {expandedTask.subtasks.map(sub => (
                           <Pressable
@@ -352,7 +352,7 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                             style={[st.subRow, { backgroundColor: dim }]}>
                             <IconSymbol
                               name={sub.done ? 'checkmark.circle.fill' : 'circle'}
-                              size={19}
+                              size={18}
                               color={sub.done ? t.status.success : c.sub}
                             />
                             <Text
@@ -374,7 +374,7 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                   onPress={() => { void stopTimer(expanded.id); setExpandedId(null); }}
                   accessibilityRole="button"
                   style={[st.stopWide, { ...gs.card }]}>
-                  <IconSymbol name="stop.fill" size={15} color={t.status.danger} />
+                  <IconSymbol name="stop.fill" size={16} color={t.status.danger} />
                   <Text style={[st.stopWideText, { color: t.text.primary }]}>{tr.stopTimerAction}</Text>
                 </Pressable>
               </ScrollView>
@@ -452,17 +452,17 @@ const st = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontFamily: fontFamily.semibold, marginTop: 16 },
   emptyHint:  { fontSize: 13, fontFamily: fontFamily.regular, marginTop: 6, textAlign: 'center', lineHeight: 19 },
 
-  bigClockBox: { alignItems: 'center', paddingVertical: 26 },
+  bigClockBox: { alignItems: 'center', paddingVertical: 24 },
   head:        { flexDirection: 'row', alignItems: 'center', maxWidth: '100%' },
   dot:         { width: 9, height: 9, borderRadius: 5, marginRight: 8 },
   bigLabel:    { fontSize: 18, fontFamily: fontFamily.semibold, flexShrink: 1, textAlign: 'center' },
   // tabular-nums: без нього ширина цифр гуляє і великий годинник смикається.
-  caption:     { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.8, marginTop: 8, textTransform: 'uppercase' },
+  caption:     { fontSize: 12, fontFamily: fontFamily.medium, marginTop: 8 },
 
   metaRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nestedCompact, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 8 },
-  metaLabel:    { fontSize: 13, fontFamily: fontFamily.regular, marginLeft: 9, flex: 1 },
+  metaLabel:    { fontSize: 13, fontFamily: fontFamily.regular, marginLeft: 8, flex: 1 },
   metaValue:    { fontSize: 14, fontFamily: fontFamily.semibold, marginLeft: 10, flexShrink: 1, fontVariant: ['tabular-nums'] },
-  sectionLabel: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, marginBottom: 8 },
+  sectionLabel: { fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8 },
   subRow:       { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nestedCompact, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 8, minHeight: 44 },
   subText:      { fontSize: 14, fontFamily: fontFamily.medium, marginLeft: 10, flex: 1 },
 

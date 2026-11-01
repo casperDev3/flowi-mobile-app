@@ -180,7 +180,7 @@ export function TimerCell({
             accessibilityLabel={stopLabel}
             hitSlop={8}
             style={[st.stop, { ...gs.subtle }]}>
-            <IconSymbol name="stop.fill" size={13} color={t.status.danger} />
+            <IconSymbol name="stop.fill" size={12} color={t.status.danger} />
             <Text style={[st.stopText, { color: t.text.primary }]}>{stopLabel}</Text>
           </Pressable>
         </View>
@@ -193,7 +193,7 @@ const st = StyleSheet.create({
   card: {
     borderRadius: radius.cardCompact,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     justifyContent: 'space-between',
   },
   head:     { flexDirection: 'row', alignItems: 'center' },
@@ -208,13 +208,13 @@ const st = StyleSheet.create({
     alignItems: 'center',
     borderRadius: radius.pill,
     minHeight: 32,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 6,
   },
   stopText: { fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 6 },
   subs:     { marginBottom: 10 },
-  subRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
-  subDot:   { width: 7, height: 7, borderRadius: 4, borderWidth: 1.2, marginRight: 7 },
+  subRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  subDot:   { width: 7, height: 7, borderRadius: 4, borderWidth: 1.2, marginRight: 8 },
   subText:  { flex: 1, fontSize: 12, fontFamily: fontFamily.regular },
-  subCount: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.3, marginTop: 1, fontVariant: ['tabular-nums'] },
+  subCount: { fontSize: 11, fontFamily: fontFamily.semibold, marginTop: 1, fontVariant: ['tabular-nums'] },
 });

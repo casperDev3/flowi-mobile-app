@@ -643,7 +643,7 @@ export default function TimeScreen() {
       <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium }}>
         {periodLabels[period]}
         {grouping === 'project' ? tr.timeByProjectSuffix : ''}
-        {` · ${filtered.length} ${tr.sessionsCount}`}
+        {` · ${filtered.length} ${tr.sessionsCount.toLocaleLowerCase()}`}
       </Text>
     </View>
   );
@@ -653,11 +653,11 @@ export default function TimeScreen() {
   const renderSectionHeader = ({ section }: { section: Section }) => (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, marginTop: 14 }}>
       {section.color && (
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: section.color, marginRight: 7 }} />
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: section.color, marginRight: 8 }} />
       )}
       <Text numberOfLines={1} style={[s.groupLabel, { color: c.sub, flex: 1 }]}>{section.title}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-        <IconSymbol name="timer" size={11} color={c.sub} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <IconSymbol name="timer" size={12} color={c.sub} />
         <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{fmtDur(section.seconds)}</Text>
       </View>
     </View>
@@ -742,7 +742,7 @@ export default function TimeScreen() {
           accessibilityRole="button"
           accessibilityLabel={tr.filtersAndSort}
           style={[s.periodChip, { borderColor: hasFilters ? c.indigo : 'transparent', backgroundColor: t.surface.card, flexDirection: 'row', gap: 6 }]}>
-          <IconSymbol name="slider.horizontal.3" size={13} color={hasFilters ? c.indigo : c.sub} />
+          <IconSymbol name="slider.horizontal.3" size={14} color={hasFilters ? c.indigo : c.sub} />
           <Text style={{ color: hasFilters ? c.indigo : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.timeMoreFilters}</Text>
         </TouchableOpacity>
       )}
@@ -916,7 +916,7 @@ export default function TimeScreen() {
             <HeaderButton
               onPress={() => { haptic.light(); setFsOpen(true); }}
               accessibilityLabel={`${tr.fullscreenTimers}, ${tr.activeTimers}: ${activeTimers.length}`}>
-              <IconSymbol name="timer" size={17} color={c.indigo} />
+              <IconSymbol name="timer" size={18} color={c.indigo} />
             </HeaderButton>
           )}
           {/* На широкому фільтри стоять над самою історією (вкладки
@@ -926,7 +926,7 @@ export default function TimeScreen() {
               onPress={() => setShowFilters(true)}
               accessibilityLabel={tr.filtersAndSort}
               style={hasFilters ? { backgroundColor: c.indigo + '20' } : undefined}>
-              <IconSymbol name="slider.horizontal.3" size={17} color={hasFilters ? c.indigo : c.sub} />
+              <IconSymbol name="slider.horizontal.3" size={18} color={hasFilters ? c.indigo : c.sub} />
             </HeaderButton>
           )}
         </>
@@ -1086,7 +1086,7 @@ const ActiveTimerRow = React.memo(function ActiveTimerRow({
   return (
     <View style={[s.activeRow, { backgroundColor: card }]}>
       <View style={[s.rowDot, { backgroundColor: accent }]} />
-      <View style={{ flex: 1, marginLeft: 11, marginRight: 8 }}>
+      <View style={{ flex: 1, marginLeft: 12, marginRight: 8 }}>
         <Text style={[s.entryTask, { color: text }]} numberOfLines={1}>{timer.label}</Text>
         <TimerProjectTag project={project} tr={tr} color={sub} style={{ marginTop: 2 }} />
         {all.length > 0 && (
@@ -1111,7 +1111,7 @@ const ActiveTimerRow = React.memo(function ActiveTimerRow({
         accessibilityLabel={stopLabel}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         style={s.stopBtn}>
-        <IconSymbol name="stop.fill" size={13} color={STOP_RED} />
+        <IconSymbol name="stop.fill" size={14} color={STOP_RED} />
       </TouchableOpacity>
     </View>
   );
@@ -1181,10 +1181,10 @@ const EntryRow = React.memo(function EntryRow({
       {/* Смуга: колір проєкту, а в аномального запису — колір тривоги, і
           ширша, щоб її було видно краєм ока під час гортання. */}
       <View style={[s.entryBar, flag ? { width: 4, backgroundColor: flag } : { backgroundColor: projectColor ?? accent }]} />
-      <View style={{ flex: 1, marginLeft: 11 }}>
+      <View style={{ flex: 1, marginLeft: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {flag && (
-            <IconSymbol name="exclamationmark.triangle.fill" size={12} color={flag} style={{ marginRight: 5 }} />
+            <IconSymbol name="exclamationmark.triangle.fill" size={12} color={flag} style={{ marginRight: 4 }} />
           )}
           <Text numberOfLines={1} style={[s.entryTask, { color: text, flexShrink: 1 }]}>{title}</Text>
         </View>
@@ -1205,8 +1205,8 @@ const EntryRow = React.memo(function EntryRow({
             accessibilityLabel={`${trimLabel}: ${title}`}
             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
             style={[s.trimBtn, { backgroundColor: t.surface.subtle }]}>
-            <IconSymbol name="scissors" size={11} color={accent} />
-            <Text style={{ color: accent, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{trimLabel}</Text>
+            <IconSymbol name="scissors" size={12} color={accent} />
+            <Text style={{ color: accent, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 4 }}>{trimLabel}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -1225,19 +1225,19 @@ const EntryRow = React.memo(function EntryRow({
 const s = StyleSheet.create({
   activeRow: { borderRadius: Atlas.radius.xlarge, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   rowDot: { width: 9, height: 9, borderRadius: 5 },
-  rowSubLine: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
+  rowSubLine: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   rowSubDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1.2, marginRight: 6 },
   rowSubText: { fontFamily: fontFamily.regular, flex: 1, fontSize: 11, opacity: 0.85 },
-  rowSubMore: { fontSize: 10, fontFamily: fontFamily.bold, marginTop: 3, letterSpacing: 0.3 },
+  rowSubMore: { fontSize: 11, fontFamily: fontFamily.semibold, marginTop: 4 },
   rowClock: { fontSize: 20, fontFamily: fontFamily.light, letterSpacing: -0.4, fontVariant: ['tabular-nums'], marginRight: 10 },
   stopBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(232,84,63,0.12)', alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { fontSize: 16, fontFamily: fontFamily.semibold },
   historyHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4, minHeight: 36 },
   headChip: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   countPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 },
-  groupLabel: { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
+  groupLabel: { fontSize: 12, fontFamily: fontFamily.medium },
   entryCard: { borderRadius: Atlas.radius.xlarge, borderWidth: 2, minHeight: 56, paddingVertical: 12, paddingRight: 16, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
-  entryBar: { width: 3, alignSelf: 'stretch', borderRadius: 2, marginLeft: 11 },
+  entryBar: { width: 3, alignSelf: 'stretch', borderRadius: 2, marginLeft: 12 },
   entryTask: { fontSize: 14, fontFamily: fontFamily.semibold },
   entryMeta: { fontFamily: fontFamily.regular, fontSize: 12, marginTop: 2 },
   entryDur: { fontSize: 15, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },

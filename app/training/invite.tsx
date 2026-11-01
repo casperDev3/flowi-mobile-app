@@ -49,7 +49,7 @@ export default function TrainingInviteScreen() {
           <PrimaryButton
             label={tr.tgOpenGroup}
             onPress={() => router.replace(trainingRoutes.group(joined.group.id))}
-            style={{ marginTop: 14 }}
+            style={{ marginTop: 16 }}
           />
         </Card>
       ) : online ? (

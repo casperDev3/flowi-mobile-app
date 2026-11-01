@@ -90,15 +90,15 @@ export function SleepTab({ h }: HealthTabProps) {
                 <View style={[s.fill, { backgroundColor: k.accent.amber, width: `${Math.round(Math.min(sleep / goals.sleep, 1) * 100)}%` as any }]} />
               </View>
               <MiniBarChart values={h.charts.sleep} color={ACCENT_SLEEP} height={40} />
-              <View style={{ flexDirection: 'row', marginTop: 3 }}>
-                {labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{l}</Text>)}
+              <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                {labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{l}</Text>)}
               </View>
             </>
           ) : (
             <TouchableOpacity onPress={() => setModal('sleep')} accessibilityRole="button" accessibilityLabel={tr.recordSleep}
               style={[s.empty, { backgroundColor: c.dim }]}>
               <IconSymbol name="moon.fill" size={18} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 9, flex: 1 }}>{tr.recordSleep}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 8, flex: 1 }}>{tr.recordSleep}</Text>
               <IconSymbol name="plus" size={14} color={c.sub} />
             </TouchableOpacity>
           )}
@@ -140,7 +140,7 @@ export function SleepTab({ h }: HealthTabProps) {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, gap: 10 }}>
                 {phases.map(p => (
                   <View key={p.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.color, marginRight: 5 }} />
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.color, marginRight: 4 }} />
                     <Text style={{ color: c.sub, fontSize: 11 }}>{p.label} · {fmtSleep(p.value)}</Text>
                   </View>
                 ))}
@@ -167,7 +167,7 @@ export function SleepTab({ h }: HealthTabProps) {
         </Text>
         {today.pulse != null && (
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 10 }}>
-            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, flex: 1 }}>{tr.hautoPulseAvg}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, flex: 1 }}>{tr.hautoPulseAvg}</Text>
             <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{today.pulse}</Text>
             <Text style={{ color: c.sub, fontSize: 11, marginLeft: 4 }}>{tr.hautoBpm}</Text>
           </View>

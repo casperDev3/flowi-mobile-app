@@ -6,7 +6,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -73,9 +72,10 @@ export function RingCell({ pct, color, label, value }: RingCellProps) {
   useEffect(() => {
     const prev = prevPctRef.current;
     if (prev !== null && prev < 1 && pct >= 1 && !reduced) {
+      // Unslop: без пружного перебігу — короткий «вдих» на одній кривій.
       scale.value = withSequence(
-        withSpring(1.12, Motion.spring.bouncy),
-        withSpring(1, Motion.spring.bouncy),
+        withTiming(1.04, { duration: Motion.duration.fast, easing: Motion.easing.out }),
+        withTiming(1, { duration: Motion.duration.slow, easing: Motion.easing.out }),
       );
       haptic.success();
     }

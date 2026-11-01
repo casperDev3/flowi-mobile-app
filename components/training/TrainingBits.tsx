@@ -99,7 +99,7 @@ export function Chip({ c, label, active, onPress, color = TG_ACCENT, icon, acces
         // Активний чип — pill action.primary; color лишився в API для сумісності.
         { backgroundColor: active ? c.t.action.primary : c.chip },
       ]}>
-      {icon && <IconSymbol name={icon} size={13} color={active ? c.t.text.onAction : (color !== TG_ACCENT ? color : c.sub)} />}
+      {icon && <IconSymbol name={icon} size={12} color={active ? c.t.text.onAction : (color !== TG_ACCENT ? color : c.sub)} />}
       <Text style={{ color: active ? c.t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>
     </TouchableOpacity>
   );
@@ -228,7 +228,7 @@ export function EmptyState({ c, icon, title, body, action }: {
   return (
     <View style={styles.empty}>
       <View style={[styles.emptyIcon, { backgroundColor: c.accentTint }]}>
-        <IconSymbol name={icon} size={26} color={c.accent} />
+        <IconSymbol name={icon} size={24} color={c.accent} />
       </View>
       <Text style={[type.h2, { color: c.text, fontSize: 17, textAlign: 'center' }]}>
         {title}
@@ -300,17 +300,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 16,
     borderRadius: radius.pill,
   },
-  badge: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
+  badge: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' },
   button: {
     minHeight: 48, borderRadius: radius.pill, flexDirection: 'row', gap: 8,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20,
   },
   fieldLabel: { ...type.caption, fontFamily: fontFamily.medium, marginBottom: 6 },
-  input: { minHeight: 44, borderRadius: radius.control, paddingHorizontal: 14, fontSize: 15, fontFamily: fontFamily.regular },
+  input: { minHeight: 44, borderRadius: radius.control, paddingHorizontal: 16, fontSize: 15, fontFamily: fontFamily.regular },
   stepper: { flex: 1, minWidth: 120 },
   stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: radius.pill },
   stepperBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 24 },
-  emptyIcon: { width: 56, height: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  emptyIcon: { width: 56, height: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   noticeRetry: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
 });

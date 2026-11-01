@@ -83,7 +83,7 @@ export function ContainerDetail({
     <View>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text accessibilityRole="header" style={{ color: c.text, fontSize: 24, lineHeight: 30, fontFamily: fontFamily.medium, letterSpacing: -0.3 }}>{container.name}</Text>
+          <Text accessibilityRole="header" style={{ color: c.text, fontSize: 24, lineHeight: 30, fontFamily: fontFamily.medium }}>{container.name}</Text>
           {place ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <IconSymbol name="location.fill" size={12} color={c.sub} />
@@ -99,7 +99,7 @@ export function ContainerDetail({
         </View>
       </View>
 
-      <View style={{ marginTop: 14 }}>
+      <View style={{ marginTop: 16 }}>
         <PhotoStrip photoIds={container.photoIds} mediaById={mediaById} c={c} accent={color} large
           onAdd={onAddPhoto} onRemove={onRemovePhoto} onCover={onCoverPhoto} />
       </View>
@@ -107,7 +107,7 @@ export function ContainerDetail({
       <View style={{ marginTop: 16 }}>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.dim, borderRadius: radius.pill,
-            paddingHorizontal: 14, minHeight: 44 }}>
+            paddingHorizontal: 16, minHeight: 44 }}>
             <IconSymbol name="plus" size={14} color={c.sub} />
             <TextInput placeholder={tr.ctrNewItemPlaceholder} placeholderTextColor={c.muted} value={name} onChangeText={setName}
               onSubmitEditing={add} returnKeyType="done" accessibilityLabel={tr.addItem}
@@ -123,14 +123,14 @@ export function ContainerDetail({
         {name.length > 0 ? (
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, backgroundColor: c.dim, borderRadius: radius.control,
-              paddingHorizontal: 14 }}>
+              paddingHorizontal: 16 }}>
               <IconSymbol name="tag" size={12} color={c.sub} />
               <TextInput placeholder={tr.ctrTagsPlaceholder} placeholderTextColor={c.muted} value={tags} onChangeText={setTags}
                 onSubmitEditing={add} returnKeyType="done" accessibilityLabel={tr.itemTags}
                 style={{ flex: 1, fontSize: 13, fontFamily: fontFamily.regular, color: c.text, paddingVertical: 10 }} />
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 6, backgroundColor: c.dim, borderRadius: radius.control,
-              paddingHorizontal: 14, paddingVertical: 10 }}>
+              paddingHorizontal: 16, paddingVertical: 10 }}>
               <IconSymbol name="text.alignleft" size={12} color={c.sub} style={{ marginTop: 2 }} />
               <TextInput placeholder={tr.ctrNotePlaceholder} placeholderTextColor={c.muted} value={note} onChangeText={setNote}
                 multiline accessibilityLabel={tr.itemNote} style={{ flex: 1, fontSize: 13, fontFamily: fontFamily.regular, color: c.text }} />
@@ -140,9 +140,9 @@ export function ContainerDetail({
       </View>
 
       {stats.count > 0 || stats.discarded > 0 ? (
-        <View style={{ marginTop: 18, gap: 8 }}>
+        <View style={{ marginTop: 20, gap: 8 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 1, ...dsType.numeric }}>
+            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, flexShrink: 1, ...dsType.numeric }}>
               {itemsCount(tr, stats.count, lang)}
               {stats.units !== stats.count ? ` · ${fill(tr.ctrUnits, { n: stats.units })}` : ''}
               {stats.lent ? ` · ${fill(tr.ctrLentCount, { n: stats.lent })}` : ''}
@@ -164,7 +164,7 @@ export function ContainerDetail({
       ) : (
         <View style={{ alignItems: 'center', paddingVertical: 40 }}>
           <View style={{ width: 52, height: 52, borderRadius: radius.pill, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-            <IconSymbol name="archivebox" size={26} color={c.sub} />
+            <IconSymbol name="archivebox" size={24} color={c.sub} />
           </View>
           <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginBottom: 4 }}>{tr.noItems}</Text>
           <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, textAlign: 'center' }}>{tr.ctrAddItemHint}</Text>

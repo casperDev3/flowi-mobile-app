@@ -257,7 +257,7 @@ export default function AccountScreen() {
             {/* Omni: профіль — картка з аватаром; далі bento-картки розділів
                 (1 колонка на телефоні, 2 — коли колонка вміщує). */}
             <BentoCard style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 {user ? <Avatar person={{ id: user.id, name: user.name || user.email }} size={56} ringColor="transparent" /> : null}
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[st.profileName, { color: c.text }]} numberOfLines={1}>{user?.name || user?.email}</Text>
@@ -272,7 +272,7 @@ export default function AccountScreen() {
             <BentoCard title={tr.accountDisplayName} icon="person.fill" accent="info">
             <View style={[st.card, { backgroundColor: k.surface.subtle }]}>
               <View style={st.fieldWrap}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.accountDisplayName.toUpperCase()}</Text>
+                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.accountDisplayName}</Text>
                 <TextInput
                   style={[st.input, { color: c.text }]}
                   placeholderTextColor={k.text.muted}
@@ -308,7 +308,7 @@ export default function AccountScreen() {
             <BentoCard title={tr.accountChangePassword} icon="key.fill" accent="lavender">
             <View style={[st.card, { backgroundColor: k.surface.subtle }]}>
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.accountOldPassword.toUpperCase()}</Text>
+                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.accountOldPassword}</Text>
                 <View style={st.row}>
                   <TextInput
                     style={[st.input, { color: c.text, flex: 1 }]}
@@ -332,7 +332,7 @@ export default function AccountScreen() {
               </View>
 
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authNewPassword.toUpperCase()}</Text>
+                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authNewPassword}</Text>
                 <View style={st.row}>
                   <TextInput
                     style={[st.input, { color: c.text, flex: 1 }]}
@@ -355,7 +355,7 @@ export default function AccountScreen() {
               </View>
 
               <View style={st.fieldWrap}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPasswordRepeat.toUpperCase()}</Text>
+                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPasswordRepeat}</Text>
                 <View style={st.row}>
                   <TextInput
                     style={[st.input, { color: c.text, flex: 1 }]}
@@ -405,7 +405,7 @@ export default function AccountScreen() {
                   onPress={() => router.push('/admin-workspace')}
                   activeOpacity={0.82}
                 >
-                  <IconSymbol name="person.badge.key.fill" size={17} color={c.accent} />
+                  <IconSymbol name="person.badge.key.fill" size={16} color={c.accent} />
                   <Text style={[st.input, { color: c.text, flex: 1 }]}>{tr.settingsAdminWorkspace}</Text>
                   <IconSymbol name="chevron.right" size={16} color={c.sub} />
                 </TouchableOpacity>
@@ -416,7 +416,7 @@ export default function AccountScreen() {
                 activeOpacity={0.82}
                 disabled={switching}
               >
-                {switching ? <ActivityIndicator color={c.sub} /> : <IconSymbol name="arrow.triangle.2.circlepath" size={17} color={c.accent} />}
+                {switching ? <ActivityIndicator color={c.sub} /> : <IconSymbol name="arrow.triangle.2.circlepath" size={16} color={c.accent} />}
                 <Text style={[st.input, { color: c.text, flex: 1 }]}>{tr.workspaceSwitchButton}</Text>
                 <IconSymbol name="chevron.right" size={16} color={c.sub} />
               </TouchableOpacity>
@@ -432,7 +432,7 @@ export default function AccountScreen() {
                 activeOpacity={0.82}
               >
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.red + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name="trash.fill" size={17} color={c.red} />
+                  <IconSymbol name="trash.fill" size={16} color={c.red} />
                 </View>
                 <Text style={[st.input, { color: c.red, flex: 1 }]}>{tr.accountDeleteAccount}</Text>
                 <IconSymbol name="chevron.right" size={16} color={c.red} />
@@ -440,7 +440,7 @@ export default function AccountScreen() {
 
               {showDeletePwd && (
                 <View style={[st.fieldWrap, { borderTopColor: c.red + '30', borderTopWidth: 1 }]}>
-                  <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.accountDeleteConfirmPwd.toUpperCase()}</Text>
+                  <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.accountDeleteConfirmPwd}</Text>
                   <View style={st.row}>
                     <TextInput
                       autoFocus
@@ -509,7 +509,6 @@ const st = StyleSheet.create({
   profileName: {
     fontSize: 20,
     fontFamily: fontFamily.semibold,
-    letterSpacing: -0.2,
   },
   profileEmail: {
     fontSize: 14,
@@ -518,12 +517,11 @@ const st = StyleSheet.create({
   },
   fieldWrap: {
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 16,
   },
   fieldLabel: {
     fontSize: 12,
     fontFamily: fontFamily.medium,
-    letterSpacing: 0.3,
     marginBottom: 4,
   },
   row: {
@@ -545,7 +543,7 @@ const st = StyleSheet.create({
     borderRadius: 999,
     minHeight: 52,
     justifyContent: 'center',
-    paddingVertical: 15,
+    paddingVertical: 16,
     alignItems: 'center',
     marginTop: 12,
   },

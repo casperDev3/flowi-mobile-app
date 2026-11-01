@@ -82,9 +82,9 @@ export function PlaceFormSheet({ request, places, c, onClose, onSubmit, onDelete
           return (
             <TouchableOpacity key={option} onPress={() => setKind(option)} accessibilityRole="radio"
               accessibilityState={{ checked: active }} accessibilityLabel={placeKindLabel(tr, option)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: radius.pill,
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill,
                 backgroundColor: active ? c.t.action.primary : c.dim }}>
-              <IconSymbol name={placeKindIcon(option)} size={13} color={active ? c.t.text.onAction : c.sub} />
+              <IconSymbol name={placeKindIcon(option)} size={12} color={active ? c.t.text.onAction : c.sub} />
               <Text style={{ color: active ? c.t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{placeKindLabel(tr, option)}</Text>
             </TouchableOpacity>
           );
@@ -98,7 +98,7 @@ export function PlaceFormSheet({ request, places, c, onClose, onSubmit, onDelete
 
       {request?.mode === 'edit' ? (
         <TouchableOpacity onPress={remove} accessibilityRole="button" accessibilityLabel={tr.ctrPlaceDelete}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, marginTop: 14, alignSelf: 'flex-start' }}>
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, marginTop: 16, alignSelf: 'flex-start' }}>
           <IconSymbol name="trash" size={14} color={c.t.status.danger} />
           <Text style={{ color: c.t.status.danger, fontFamily: fontFamily.semibold }}>{tr.ctrPlaceDelete.replace(/\?$/, '')}</Text>
         </TouchableOpacity>

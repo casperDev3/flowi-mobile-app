@@ -74,17 +74,17 @@ export const FeedbackCard = React.memo(function FeedbackCard({
             accessibilityState={{ checked: done }}
             accessibilityLabel={doneLabel}
             style={[st.check, { borderColor: done ? DONE_COLOR : ws.color, backgroundColor: done ? DONE_COLOR : 'transparent' }]}>
-            {done ? <IconSymbol name="checkmark" size={11} color="#fff" /> : null}
+            {done ? <IconSymbol name="checkmark" size={12} color="#fff" /> : null}
           </TouchableOpacity>
 
           <View style={{ flex: 1 }}>
             <View style={st.badges}>
               <View style={[st.badge, { backgroundColor: kindColor + '18' }]}>
-                <IconSymbol name={entry.kind === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={9} color={kindColor} />
+                <IconSymbol name={entry.kind === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={10} color={kindColor} />
                 <Text style={[st.badgeText, { color: kindColor }]}>{entry.kind === 'bug' ? tr.fbTypeBug : tr.fbTypeIdea}</Text>
               </View>
               <View style={[st.badge, { backgroundColor: ws.color + '18' }]}>
-                <IconSymbol name={ws.icon as never} size={9} color={ws.color} />
+                <IconSymbol name={ws.icon as never} size={10} color={ws.color} />
                 <Text style={[st.badgeText, { color: ws.color }]}>{weightLabel(tr, entry.kind, weight)}</Text>
               </View>
               {entry.item.module ? (
@@ -121,13 +121,13 @@ export const FeedbackCard = React.memo(function FeedbackCard({
               </Text>
               {attachments > 0 ? (
                 <View style={st.metaItem}>
-                  <IconSymbol name="camera.fill" size={11} color={colors.sub} />
+                  <IconSymbol name="camera.fill" size={12} color={colors.sub} />
                   <Text style={{ color: colors.sub, fontSize: 11, fontVariant: ['tabular-nums'] }}>{attachments}</Text>
                 </View>
               ) : null}
             </View>
           </View>
-          <IconSymbol name="chevron.right" size={13} color={colors.sub} />
+          <IconSymbol name="chevron.right" size={12} color={colors.sub} />
         </View>
       </View>
     </TouchableOpacity>
@@ -138,12 +138,12 @@ const st = StyleSheet.create({
   card:      { borderRadius: Atlas.radius.xlarge, padding: 16, overflow: 'hidden' },
   row:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   check:     { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
-  badges:    { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 5 },
-  badge:     { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, maxWidth: '100%' },
-  badgeText: { fontSize: 11, fontFamily: fontFamily.bold },
+  badges:    { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 4 },
+  badge:     { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, maxWidth: '100%' },
+  badgeText: { fontSize: 11, fontFamily: fontFamily.semibold },
   title:     { fontSize: 14, fontFamily: fontFamily.semibold, lineHeight: 20 },
-  desc:      { fontFamily: fontFamily.regular, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  desc:      { fontFamily: fontFamily.regular, fontSize: 12, lineHeight: 17, marginTop: 4 },
   comment:   { borderLeftWidth: 2, paddingLeft: 8, marginTop: 6 },
   meta:      { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
-  metaItem:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  metaItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });

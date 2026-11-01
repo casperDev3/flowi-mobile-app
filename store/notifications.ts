@@ -755,7 +755,7 @@ export function healthReminderPlan(
       out.push({
         id: medReminderId(med.id, i),
         ...hm,
-        title: `💊 ${med.name}`,
+        title: med.name,
         body: tr.takeNow,
         data: { medId: med.id },
       });

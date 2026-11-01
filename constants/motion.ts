@@ -4,7 +4,7 @@
  * Централізовані motion-токени для всього додатку.
  * Використовуй через useMotion() (hook) або Motion.* (константи).
  */
-import { Easing } from 'react-native-reanimated';
+import { Easing, FadeInDown } from 'react-native-reanimated';
 
 /**
  * Тривалості підібрані під ЩОДЕННЕ користування, а не під перше враження.
@@ -25,7 +25,11 @@ export const Motion = {
   spring: {
     /** ζ≈0.56, ts≈0.40 s — легкий перебіг, швидко сідає. */
     default: { damping: 20, stiffness: 320 },
-    /** ζ≈0.46, ts≈0.46 s — помітний «поп» для підтверджень дії. */
+    /**
+     * @deprecated Unslop: пружний перебіг на простому UI читається як іграшковий.
+     * Не використовуйте в нових місцях — `default` або `gentle`. Лишився лише
+     * для сумісності API.
+     */
     bouncy:  { damping: 16, stiffness: 300 },
     /** ζ≈1.0, ts≈0.30 s — критичне демпфування, без перебігу. */
     gentle:  { damping: 27, stiffness: 180 },
@@ -34,4 +38,25 @@ export const Motion = {
     out:   Easing.out(Easing.cubic),
     inOut: Easing.inOut(Easing.quad),
   },
+  /** Відстань «підйому» при появі (токен unslop: 6–12 px). */
+  riseDistance: 8,
+  /** Крок затримки між елементами списку; стагер — максимум на 6 перших. */
+  stagger: 40,
 } as const;
+
+/**
+ * Єдина вхідна анімація екрана: коротке проявлення з підйомом на 8 px.
+ *
+ * Стандартний FadeInDown стартує з 25 px — для щоденного інтерфейсу це
+ * «підстрибування». Тут — ті самі fade + rise, але на токен riseDistance
+ * і з кривою Motion.easing.out. Обгортайте в motion.entering(), щоб
+ * «Зменшити рух» вимикав її повністю:
+ *
+ *   entering={motion.entering(riseIn(Math.min(i, 6) * Motion.stagger))}
+ */
+export function riseIn(delay = 0, duration: number = Motion.duration.slow) {
+  return FadeInDown.duration(duration)
+    .delay(delay)
+    .easing(Motion.easing.out)
+    .withInitialValues({ opacity: 0, transform: [{ translateY: Motion.riseDistance }] });
+}

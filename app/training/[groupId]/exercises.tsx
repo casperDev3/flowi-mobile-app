@@ -107,10 +107,10 @@ export default function GroupExercisesScreen() {
       style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: divider ? 1 : 0, borderTopColor: c.border }}>
       {/* Omni icon-chip. */}
       <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.accentTint, alignItems: 'center', justifyContent: 'center' }}>
-        <IconSymbol name="dumbbell.fill" size={15} color={c.accent} />
+        <IconSymbol name="dumbbell.fill" size={16} color={c.accent} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }}>{ex.name}</Text>
+        <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{ex.name}</Text>
         <Text style={{ color: c.sub, fontSize: 12 }}>
           {[ex.muscleGroup, `${ex.defaultSets ?? 3}×${ex.defaultReps ?? 10}`, ex.defaultRestSec ? `${ex.defaultRestSec} s` : null].filter(Boolean).join(' · ')}
         </Text>

@@ -116,7 +116,7 @@ export default function InvitesScreen() {
         ) : ordered.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 56 }}>
             <View style={[st.emptyIcon, { backgroundColor: c.card }]}>
-              <IconSymbol name="person.badge.plus" size={30} color={c.sub} />
+              <IconSymbol name="person.badge.plus" size={32} color={c.sub} />
             </View>
             <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginTop: 16, textAlign: 'center' }}>{tr.invitesEmptyTitle}</Text>
             <Text style={{ color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center', lineHeight: 18 }}>{tr.invitesEmptySub}</Text>
@@ -130,7 +130,7 @@ export default function InvitesScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               {/* Omni icon-chip кольору проєкту. */}
               <View style={[st.chip, { backgroundColor: (invite.project.color || c.accent) + '26' }]}>
-                <IconSymbol name="folder.fill" size={15} color={invite.project.color || c.accent} />
+                <IconSymbol name="folder.fill" size={16} color={invite.project.color || c.accent} />
               </View>
               <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontSize: 16, fontFamily: fontFamily.semibold }}>
                 {invite.project.name}
@@ -162,7 +162,7 @@ export default function InvitesScreen() {
 const st = StyleSheet.create({
   pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
   chip: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  banner: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginTop: 8 },
+  banner: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 8, marginTop: 8 },
   retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
   emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
 });

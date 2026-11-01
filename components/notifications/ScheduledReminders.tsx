@@ -1,5 +1,5 @@
 import { Atlas } from '@/constants/atlas';
-import { fontFamily, type } from '@/constants/theme';
+import { accentRoles, fontFamily, moduleAccent, type, type ModuleKey } from '@/constants/theme';
 import { dsTheme } from '@/components/shared/dsTheme';
 /**
  * Вкладка «Нагадування» центру сповіщень — локально заплановані нагадування
@@ -62,19 +62,19 @@ export function reminderGroup(id: string): NotifGroup {
 
 const GROUP_ORDER: NotifGroup[] = ['meds', 'habits', 'daily', 'checkups', 'vaccines', 'tasks', 'meetings', 'subscriptions', 'other'];
 
-interface GroupMeta { icon: IconSymbolName; color: string }
+interface GroupMeta { icon: IconSymbolName; module: ModuleKey }
 
 const GROUP_ICONS: Record<NotifGroup, GroupMeta> = {
-  // DS v2: акценти розділів (tokens.ts → SCREEN_ACCENT) + status.*.
-  tasks:         { icon: 'list.bullet',     color: '#6D4CF5' },
-  meetings:      { icon: 'calendar',        color: '#6D4CF5' },
-  subscriptions: { icon: 'creditcard.fill', color: '#4F7CF7' },
-  daily:         { icon: 'clock.fill',      color: '#4F7CF7' },
-  meds:          { icon: 'cross.case.fill', color: '#22A55B' },
-  checkups:      { icon: 'stethoscope',     color: '#22A55B' },
-  vaccines:      { icon: 'syringe.fill',    color: '#22A55B' },
-  habits:        { icon: 'star.fill',       color: '#F6B93B' },
-  other:         { icon: 'bell.fill',       color: '#6D4CF5' },
+  // DS v2: колір розділу — акцент модуля (moduleAccent), а не власний відтінок.
+  tasks:         { icon: 'list.bullet',     module: 'tasks' },
+  meetings:      { icon: 'calendar',        module: 'meetings' },
+  subscriptions: { icon: 'creditcard.fill', module: 'finance' },
+  daily:         { icon: 'clock.fill',      module: 'settings' },
+  meds:          { icon: 'cross.case.fill', module: 'health' },
+  checkups:      { icon: 'stethoscope',     module: 'health' },
+  vaccines:      { icon: 'syringe.fill',    module: 'health' },
+  habits:        { icon: 'star.fill',       module: 'health' },
+  other:         { icon: 'bell.fill',       module: 'settings' },
 };
 
 interface NotifSection { group: NotifGroup; title: string; meta: GroupMeta; data: ScheduledItem[] }
@@ -276,14 +276,14 @@ export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: 
             <Text style={{ color: t.status.danger, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.notifDisabled}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{tr.notifDisabledSub}</Text>
           </View>
-          <IconSymbol name="chevron.right" size={15} color={t.status.danger} />
+          <IconSymbol name="chevron.right" size={16} color={t.status.danger} />
         </TouchableOpacity>
       )}
 
       <View style={[st.card, { borderColor: c.border, marginBottom: 10 }, { backgroundColor: t.surface.card }]}>
         <View style={st.toggleRow}>
           <View style={[st.iconBox, { backgroundColor: t.surface.subtle }]}>
-            <IconSymbol name="bell.badge" size={17} color={t.text.primary} />
+            <IconSymbol name="bell.badge" size={16} color={t.text.primary} />
           </View>
           <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 12 }}>
             {tr.ncLocalRemindersToggle}
@@ -334,14 +334,14 @@ export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: 
   const listEmpty = permGranted === false ? null : (
     <View style={{ alignItems: 'center', paddingVertical: 48 }}>
       <AccentIcon isDark={t === dsTheme(true)} icon="bell.slash" accent="lavender" size="lg" style={st.emptyIcon} />
-      <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontFamily: fontFamily.semibold }}>{tr.noNotifications}</Text>
+      <Text style={{ color: c.text, fontSize: 16, marginTop: 20, fontFamily: fontFamily.semibold }}>{tr.noNotifications}</Text>
       <Text style={{ color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center' }}>{tr.noNotifSub}</Text>
       <TouchableOpacity
         onPress={() => router.push('/(tabs)')}
         accessibilityRole="button"
         accessibilityLabel={tr.addTask}
         style={[st.emptyBtn, { backgroundColor: t.action.primary }]}>
-        <IconSymbol name="plus" size={15} color={t.text.onAction} />
+        <IconSymbol name="plus" size={16} color={t.text.onAction} />
         <Text style={[st.emptyBtnText, { color: t.text.onAction }]}>{tr.addTask}</Text>
       </TouchableOpacity>
     </View>
@@ -353,7 +353,7 @@ export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: 
       keyExtractor={item => item.identifier}
       renderItem={renderItem}
       renderSectionHeader={({ section }) => (
-        <Text style={[st.sectionLabel, { color: c.sub }]}>{section.title.toUpperCase()}</Text>
+        <Text style={[st.sectionLabel, { color: c.sub }]}>{section.title}</Text>
       )}
       renderSectionFooter={() => <View style={{ height: 8 }} />}
       stickySectionHeadersEnabled={false}
@@ -379,18 +379,19 @@ interface CardProps {
 const ReminderCard = React.memo(function ReminderCard({ item, meta, dateText, isDark, colors, deleteLabel, onDelete }: CardProps) {
   const handleDelete = useCallback(() => onDelete(item), [onDelete, item]);
   const t = dsTheme(isDark);
+  const accent = accentRoles(moduleAccent[meta.module], isDark);
   return (
     <View style={[st.itemCard, { borderColor: colors.border }, { backgroundColor: t.surface.card }]}>
-      <View style={[st.iconBox, { backgroundColor: meta.color + '20' }]}>
-        <IconSymbol name={meta.icon} size={17} color={meta.color} />
+      <View style={[st.iconBox, { backgroundColor: accent.tint }]}>
+        <IconSymbol name={meta.icon} size={16} color={accent.ink} />
       </View>
       <View style={{ flex: 1, marginLeft: 12 }}>
         {item.title ? (
-          <Text style={{ color: colors.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 1 }} numberOfLines={1}>{item.title}</Text>
+          <Text style={{ color: colors.sub, fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 2 }} numberOfLines={1}>{item.title}</Text>
         ) : null}
         <Text style={{ color: colors.text, fontSize: 14, fontFamily: fontFamily.semibold }} numberOfLines={2}>{item.body || item.title}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
-          <IconSymbol name={item.isRecurring ? 'arrow.clockwise' : 'clock'} size={11} color={meta.color} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
+          <IconSymbol name={item.isRecurring ? 'arrow.clockwise' : 'clock'} size={12} color={colors.sub} />
           <Text style={{ color: colors.sub, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{dateText}</Text>
         </View>
       </View>
@@ -400,7 +401,7 @@ const ReminderCard = React.memo(function ReminderCard({ item, meta, dateText, is
         accessibilityLabel={`${deleteLabel}: ${item.body || item.title}`}
         style={st.deleteBtnTarget}>
         <View style={[st.deleteBtn, { backgroundColor: t.status.danger + '18' }]}>
-          <IconSymbol name="xmark" size={13} color={t.status.danger} />
+          <IconSymbol name="xmark" size={12} color={t.status.danger} />
         </View>
       </TouchableOpacity>
     </View>
@@ -408,9 +409,9 @@ const ReminderCard = React.memo(function ReminderCard({ item, meta, dateText, is
 });
 
 const st = StyleSheet.create({
-  sectionLabel: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, marginBottom: 8, marginLeft: 2 },
+  sectionLabel: { fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8, marginLeft: 2 },
   card:         { borderRadius: Atlas.radius.xlarge, overflow: 'hidden' },
-  toggleRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
+  toggleRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
   iconBox:      { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   statCard:     { borderRadius: Atlas.radius.xlarge, overflow: 'hidden', paddingVertical: 16, paddingHorizontal: 16 },
   itemCard:     { borderRadius: Atlas.radius.xlarge, overflow: 'hidden', paddingVertical: 10, paddingLeft: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
@@ -421,6 +422,6 @@ const st = StyleSheet.create({
   hint:         { fontFamily: fontFamily.regular, fontSize: 12, lineHeight: 17, marginBottom: 8, marginHorizontal: 2 },
   deleteAll:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, minHeight: 44, marginBottom: 16 },
   emptyIcon:    { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
-  emptyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 20, minHeight: 44, borderRadius: 999, marginTop: 20 },
+  emptyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, minHeight: 44, borderRadius: 999, marginTop: 20 },
   emptyBtnText: { fontSize: 14, fontFamily: fontFamily.semibold },
 });

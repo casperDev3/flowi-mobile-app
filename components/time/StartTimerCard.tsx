@@ -62,7 +62,7 @@ export function StartTimerCard({ c, tr, tasks, running, projectById, onStart }: 
               accessibilityLabel={tr.timeStartTimerA11y.replace('{task}', task.title)}
               style={s.row}>
               <View style={[s.play, { backgroundColor: c.t.action.primary }]}>
-                <IconSymbol name="play.fill" size={11} color={c.t.text.onAction} />
+                <IconSymbol name="play.fill" size={12} color={c.t.text.onAction} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium }}>{task.title}</Text>
@@ -96,7 +96,7 @@ const s = StyleSheet.create({
   input: { borderRadius: radius.pill, paddingHorizontal: space[4], minHeight: touchTarget, fontSize: 14, fontFamily: fontFamily.regular, marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingVertical: 4 },
   play: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  projectLine: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  projectLine: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   hint: { ...dsType.caption, marginTop: 8 },
 });

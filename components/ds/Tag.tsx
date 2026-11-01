@@ -71,9 +71,9 @@ export function PriorityFlag({ priority, label, accessibilityLabel, style }: Pri
 }
 
 const st = StyleSheet.create({
-  tag: { alignSelf: 'flex-start', borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
-  tagSm: { paddingHorizontal: 10, paddingVertical: 3 },
-  tagText: { fontSize: 13, lineHeight: 17, fontFamily: fontFamily.medium },
+  tag: { alignSelf: 'flex-start', borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 4 },
+  tagSm: { paddingHorizontal: 8, paddingVertical: 2 },
+  tagText: { fontSize: 13, lineHeight: 16, fontFamily: fontFamily.medium },
   tagTextSm: { fontSize: 12, lineHeight: 16 },
   flag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   flagText: { fontSize: 13, fontFamily: fontFamily.medium },

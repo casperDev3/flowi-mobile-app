@@ -148,12 +148,12 @@ export default function HealthHubScreen() {
             <>
               <HeaderButton onPress={() => setHistoryOpen(true)} accessibilityLabel={tr.history}
                 style={{ backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }}>
-                <IconSymbol name="clock.arrow.circlepath" size={17} color={c.text} />
+                <IconSymbol name="clock.arrow.circlepath" size={18} color={c.text} />
               </HeaderButton>
               {/* Налаштування розділу: профіль здоровʼя і джерела даних. */}
               <HeaderButton onPress={() => router.push('/health-profile')} accessibilityLabel={tr.settings}
                 style={{ backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }}>
-                <IconSymbol name="gearshape.fill" size={17} color={c.text} />
+                <IconSymbol name="gearshape.fill" size={18} color={c.text} />
               </HeaderButton>
             </>
           }>
@@ -244,7 +244,7 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
                           <Text style={{ color: c.sub, fontSize: 12, marginTop: 2, fontVariant: ['tabular-nums'] }}>{dayStr} · {timeStr}</Text>
                         </View>
                         <View style={[s.badge, { backgroundColor: cfg.color + '18' }]}>
-                          <Text style={{ color: cfg.color, fontSize: 10, fontFamily: fontFamily.bold }}>{cfg.typeLabel}</Text>
+                          <Text style={{ color: cfg.color, fontSize: 10, fontFamily: fontFamily.semibold }}>{cfg.typeLabel}</Text>
                         </View>
                         <TouchableOpacity
                           onPress={() => Alert.alert(tr.tlHealthDeleteEntryTitle, tr.tlHealthDeleteEntryMsg, [
@@ -254,7 +254,7 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
                           accessibilityRole="button"
                           accessibilityLabel={`${tr.delete}: ${cfg.typeLabel} ${cfg.valueStr}`}
                           style={s.deleteBtn}>
-                          <IconSymbol name="trash" size={15} color={c.sub} />
+                          <IconSymbol name="trash" size={16} color={c.sub} />
                         </TouchableOpacity>
                       </View>
                     );
@@ -289,7 +289,7 @@ function getEntryCfg(entry: HealthEntry, tr: any) {
 }
 
 const s = StyleSheet.create({
-  badge:        { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  badge:        { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   // 44×44 — мінімальна ціль дотику (HIG); іконка маленька, ціль — ні.
   deleteBtn:    { width: 44, height: 44, marginLeft: 4, marginRight: -8, alignItems: 'center', justifyContent: 'center' },
   historyCard:  { borderRadius: Atlas.radius.large, padding: 14, flexDirection: 'row', alignItems: 'center' },

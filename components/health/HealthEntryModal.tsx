@@ -109,7 +109,7 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
                     accessibilityLabel={tr.cancel}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <IconSymbol name="xmark" size={17} color={c.sub} />
+                    <IconSymbol name="xmark" size={18} color={c.sub} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -145,7 +145,7 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
                   <Macro label={tr.carbs} value={carb} onChange={setCarb} color={ACCENT_STEPS} c={c} />
                 </View>
                 <Text style={[s.label, { color: c.sub }]}>НОТАТКА (страва)</Text>
-                <TextInput placeholder="Обід, гречка з куркою…" placeholderTextColor={k.text.muted} value={note} onChangeText={setNote}
+                <TextInput placeholder="Обід, гречка з куркою" placeholderTextColor={k.text.muted} value={note} onChangeText={setNote}
                   accessibilityLabel={tr.note}
                   style={[s.noteInput, { color: c.text, backgroundColor: c.dim }]} />
               </>}
@@ -301,8 +301,8 @@ const s = StyleSheet.create({
   label:        { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 14 },
   // Великі тонкі цифри (display DS v2): Light 300, tabular-nums, tracking −2%.
   bigInput:     { fontSize: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], textAlign: 'center', borderRadius: 16, paddingVertical: 16, letterSpacing: -0.96 },
-  noteInput:    { fontSize: 14, fontFamily: fontFamily.regular, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, minHeight: 44 },
+  noteInput:    { fontSize: 14, fontFamily: fontFamily.regular, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 44 },
   durBlock:     { flexDirection: 'row', borderRadius: 16, padding: 16, alignItems: 'flex-start' },
-  presetBtn:    { flex: 1, borderRadius: 999, minHeight: 44, paddingVertical: 9, alignItems: 'center', justifyContent: 'center' },
+  presetBtn:    { flex: 1, borderRadius: 999, minHeight: 44, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
   btn:          { minHeight: 48, paddingVertical: 14, borderRadius: 999, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

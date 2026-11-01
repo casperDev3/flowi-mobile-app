@@ -619,7 +619,7 @@ export default function FeedbackScreen() {
                   style={[st.sortChip, {
                     backgroundColor: sort === opt.key ? c.action : k.surface.card,
                   }]}>
-                  <IconSymbol name={opt.icon as never} size={11} color={sort === opt.key ? c.onAction : c.sub} />
+                  <IconSymbol name={opt.icon as never} size={12} color={sort === opt.key ? c.onAction : c.sub} />
                   <Text style={{ color: sort === opt.key ? c.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 4 }}>{opt.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -732,8 +732,8 @@ const st = StyleSheet.create({
   filterRow:  { flexDirection: 'row', borderRadius: 999, padding: 4, overflow: 'hidden', marginTop: 4 },
   filterBtn:  { flex: 1, minHeight: 36, justifyContent: 'center', paddingVertical: 8, borderRadius: 999, alignItems: 'center' },
   sortRow:    { flexDirection: 'row', gap: 6, marginTop: 8, marginBottom: 12 },
-  sortChip:   { flexDirection: 'row', alignItems: 'center', borderRadius: 999, minHeight: 36, paddingHorizontal: 14, paddingVertical: 7 },
-  banner:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 16, padding: 14, marginBottom: 12 },
+  sortChip:   { flexDirection: 'row', alignItems: 'center', borderRadius: 999, minHeight: 36, paddingHorizontal: 16, paddingVertical: 8 },
+  banner:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 16, padding: 16, marginBottom: 12 },
   empty:      { alignItems: 'center', paddingTop: 60, gap: 10 },
   retryBtn:   { borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10, minHeight: 44, justifyContent: 'center' },
 });

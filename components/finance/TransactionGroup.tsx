@@ -92,7 +92,7 @@ export function TransactionGroup({
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {incomeCodes.map(code => (
             <View key={'in_' + code} style={{ ...pill, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
-              <IconSymbol name="arrow.up" size={9} color={t.status.success} />
+              <IconSymbol name="arrow.up" size={10} color={t.status.success} />
               <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.semibold, ...dsType.numeric }}>
                 {fmt(group.dayIncomeByCur[code], curOf(code))}
               </Text>
@@ -100,7 +100,7 @@ export function TransactionGroup({
           ))}
           {expenseCodes.map(code => (
             <View key={'ex_' + code} style={{ ...pill, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
-              <IconSymbol name="arrow.down" size={9} color={t.status.danger} />
+              <IconSymbol name="arrow.down" size={10} color={t.status.danger} />
               <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.semibold, ...dsType.numeric }}>
                 {fmt(group.dayExpenseByCur[code], curOf(code))}
               </Text>
@@ -148,22 +148,22 @@ export function TransactionGroup({
               <React.Fragment key={tx.id}>{row(tx, radius.cardCompact, (
                 <View style={[{ backgroundColor: rowBg(tx.id), borderRadius: radius.cardCompact, paddingLeft: 14, paddingRight: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center' }, sh]}>
                   {lead(tx.id, 40, iconName, 19, color)}
-                  <View style={{ flex: 1, marginLeft: 11 }}>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={{ ...dsType.bodyMedium, color: t.text.primary }} numberOfLines={1}>{title}</Text>
                     {tx.note ? <Text style={{ ...dsType.caption, color: t.text.secondary, marginTop: 2 }} numberOfLines={1}>{tx.note}</Text> : null}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                       <IconSymbol name="clock" size={10} color={t.text.secondary} />
                       <Text style={{ color: t.text.secondary, fontSize: 11, fontFamily: fontFamily.regular, ...dsType.numeric }}>
                         {txDate.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
                       </Text>
                       <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: t.text.muted }} />
-                      <View style={{ ...pill, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 1 }}>
+                      <View style={{ ...pill, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 1 }}>
                         <Text style={{ color: t.text.secondary, fontSize: 10, fontFamily: fontFamily.semibold }}>
                           {transfer ? transferLabel : isIncome ? incomeLabel : expenseLabel}
                         </Text>
                       </View>
                       {cur.code !== primaryCode && (
-                        <View style={{ ...pill, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 1 }}>
+                        <View style={{ ...pill, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 1 }}>
                           <Text style={{ color: t.text.secondary, fontSize: 10, fontFamily: fontFamily.semibold }}>{cur.code}</Text>
                         </View>
                       )}

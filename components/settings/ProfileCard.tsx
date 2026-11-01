@@ -108,7 +108,7 @@ export function ProfileCard({
           </View>
           {/* Omni: кругла ↗-кнопка «картка веде далі» (декор — уся картка кнопка). */}
           <View style={[st.arrow, { backgroundColor: 'rgba(255,255,255,0.12)' }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <IconSymbol name="arrow.up.right" size={15} color={f.text} />
+            <IconSymbol name="arrow.up.right" size={16} color={f.text} />
           </View>
         </View>
       </View>
@@ -119,7 +119,7 @@ export function ProfileCard({
 const st = StyleSheet.create({
   card:      { borderRadius: Atlas.radius.xxlarge, padding: 20 },
   arrow:     { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  head:      { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  head:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar:    { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   initials:  { fontSize: 20, fontFamily: fontFamily.medium },
   dot:       { position: 'absolute', right: 0, bottom: 0, width: 16, height: 16, borderRadius: 8, borderWidth: 3 },
@@ -129,7 +129,7 @@ const st = StyleSheet.create({
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   statusDot: { width: 7, height: 7, borderRadius: 4 },
   statusText:{ fontSize: 12, fontFamily: fontFamily.regular },
-  actions:   { flexDirection: 'row', gap: 10, marginTop: 14 },
+  actions:   { flexDirection: 'row', gap: 10, marginTop: 16 },
   // 44 — мінімальний тач-таргет.
   btn:       { flex: 1, minHeight: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   btnText:   { fontSize: 15, fontFamily: fontFamily.semibold },

@@ -61,7 +61,7 @@ export function RequestsTab({
       {shown.map((f) =>
         panel(
           <>
-            <Text style={{ color: c.text, fontFamily: fontFamily.bold }}>
+            <Text style={{ color: c.text, fontFamily: fontFamily.semibold }}>
               {f.kind === 'complaint' ? f.snapshot.title || 'Скарга' : f.text}
             </Text>
             {text(
@@ -187,7 +187,7 @@ export function GroupTab({
   const { btn, panel, text, row } = bits;
   return panel(
     <>
-      <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.bold }}>{menu.name}</Text>
+      <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.semibold }}>{menu.name}</Text>
       {text(menu.timezone + ' · Понеділок — неділя', true)}
       {text(menu.meals.map((m) => meals[m]).join(' · '))}
       {text('Нові прийоми їжі застосовуються лише до ще не створених тижнів.', true)}

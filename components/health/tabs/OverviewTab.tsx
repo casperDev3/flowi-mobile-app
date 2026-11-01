@@ -134,10 +134,10 @@ export function OverviewTab({ h }: HealthTabProps) {
             const up = ins.deltaPct > 0;
             const col = ins.good ? k.status.success : k.status.danger;
             return (
-              <View key={ins.type} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 9,
+              <View key={ins.type} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
                 borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth, borderTopColor: k.accent.lavender + '55' }}>
                 <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: col + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name={up ? 'arrow.up.right' : 'arrow.down.right'} size={13} color={col} />
+                  <IconSymbol name={up ? 'arrow.up.right' : 'arrow.down.right'} size={14} color={col} />
                 </View>
                 <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium, marginLeft: 10, flex: 1 }}>{insightLabel[ins.type]}</Text>
                 <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{up ? '+' : ''}{ins.deltaPct}%</Text>
@@ -186,7 +186,7 @@ export function OverviewTab({ h }: HealthTabProps) {
             <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.healthProfile}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{tr.profileHint}</Text>
           </View>
-          <IconSymbol name="chevron.right" size={13} color={c.sub} />
+          <IconSymbol name="chevron.right" size={14} color={c.sub} />
         </TouchableOpacity>
       )}
 

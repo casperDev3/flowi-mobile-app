@@ -458,8 +458,8 @@ export function useProjectTaskCard({
               onPress={() => openDiscussion(d.id)}
               accessibilityRole="link"
               accessibilityLabel={`${tr.taskCardDiscussions}: ${d.title}`}
-              style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderRadius: radius.nestedCompact, backgroundColor: c.dim }}>
-              <IconSymbol name="bubble.left.and.bubble.right.fill" size={15} color={c.sub} />
+              style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, borderRadius: radius.nestedCompact, backgroundColor: c.dim }}>
+              <IconSymbol name="bubble.left.and.bubble.right.fill" size={16} color={c.sub} />
               <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{d.title}</Text>
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
             </TouchableOpacity>

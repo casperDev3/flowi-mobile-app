@@ -118,7 +118,7 @@ export function PrintLabelsSheet({ visible, containers, places, statsFor, presel
           return (
             <TouchableOpacity key={option.id} onPress={() => setPreset(option.id)} accessibilityRole="radio"
               accessibilityState={{ checked: active }} accessibilityLabel={`${option.title}. ${option.hint}`}
-              style={{ padding: 14, borderRadius: radius.nestedCompact, borderWidth: 2,
+              style={{ padding: 16, borderRadius: radius.nestedCompact, borderWidth: 2,
                 borderColor: active ? c.t.action.primary : 'transparent', backgroundColor: c.dim }}>
               <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 14 }}>{option.title}</Text>
               <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], marginTop: 2 }}>{option.hint} · {p.columns}×{p.rows}</Text>

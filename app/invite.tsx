@@ -329,7 +329,7 @@ export default function InviteScreen() {
 
           {stage === 'switch-confirm' && (
             <View style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}>
-              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold, marginBottom: 8 }}>{tr.inviteSwitchWorkspaceTitle}</Text>
+              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.inviteSwitchWorkspaceTitle}</Text>
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 16 }}>{tr.inviteSwitchWorkspaceMsg}</Text>
               <TouchableOpacity onPress={confirmSwitch} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
                 <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteSwitchWorkspaceConfirm}</Text>
@@ -342,7 +342,7 @@ export default function InviteScreen() {
 
           {stage === 'confirm-workspace' && pendingWorkspace && (
             <View style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}>
-              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold, marginBottom: 8 }}>{tr.inviteConfirmWorkspaceTitle}</Text>
+              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.inviteConfirmWorkspaceTitle}</Text>
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 16 }}>
                 {tr.inviteConfirmWorkspaceMsg.replace('{name}', pendingWorkspace.info.name || pendingWorkspace.origin)}
               </Text>
@@ -460,10 +460,10 @@ export default function InviteScreen() {
 const st = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 60 },
   title: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32, marginBottom: 20 },
-  card: { borderRadius: 24, overflow: 'hidden', padding: 24 },
+  card: { borderRadius: 16, overflow: 'hidden', padding: 24 },
   colorDot: { width: 14, height: 14, borderRadius: 7 },
-  primaryBtn: { borderRadius: 999, minHeight: 52, justifyContent: 'center', paddingVertical: 15, alignItems: 'center' },
+  primaryBtn: { borderRadius: 999, minHeight: 52, justifyContent: 'center', paddingVertical: 16, alignItems: 'center' },
   primaryBtnText: { fontSize: 15, fontFamily: fontFamily.semibold },
   linkBtn: { marginTop: 12, alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingVertical: 6 },
-  hintRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 16 },
+  hintRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16 },
 });

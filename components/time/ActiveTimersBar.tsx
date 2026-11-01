@@ -124,7 +124,7 @@ export function ActiveTimersBar() {
             accessibilityLabel={single ? `${tr.navTimeTracker}: ${primaryLabel}` : tr.activeTimersExpandA11y}
             style={st.body}>
             <View style={[st.icon, { ...gs.subtle }]}>
-              <IconSymbol name={single ? TIMER_KIND_ICON[timerKind(primary)] : 'timer'} size={15} color={c.text} />
+              <IconSymbol name={single ? TIMER_KIND_ICON[timerKind(primary)] : 'timer'} size={16} color={c.text} />
             </View>
             <Text numberOfLines={1} style={[st.title, { color: c.text }]}>{title}</Text>
             {single && (
@@ -179,7 +179,7 @@ export function ActiveTimersBar() {
               onPress={() => { setSheetOpen(false); router.push('/(tabs)/time' as never); }}
               accessibilityRole="button"
               style={[st.action, { ...gs.subtle }]}>
-              <IconSymbol name="timer" size={15} color={t.action.secondaryText} />
+              <IconSymbol name="timer" size={16} color={t.action.secondaryText} />
               <Text numberOfLines={1} style={[st.actionText, { color: t.action.secondaryText }]}>{tr.navTimeTracker}</Text>
             </Pressable>
             <Pressable
@@ -192,7 +192,7 @@ export function ActiveTimersBar() {
               accessibilityRole="button"
               accessibilityLabel={`${tr.focusMode}, ${tr.activeTimers}: ${count}`}
               style={[st.action, { backgroundColor: t.action.primary }]}>
-              <IconSymbol name="viewfinder" size={15} color={t.text.onAction} />
+              <IconSymbol name="viewfinder" size={16} color={t.text.onAction} />
               <Text numberOfLines={1} style={[st.actionText, { color: t.text.onAction }]}>{tr.focusMode}</Text>
             </Pressable>
           </View>

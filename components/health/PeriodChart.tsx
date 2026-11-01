@@ -17,13 +17,13 @@ export function PeriodSelector({ period, onChange, color, c, tr }: {
   const { t: k } = useDS();
   // Сегментований перемикач DS v2: subtle-доріжка, активний сегмент — pill action.primary.
   return (
-    <View style={{ flexDirection: 'row', gap: 2, backgroundColor: c.dim, borderRadius: radius.pill, padding: 3 }}>
+    <View style={{ flexDirection: 'row', gap: 2, backgroundColor: c.dim, borderRadius: radius.pill, padding: 4 }}>
       {PERIODS.map(p => {
         const active = p === period;
         return (
           <TouchableOpacity key={p} onPress={() => onChange(p)} accessibilityRole="button" accessibilityLabel={tr[PERIOD_LABEL[p]]}
             accessibilityState={{ selected: active }}
-            style={{ flex: 1, paddingVertical: 7, borderRadius: radius.pill, alignItems: 'center', backgroundColor: active ? k.action.primary : 'transparent' }}>
+            style={{ flex: 1, paddingVertical: 8, borderRadius: radius.pill, alignItems: 'center', backgroundColor: active ? k.action.primary : 'transparent' }}>
             <Text style={{ color: active ? k.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr[PERIOD_LABEL[p]]}</Text>
           </TouchableOpacity>
         );
@@ -42,7 +42,7 @@ export function ChartTypeToggle({ value, onChange, color, c, tr }: {
 }) {
   const { t: k } = useDS();
   return (
-    <View style={{ flexDirection: 'row', gap: 2, backgroundColor: c.dim, borderRadius: radius.pill, padding: 3 }}>
+    <View style={{ flexDirection: 'row', gap: 2, backgroundColor: c.dim, borderRadius: radius.pill, padding: 4 }}>
       {CHART_TYPES.map(t => {
         const active = t === value;
         return (
@@ -107,7 +107,7 @@ export function TrendChart({ data, color, height = 96, sub, goal, chartType = 'b
 
       <View style={{ flexDirection: 'row', marginTop: 4 }}>
         {data.labels.map((l, i) => (
-          <Text key={i} style={{ flex: 1, textAlign: 'center', color: sub, fontSize: 9, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }} numberOfLines={1}>{l}</Text>
+          <Text key={i} style={{ flex: 1, textAlign: 'center', color: sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }} numberOfLines={1}>{l}</Text>
         ))}
       </View>
     </View>

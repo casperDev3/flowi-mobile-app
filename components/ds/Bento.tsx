@@ -9,7 +9,9 @@
  * Варіанти:
  *   default — surface.card + м'яка тінь (темна — світлий верхній край);
  *   dark    — «виділена» чорнильна картка (featured.*), ОДНА на сторінку;
- *   ai      — лавандово-рожева змивка gradient.aiCard + сфера.
+ *   ai      — (unslop) та сама суцільна картка, що й default: змивку
+ *             gradient.aiCard і глянцеву сферу прибрано — кольорові плями
+ *             за вмістом не несуть сенсу. Варіант лишився в API.
  * Дочірні елементи беруть кольори тексту з useBentoColors() — інакше на
  * dark-картці text.primary стає чорним по чорному.
  *
@@ -19,7 +21,6 @@
  * на одну картку). Дитина може займати кілька колонок: <BentoCard span={2}>
  * або span="full".
  */
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { createContext, useContext, useState } from 'react';
 import {
   Pressable,
@@ -31,7 +32,6 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { AIOrb } from '@/components/ds/AIBlock';
 import { useResolvedAccent } from '@/components/ds/AccentContext';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { fontFamily, radius, shadow, space, type GlassAccent } from '@/constants/theme';
@@ -60,7 +60,7 @@ export type BentoColors = {
 const BentoColorsContext = createContext<BentoColors | null>(null);
 
 function useBentoPalette(variant: BentoVariant): BentoColors {
-  const { t, isDark } = useDS();
+  const { t } = useDS();
   if (variant === 'dark') {
     return {
       variant,
@@ -77,8 +77,8 @@ function useBentoPalette(variant: BentoVariant): BentoColors {
     variant,
     text: t.text.primary,
     textSecondary: t.text.secondary,
-    chipBg: variant === 'ai' ? (isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.7)') : t.surface.subtle,
-    nestedBg: variant === 'ai' ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.6)') : t.surface.subtle,
+    chipBg: t.surface.subtle,
+    nestedBg: t.surface.subtle,
     hairline: t.border.hairline,
     actionBg: t.action.primary,
     actionText: t.text.onAction,
@@ -110,7 +110,7 @@ export function BentoArrowButton({ onPress, accessibilityLabel, testID }: {
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
         style={[st.roundBtn, { backgroundColor: c.chipBg }]}>
-        <IconSymbol name="arrow.up.right" size={15} color={c.text} />
+        <IconSymbol name="arrow.up.right" size={16} color={c.text} />
       </View>
     );
   }
@@ -122,7 +122,7 @@ export function BentoArrowButton({ onPress, accessibilityLabel, testID }: {
       accessibilityLabel={accessibilityLabel}
       hitSlop={4}
       style={({ pressed }) => [st.roundBtn, { backgroundColor: c.chipBg, opacity: pressed ? 0.7 : 1 }]}>
-      <IconSymbol name="arrow.up.right" size={15} color={c.text} />
+      <IconSymbol name="arrow.up.right" size={16} color={c.text} />
     </Pressable>
   );
 }
@@ -135,7 +135,7 @@ export function BentoPeriodPill({ label, onPress, accessibilityLabel }: {
   const body = (
     <>
       <Text numberOfLines={1} style={[st.periodText, { color: c.text }]}>{label}</Text>
-      {onPress ? <IconSymbol name="chevron.down" size={11} color={c.textSecondary} /> : null}
+      {onPress ? <IconSymbol name="chevron.down" size={12} color={c.textSecondary} /> : null}
     </>
   );
   if (!onPress) return <View style={[st.period, { backgroundColor: c.chipBg }]}>{body}</View>;
@@ -170,7 +170,7 @@ export function BentoCardHeader({ title, icon, accent, right, subtitle }: BentoC
     <View style={st.head}>
       <View style={st.headLead}>
         {icon ? (
-          <View style={[st.chip, { backgroundColor: c.variant === 'default' ? a.tint : c.chipBg }]}>
+          <View style={[st.chip, { backgroundColor: c.variant === 'dark' ? c.chipBg : a.tint }]}>
             <IconSymbol name={icon} size={16} color={c.variant === 'dark' ? c.text : a.ink} />
           </View>
         ) : null}
@@ -221,25 +221,11 @@ export function BentoCard({
     borderRadius: compact ? radius.cardCompact : radius.card,
     padding: pad,
     overflow: 'hidden',
-    backgroundColor: variant === 'dark' ? t.featured.bg : variant === 'ai' ? t.surface.card : t.surface.card,
+    backgroundColor: variant === 'dark' ? t.featured.bg : t.surface.card,
     ...(variant === 'dark' ? shadow[scheme].popover : shadow[scheme].card),
   };
   const content = (
     <BentoColorsContext.Provider value={palette}>
-      {variant === 'ai' ? (
-        <>
-          <LinearGradient
-            pointerEvents="none"
-            colors={t.gradient.aiCard}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View pointerEvents="none" style={st.orb} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <AIOrb size={120} />
-          </View>
-        </>
-      ) : null}
       {title ? (
         <BentoCardHeader title={title} icon={icon} accent={accent} right={headerRight} subtitle={subtitle} />
       ) : null}
@@ -304,7 +290,7 @@ export function BentoGrid({ columns = BENTO_COLUMNS, gap, style, children }: Ben
 const st = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12, minHeight: 36 },
   headLead: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
-  headRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  headRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
   chip: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 16, lineHeight: 22, fontFamily: fontFamily.semibold },
   subtitle: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.regular },
@@ -314,5 +300,4 @@ const st = StyleSheet.create({
     paddingHorizontal: 12, borderRadius: radius.pill,
   },
   periodText: { fontSize: 12, fontFamily: fontFamily.medium },
-  orb: { position: 'absolute', right: -36, top: -36, opacity: 0.35 },
 });

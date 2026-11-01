@@ -79,7 +79,7 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
                 <View style={[s.handle, { backgroundColor: c.border }]} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
                   <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.cancel} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                    <IconSymbol name="xmark" size={17} color={c.sub} />
+                    <IconSymbol name="xmark" size={18} color={c.sub} />
                   </TouchableOpacity>
                 </View>
               </View>

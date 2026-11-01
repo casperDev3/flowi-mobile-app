@@ -478,11 +478,11 @@ function DateButton({ value, open, onToggle, label, locale, c }: {
       accessibilityState={{ expanded: open }}
       accessibilityLabel={`${label}: ${text}`}
       style={[st.dateBtn, { borderColor: 'transparent', backgroundColor: c.dim }]}>
-      <IconSymbol name="calendar" size={15} color={open ? c.text : c.sub} />
+      <IconSymbol name="calendar" size={16} color={open ? c.text : c.sub} />
       <Text style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
         {text}
       </Text>
-      <IconSymbol name={open ? 'chevron.up' : 'chevron.down'} size={13} color={c.sub} />
+      <IconSymbol name={open ? 'chevron.up' : 'chevron.down'} size={14} color={c.sub} />
     </TouchableOpacity>
   );
 }
@@ -536,13 +536,13 @@ function chunk<T>(arr: T[], n: number): T[][] {
 const st = StyleSheet.create({
   sheet:      { borderRadius: radius.card, padding: space.cardPaddingCompact, overflow: 'hidden' },
   title:      { fontSize: 20, lineHeight: 26, fontFamily: fontFamily.semibold, marginBottom: 4 },
-  label:      { fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 16, marginBottom: 6, letterSpacing: 0.3 },
+  label:      { fontSize: 12, fontFamily: fontFamily.medium, marginTop: 16, marginBottom: 6 },
   // Поля DS: subtle-тло; рамка лише для стану помилки (прозора у спокої).
-  input:      { borderRadius: radius.control, borderWidth: 1, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 11, fontSize: 15, fontFamily: fontFamily.regular, ...dsType.numeric },
+  input:      { borderRadius: radius.control, borderWidth: 1, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 12, fontSize: 15, fontFamily: fontFamily.regular, ...dsType.numeric },
   everyInput: { width: 64, textAlign: 'center', paddingVertical: 8, fontFamily: fontFamily.semibold },
   stepBtn:    { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   chipsRow:   { flexDirection: 'row', gap: 8 },
-  chip:       { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.pill, minHeight: 36, paddingHorizontal: 14, paddingVertical: 8 },
+  chip:       { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, minHeight: 36, paddingHorizontal: 14, paddingVertical: 8 },
   dateBtn:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.control, borderWidth: 1, paddingHorizontal: 14, minHeight: touchTarget },
   calendar:   { borderRadius: radius.nested, padding: 12, marginTop: 8 },
   iconOption: { flex: 1, aspectRatio: 1, maxWidth: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 2 },

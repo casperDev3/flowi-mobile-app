@@ -205,7 +205,7 @@ export default function RegisterScreen() {
         {/* Header */}
         <View style={st.header}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="chevron.left" size={22} color={c.text} />
+            <IconSymbol name="chevron.left" size={24} color={c.text} />
           </TouchableOpacity>
         </View>
 
@@ -236,7 +236,7 @@ export default function RegisterScreen() {
             >
               {/* Name */}
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authName.toUpperCase()}</Text>
+                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authName}</Text>
                 <TextInput
                   style={[st.input, { color: c.text }]}
                   placeholderTextColor={k.text.muted}
@@ -251,7 +251,7 @@ export default function RegisterScreen() {
 
               {/* Email */}
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authEmail.toUpperCase()}{" "}
+                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authEmail}{" "}
                   <Text style={{ color: c.red }}>*</Text>
                 </Text>
                 <TextInput
@@ -281,7 +281,7 @@ export default function RegisterScreen() {
 
               {/* Password */}
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPassword.toUpperCase()}{" "}
+                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPassword}{" "}
                   <Text style={{ color: c.red }}>*</Text>
                 </Text>
                 <View style={st.passwordRow}>
@@ -321,7 +321,7 @@ export default function RegisterScreen() {
 
               {/* Repeat password */}
               <View style={st.fieldWrap}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPasswordRepeat.toUpperCase()}{" "}
+                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPasswordRepeat}{" "}
                   <Text style={{ color: c.red }}>*</Text>
                 </Text>
                 <View style={st.passwordRow}>
@@ -397,7 +397,7 @@ export default function RegisterScreen() {
 const st = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 16,
     paddingBottom: 4,
   },
   scroll: {
@@ -420,17 +420,16 @@ const st = StyleSheet.create({
     marginBottom: 16,
   },
   card: {
-    borderRadius: 24,
+    borderRadius: 16,
     overflow: 'hidden',
   },
   fieldWrap: {
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 16,
   },
   fieldLabel: {
     fontSize: 12,
     fontFamily: fontFamily.medium,
-    letterSpacing: 0.3,
     marginBottom: 4,
   },
   fieldError: {

@@ -65,7 +65,7 @@ export function MeetingWorkspace({ meeting, date, colors: c, section = "agenda" 
       <View>{agenda.map(item => <View key={item.id} style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: item.done, disabled: !canEdit || busy }} accessibilityLabel={item.text} disabled={!canEdit || busy} onPress={() => void run(() => mutate({ kind: 'set', id: item.id, done: !item.done }))} style={{ flex: 1, flexDirection: 'row', gap: 10, minHeight: 44, alignItems: 'center' }}>
           {/* Omni-чекліст: виконаний — суцільне коло з галочкою, ні — порожнє коло. */}
-          <IconSymbol name={item.done ? 'checkmark.circle.fill' : 'circle'} size={22} color={item.done ? c.text : c.sub} /><Text style={{ color: item.done ? c.sub : c.text, flex: 1, textDecorationLine: item.done ? 'line-through' : 'none' }}>{item.text}</Text>
+          <IconSymbol name={item.done ? 'checkmark.circle.fill' : 'circle'} size={24} color={item.done ? c.text : c.sub} /><Text style={{ color: item.done ? c.sub : c.text, flex: 1, textDecorationLine: item.done ? 'line-through' : 'none' }}>{item.text}</Text>
         </TouchableOpacity>
         {canEdit ? button(t('Видалити', 'Remove'), () => void run(() => mutate({ kind: 'remove', id: item.id }))) : null}
       </View>)}</View>
@@ -81,7 +81,7 @@ export function MeetingWorkspace({ meeting, date, colors: c, section = "agenda" 
         {canEdit ? <View style={st.actions}>{button(t('Редагувати нотатку', 'Edit note'), () => { setEditing({ id: note.id, body: noteBody(note) }); setBody(noteBody(note)); }, !!body.trim())}{button(t('Відкріпити', 'Detach'), () => void run(() => attach(note.id)), editing?.id === note.id)}</View> : null}
       </View>)}
       {canEdit ? <>
-        <TextInput accessibilityLabel={t('Нова нотатка зустрічі', 'New meeting note')} placeholder={t('Рішення, ідеї та наступні кроки…', 'Decisions, ideas and next steps…')} placeholderTextColor={c.sub} multiline textAlignVertical="top" value={body} onChangeText={setBody} editable={!busy} style={[st.input, { color: c.text, backgroundColor: c.dim, minHeight: 110 }]} />
+        <TextInput accessibilityLabel={t('Нова нотатка зустрічі', 'New meeting note')} placeholder={t('Рішення, ідеї та наступні кроки', 'Decisions, ideas and next steps')} placeholderTextColor={c.sub} multiline textAlignVertical="top" value={body} onChangeText={setBody} editable={!busy} style={[st.input, { color: c.text, backgroundColor: c.dim, minHeight: 110 }]} />
         {button(t('Зберегти нотатку', 'Save note'), () => void run(async () => {
           if (editing) {
             await updateSynced<Note>('notes', fresh => {

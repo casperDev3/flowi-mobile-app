@@ -84,13 +84,14 @@ export function QuestFormSheet({ c, visible, quest, members, onClose, onSave, on
 
       {measurable ? (
         <>
-          <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, marginBottom: 6 }}>{tr.tgMetric}</Text>
+          <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginBottom: 6 }}>{tr.tgMetric}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
             {QUEST_METRICS.map(m => (
               <Chip
                 key={m.metric}
                 c={c}
-                label={`${m.health ? '🔒 ' : ''}${tr[m.labelKey]}`}
+                label={tr[m.labelKey]}
+                icon={m.health ? 'lock.fill' : undefined}
                 active={draft.metric === m.metric}
                 onPress={() => setDraft({ ...draft, metric: m.metric as QuestMetric })}
               />
@@ -134,7 +135,7 @@ export function QuestFormSheet({ c, visible, quest, members, onClose, onSave, on
         onChange={xpReward => setDraft({ ...draft, xpReward })}
       />
 
-      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, marginTop: 14, marginBottom: 6 }}>{tr.tgSelectMembers}</Text>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 16, marginBottom: 6 }}>{tr.tgSelectMembers}</Text>
       <Chip c={c} label={tr.tgAllMembers} active={assignees.size === 0} onPress={() => setDraft({ ...draft, assigneeIds: [] })} />
       {candidates.map(m => {
         const on = assignees.has(m.user.id);

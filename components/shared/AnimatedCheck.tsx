@@ -2,7 +2,8 @@
  * components/shared/AnimatedCheck.tsx
  *
  * Анімований кружечок-чекбокс:
- * — checked=true  → withSequence(withSpring 1.25 bouncy, withSpring 1 default) + галочка FadeIn
+ * — checked=true  → withSequence(withTiming 1.06, withTiming 1) + галочка FadeIn
+ *   (unslop: без пружного перебігу — короткий «натиск» на одну криву Motion.easing.out)
  * — checked=false → scale повертається до 1, галочка FadeOut (withTiming fast)
  * — reduced motion → без анімацій, стан змінюється миттєво
  *
@@ -15,7 +16,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -77,10 +77,10 @@ export function AnimatedCheck({
         scale.value        = 1;
         checkOpacity.value = 1;
       } else {
-        /* Bounce in */
+        /* Короткий натиск без перебігу: 1 → 1.06 → 1. */
         scale.value = withSequence(
-          withSpring(1.25, Motion.spring.bouncy),
-          withSpring(1,    Motion.spring.default),
+          withTiming(1.06, { duration: 90,                    easing: Motion.easing.out }),
+          withTiming(1,    { duration: Motion.duration.fast,  easing: Motion.easing.out }),
         );
         checkOpacity.value = withTiming(1, { duration: Motion.duration.fast });
       }

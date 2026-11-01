@@ -373,7 +373,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
         accessibilityState={{ selected: pinnedSidebar }}
         testID="nav-sidebar-pin"
         style={[st.iconBtn, pinnedSidebar && { backgroundColor: t.surface.subtle }]}>
-        <IconSymbol name={pinnedSidebar ? 'pin.fill' : 'pin'} size={15} color={pinnedSidebar ? c.text : c.sub} />
+        <IconSymbol name={pinnedSidebar ? 'pin.fill' : 'pin'} size={16} color={pinnedSidebar ? c.text : c.sub} />
       </TouchableOpacity>
       <TouchableOpacity
         onPress={pinnedSidebar ? toggleRail : closePeek}
@@ -411,7 +411,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
         {
           width: drawer ? (width ?? SIDEBAR_WIDTH) : SIDEBAR_WIDTH,
           backgroundColor: reduceTransparency && !drawer && !overlay ? t.surface.card : 'transparent',
-          paddingTop: insets.top + 14,
+          paddingTop: insets.top + 16,
         },
         (drawer || overlay) && { flex: 1 },
       ]}
@@ -430,13 +430,13 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
           // звичайним підписом, щоб не обіцяти дію, якої немає.
           const collapsible = Boolean(group.id);
           const activeInside = hidden && groupHasActiveItem(group, pathname);
-          const title = group.titleKey ? String(tr[group.titleKey] ?? '').toUpperCase() : '';
+          const title = group.titleKey ? String(tr[group.titleKey] ?? '') : '';
           const pinnedGroup = group.kind === 'pinned';
 
           return (
             <View
               key={group.id ?? group.kind ?? `g${gi}`}
-              style={{ marginBottom: hidden ? 6 : group.kind ? 8 : 14 }}
+              style={{ marginBottom: hidden ? 8 : group.kind ? 8 : 16 }}
               accessibilityLabel={pinnedGroup ? ss.pinnedGroup : undefined}>
               {group.titleKey && (
                 collapsible ? (
@@ -448,7 +448,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
                     style={st.groupHead}>
                     <IconSymbol
                       name={hidden ? 'chevron.right' : 'chevron.down'}
-                      size={13}
+                      size={12}
                       color={activeInside ? c.accent : c.sub}
                     />
                     <Text style={[st.groupTitle, { color: activeInside ? c.accent : c.sub, flex: 1, marginLeft: 4 }]}>
@@ -508,7 +508,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
                       accessibilityLabel={ss.unpinSection(label)}
                       testID={`nav-unpin-${mod}`}
                       style={st.iconBtn}>
-                      <IconSymbol name="pin.fill" size={13} color={c.sub} />
+                      <IconSymbol name="pin.fill" size={12} color={c.sub} />
                     </TouchableOpacity>
                   </View>
                 );
@@ -521,7 +521,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
       {/* Активні таймери — ПОЗА скролом, притиснуті до низу: зупинити таймер
           мусить бути можна з будь-якого розділу без прокрутки сайдбара.
           Картка сама ховається, коли таймерів немає. */}
-      <View style={{ paddingBottom: insets.bottom + 10, gap: 10 }}>
+      <View style={{ paddingBottom: insets.bottom + 12, gap: 12 }}>
         {/* Шухляда: тло малює SidebarDrawer («брудне скло» OverlaySurface). */}
         {footer}
         <ActiveTimersSidebarCard colors={timerCardColors} />
@@ -563,7 +563,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
   if (rail) {
     return (
       <View
-        style={[st.root, st.railRoot, { width: Layout.railWidth, backgroundColor: reduceTransparency ? c.bg : 'transparent', paddingTop: insets.top + 14 }]}
+        style={[st.root, st.railRoot, { width: Layout.railWidth, backgroundColor: reduceTransparency ? c.bg : 'transparent', paddingTop: insets.top + 16 }]}
         accessibilityRole="menu">
         {glassLayer}
         <Image source={require('@/assets/logo_app.png')} style={st.railLogo} accessible={false} />
@@ -586,7 +586,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
                     accessibilityLabel={groupTitle}
                     accessibilityState={{ expanded: !hidden, selected: activeInside }}
                     style={st.iconBtn}>
-                    <IconSymbol name={hidden ? 'chevron.right' : 'chevron.down'} size={13} color={activeInside ? c.accent : c.sub} />
+                    <IconSymbol name={hidden ? 'chevron.right' : 'chevron.down'} size={12} color={activeInside ? c.accent : c.sub} />
                     {hidden && <Text style={[st.railCount, { color: activeInside ? c.accent : c.sub }]}>{group.items.length}</Text>}
                     {activeInside && <View style={[st.activeDot, st.railActiveDot, { backgroundColor: c.accent }]} />}
                   </TouchableOpacity>
@@ -605,7 +605,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
                       {...pinA11y(item)}
                       style={[st.railItem, active && activeStyle(accent)]}>
                       <View style={[st.railChip, active ? null : iconChip(accent, false)]}>
-                        <IconSymbol name={item.icon} size={19} color={active ? activeIcon(accent) : idleIcon(accent)} />
+                        <IconSymbol name={item.icon} size={18} color={active ? activeIcon(accent) : idleIcon(accent)} />
                       </View>
                       {item.route === '/(tabs)/settings' && (
                         <NotificationBadge variant="dot" style={st.railBadge} />
@@ -613,7 +613,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
                       {/* Закріплений розділ у рейці — крихітна шпилька в куті. */}
                       {group.kind === 'pinned' && (
                         <View pointerEvents="none" style={st.railPin}>
-                          <IconSymbol name="pin.fill" size={9} color={active ? activeIcon(accent) : c.sub} />
+                          <IconSymbol name="pin.fill" size={10} color={active ? activeIcon(accent) : c.sub} />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -626,14 +626,14 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
         {/* Повна картка таймерів у 76pt не влазить — лишаємо вхід у Трекер
             часу з лічильником, щоб зупинити таймер можна було звідусіль. */}
         {activeTimers.length > 0 && (
-          <View style={{ paddingBottom: insets.bottom + 10, alignItems: 'center' }}>
+          <View style={{ paddingBottom: insets.bottom + 12, alignItems: 'center' }}>
             <TouchableOpacity
               onPress={() => go('/(tabs)/time')}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel={`${tr.navTime}: ${activeTimers.length}`}
               style={[st.railItem, { backgroundColor: timerCardColors.activeBg }]}>
-              <IconSymbol name="timer" size={21} color={c.accent} />
+              <IconSymbol name="timer" size={20} color={c.accent} />
               <Text style={[st.railTimerCount, { color: c.accent }]}>{activeTimers.length}</Text>
             </TouchableOpacity>
           </View>
@@ -650,13 +650,13 @@ const st = StyleSheet.create({
   root:       { paddingHorizontal: 12 },
   // Спекулярний обідок скла на правому краї сайдбара (межа зі вмістом).
   rimRight:   { position: 'absolute', top: 0, bottom: 0, right: 0, width: StyleSheet.hairlineWidth },
-  brand:      { fontSize: 20, fontFamily: fontFamily.semibold, paddingHorizontal: 10, marginBottom: 18 },
+  brand:      { fontSize: 20, fontFamily: fontFamily.semibold, paddingHorizontal: 10, marginBottom: 16 },
   // 32 — свідомо менше за 44: це заголовок, а не пункт призначення. Промах по
   // ньому нічого не ламає (розгорнулась зайва група), тож повний тач-таргет
   // тут коштував би рядків, заради яких усе й затівалося.
   groupHead:  { flexDirection: 'row', alignItems: 'center', minHeight: 32, paddingHorizontal: 10, borderRadius: Atlas.radius.small },
-  groupTitle: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.6, marginBottom: 6 },
-  groupCount: { fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 6, fontVariant: ['tabular-nums'] },
+  groupTitle: { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 4 },
+  groupCount: { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 4, fontVariant: ['tabular-nums'] },
   // 44 — мінімальний тач-таргет за HIG; на планшеті промахуються частіше,
   // бо палець тягнеться через увесь екран.
   row:        { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingLeft: 8, paddingRight: 14, borderRadius: radius.pill },
@@ -666,19 +666,19 @@ const st = StyleSheet.create({
   label:      { fontSize: 14, flex: 1 },
   // ── Рейка ──
   railRoot:   { paddingHorizontal: 0, alignItems: 'center' },
-  railLogo:   { width: 34, height: 34, borderRadius: Atlas.radius.medium, marginBottom: 6 },
-  railGroup:  { alignItems: 'center', paddingVertical: 6, gap: 2, alignSelf: 'stretch' },
-  railGroupGap: { marginTop: 6 },
+  railLogo:   { width: 34, height: 34, borderRadius: Atlas.radius.medium, marginBottom: 8 },
+  railGroup:  { alignItems: 'center', paddingVertical: 4, gap: 4, alignSelf: 'stretch' },
+  railGroupGap: { marginTop: 8 },
   // 44×44 — мінімальний тач-таргет; у рейці підпису немає, тож площа кнопки —
   // єдине, у що цілиться палець.
   iconBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
   railItem:   { width: 52, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
   railBadge:  { position: 'absolute', top: 10, right: 12 },
-  railCount:  { position: 'absolute', bottom: 4, fontSize: 9, fontFamily: fontFamily.bold, fontVariant: ['tabular-nums'] },
+  railCount:  { position: 'absolute', bottom: 4, fontSize: 10, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   // Крапка «поточний розділ усередині» на згорнутому заголовку групи.
-  activeDot:  { width: 6, height: 6, borderRadius: 3, marginBottom: 6 },
+  activeDot:  { width: 6, height: 6, borderRadius: 3, marginBottom: 4 },
   railActiveDot: { position: 'absolute', top: 9, right: 9, marginBottom: 0 },
-  railTimerCount: { position: 'absolute', bottom: 3, right: 8, fontSize: 10, fontFamily: fontFamily.bold, fontVariant: ['tabular-nums'] },
+  railTimerCount: { position: 'absolute', bottom: 4, right: 8, fontSize: 10, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   railPin:    { position: 'absolute', top: 5, right: 7 },
   headRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
   headLogo:   { width: 34, height: 34, borderRadius: Atlas.radius.medium, marginRight: 4 },

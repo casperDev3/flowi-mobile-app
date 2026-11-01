@@ -239,14 +239,14 @@ export default function NotificationsScreen() {
               onPress={() => { void markAllNotificationsRead(); }}
               accessibilityLabel={tr.ncMarkAllRead}
               style={{ backgroundColor: c.card, borderColor: 'transparent' }}>
-              <IconSymbol name="checkmark.circle" size={17} color={c.text} />
+              <IconSymbol name="checkmark.circle" size={18} color={c.text} />
             </HeaderButton>
           ) : null}
           <HeaderButton
             onPress={() => router.push('/settings-notifications' as never)}
             accessibilityLabel={tr.ncOpenSettings}
             style={{ backgroundColor: c.card, borderColor: 'transparent' }}>
-            <IconSymbol name="gearshape.fill" size={16} color={c.sub} />
+            <IconSymbol name="gearshape.fill" size={18} color={c.sub} />
           </HeaderButton>
         </View>
       }>
@@ -346,7 +346,7 @@ export default function NotificationsScreen() {
   ) : (
     <View style={{ alignItems: 'center', paddingVertical: 56, paddingHorizontal: 12 }}>
       <AccentIcon isDark={isDark} icon={filter === 'unread' ? 'checkmark.circle' : 'bell'} accent="lavender" size="lg" style={st.emptyIcon} />
-      <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontFamily: fontFamily.semibold, textAlign: 'center' }}>
+      <Text style={{ color: c.text, fontSize: 16, marginTop: 20, fontFamily: fontFamily.semibold, textAlign: 'center' }}>
         {filter === 'unread' ? tr.ncEmptyUnreadTitle : tr.ncEmptyTitle}
       </Text>
       {filter === 'all' ? (
@@ -417,7 +417,7 @@ const st = StyleSheet.create({
   countText:   { color: '#fff', fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   filterRow:   { flexDirection: 'row', gap: 8, marginBottom: 12 },
   chip:        { minHeight: 36, paddingHorizontal: 16, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  banner:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 12 },
+  banner:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 12 },
   bannerText:  { flex: 1, fontSize: 13, lineHeight: 18 },
   retryBtn:    { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
   hint:        { fontSize: 12, marginBottom: 10, marginHorizontal: 2 },

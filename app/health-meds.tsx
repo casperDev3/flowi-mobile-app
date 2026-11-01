@@ -77,7 +77,7 @@ export default function MedsScreen() {
     // ERR-10: порожній масив — це відмова планувальника (вимкнені сповіщення
     // або не дано дозвіл), а не «нагадувань не просили». Раніше він мовчки
     // лягав у запис, і ліки виглядали як такі, що дзвонитимуть о 08:00.
-    const notifIds = await scheduleMedReminders(id, t, `💊 ${name.trim()}`, tr.takeNow);
+    const notifIds = await scheduleMedReminders(id, t, name.trim(), tr.takeNow);
     setReminderBlocked(notifIds.length === 0);
     const med: Medication = {
       id, name: name.trim(), dose: dose.trim() || undefined, times: t,
@@ -103,7 +103,7 @@ export default function MedsScreen() {
       await cancelMedReminders(medNotifIds(m));
       setMeds(p => p.map(x => x.id === m.id ? { ...x, active: false, notifIds: [] } : x));
     } else {
-      const ids = await scheduleMedReminders(m.id, m.times, `💊 ${m.name}`, tr.takeNow);
+      const ids = await scheduleMedReminders(m.id, m.times, m.name, tr.takeNow);
       // ERR-10: «активне» без жодного запланованого нагадування — обіцянка,
       // якої застосунок не виконає; кажемо це вголос.
       setReminderBlocked(ids.length === 0);
@@ -170,7 +170,7 @@ export default function MedsScreen() {
                     </Text>
                   </View>
                   <TouchableOpacity onPress={() => remove(m)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${m.name}`} style={s.removeBtn}>
-                    <IconSymbol name="trash" size={15} color={c.sub} />
+                    <IconSymbol name="trash" size={16} color={c.sub} />
                   </TouchableOpacity>
                 </View>
                 {total > 0 ? (

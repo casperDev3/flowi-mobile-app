@@ -63,7 +63,7 @@ export function TodaySessionCard({ c, session, next, onOpen, noPlanText }: {
         </View>
         {next ? (
           <TouchableOpacity onPress={() => onOpen(next)} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center', marginTop: 4 }}>
-            <Text style={{ color: TG_ACCENT, fontSize: 14, fontFamily: fontFamily.bold }}>
+            <Text style={{ color: TG_ACCENT, fontSize: 14, fontFamily: fontFamily.semibold }}>
               {fmt(tr.tgNextSession, { date: `${formatSessionDate(tr, next.date)} · ${next.title || next.programName || ''}` })}
             </Text>
           </TouchableOpacity>
@@ -111,9 +111,9 @@ function TodaySessionBody({ c, session, onOpen }: {
       </View>
       {open ? (
         <PrimaryButton label={tr.tgStart} icon="play.fill" onPress={() => onOpen(session)} color={bc.actionBg}
-          style={{ marginTop: 14 }} textColor={bc.actionText} />
+          style={{ marginTop: 16 }} textColor={bc.actionText} />
       ) : (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, gap: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
             <Text style={{ color: bc.text, fontFamily: fontFamily.semibold }}>{statusLabel(tr, session.status)}</Text>
@@ -168,15 +168,15 @@ export function StreakXpCard({ c, xpTotal, streakDays }: { c: TrainingColors; xp
   return (
     <View style={{ flexDirection: 'row', gap: 10 }}>
       <Card c={c} style={{ flex: 1 }} accent={TG_WARN}>
-        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold }}>{tr.tgStreak}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.tgStreak}</Text>
         <Text style={{ color: c.text, fontSize: 24, fontFamily: fontFamily.semibold, marginTop: 4 }}>
-          {`🔥 ${fmt(tr.tgStreakDays, { n: streakDays })}`}
+          {fmt(tr.tgStreakDays, { n: streakDays })}
         </Text>
         <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginTop: 2 }}>{fmt(tr.tgMultiplier, { x: mult })}</Text>
       </Card>
       <Card c={c} style={{ flex: 1 }} accent={TG_XP}>
-        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold }}>{tr.tgXpTotal}</Text>
-        <Text style={{ color: c.text, fontSize: 24, fontFamily: fontFamily.semibold, marginTop: 4 }}>{`★ ${xpTotal}`}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.tgXpTotal}</Text>
+        <Text style={{ color: c.text, fontSize: 24, fontFamily: fontFamily.semibold, marginTop: 4 }}>{xpTotal}</Text>
       </Card>
     </View>
   );

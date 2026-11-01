@@ -1067,7 +1067,7 @@ export default function ProjectTasksScreen() {
             {calendarGroups.length === 0 ? (
               <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 24 }}>{tr.projectNoTasks}</Text>
             ) : calendarGroups.map(group => (
-              <View key={group.key} style={{ marginTop: 14 }}>
+              <View key={group.key} style={{ marginTop: 16 }}>
                 <Text style={[type.caption, { color: c.sub, fontFamily: fontFamily.semibold, marginBottom: 6 }]}>{group.label}</Text>
                 {group.meetings.map(meeting => (
                   <TouchableOpacity
@@ -1078,7 +1078,7 @@ export default function ProjectTasksScreen() {
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: meeting.color }} />
                     <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{meeting.title}</Text>
                     {meeting.time ? <Text style={[type.caption, type.numeric, { color: c.sub }]}>{meeting.time}</Text> : null}
-                    <IconSymbol name="calendar" size={13} color={c.sub} />
+                    <IconSymbol name="calendar" size={12} color={c.sub} />
                   </TouchableOpacity>
                 ))}
                 {group.tasks.map(task => (
@@ -1225,7 +1225,7 @@ export default function ProjectTasksScreen() {
         // особистих Завдань на планшеті). «Лише мої» видно чипом, поки увімкнено.
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={[st.search, { backgroundColor: t.surface.card }]}>
-            <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
+            <IconSymbol name="magnifyingglass" size={16} color={c.sub} />
             <TextInput
               accessibilityLabel={tr.projectTasksSearch}
               placeholder={tr.projectTasksSearch}
@@ -1343,8 +1343,8 @@ const st = StyleSheet.create({
   statusRing: { width: 14, height: 14, borderRadius: 7, borderWidth: 2.5 },
   countPill: { minWidth: 24, height: 22, paddingHorizontal: 8, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.nested, padding: 12 },
-  meetingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, paddingHorizontal: 14, paddingVertical: 12, minHeight: 44 },
+  meetingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, paddingHorizontal: 16, paddingVertical: 12, minHeight: 44 },
   dateEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.nested, padding: 8, marginTop: 6 },
   dateInput: { flex: 1, minHeight: 44, borderRadius: radius.control, paddingHorizontal: 12, paddingVertical: 6, fontSize: 13, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'] },
-  emptyHint: { fontSize: 12, fontFamily: fontFamily.regular, textAlign: 'center', borderRadius: radius.nested, overflow: 'hidden', paddingVertical: 18, paddingHorizontal: 12 },
+  emptyHint: { fontSize: 12, fontFamily: fontFamily.regular, textAlign: 'center', borderRadius: radius.nested, overflow: 'hidden', paddingVertical: 16, paddingHorizontal: 12 },
 });

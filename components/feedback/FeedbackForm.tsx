@@ -164,7 +164,7 @@ export function FeedbackForm({
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
                   style={[st.segmentBtn, active && { backgroundColor: t.action.primary }]}>
-                  <IconSymbol name={kind === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={13} color={active ? t.text.onAction : c.sub} />
+                  <IconSymbol name={kind === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={12} color={active ? t.text.onAction : c.sub} />
                   <Text style={{ color: active ? t.text.onAction : c.sub, fontFamily: fontFamily.semibold, fontSize: 13 }}>
                     {kind === 'bug' ? tr.fbTypeBug : tr.fbTypeIdea}
                   </Text>
@@ -327,7 +327,7 @@ export function FeedbackForm({
         </Text>
         {draft.attachments.map((att) => (
           <View key={att.uid} style={[st.attRow, { backgroundColor: glassOf(t).surfaceSubtle }]}>
-            <IconSymbol name={att.kind === 'video' ? 'play.circle.fill' : 'camera.fill'} size={15} color={c.sub} />
+            <IconSymbol name={att.kind === 'video' ? 'play.circle.fill' : 'camera.fill'} size={16} color={c.sub} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }} numberOfLines={1}>
                 {att.name}
@@ -356,7 +356,7 @@ export function FeedbackForm({
             accessibilityLabel={tr.fbAddAttachment}
             style={[st.addAtt, { borderColor: t.border.hairline }]}>
             {picking ? <ActivityIndicator size="small" color={accent} /> : <IconSymbol name="plus" size={14} color={accent} />}
-            <Text style={{ color: accent, fontFamily: fontFamily.bold, fontSize: 13 }}>
+            <Text style={{ color: accent, fontFamily: fontFamily.semibold, fontSize: 13 }}>
               {tr.fbAddAttachment}
             </Text>
           </TouchableOpacity>
@@ -364,7 +364,7 @@ export function FeedbackForm({
 
         {canSend ? (
           <View style={[st.ctxBox, { backgroundColor: glassOf(t).surfaceSubtle }]}>
-            <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.bold }}>
+            <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold }}>
               {tr.fbContext}
             </Text>
             <Text style={{ color: c.sub, fontSize: 11, marginBottom: 6 }}>
@@ -386,7 +386,7 @@ export function FeedbackForm({
         {!isNew && !canSend ? (
           // «Що надіслав — те й надіслав» (§15 п. 3): правка лишається в
           // особистому списку, звернення на сервері не змінюється.
-          <Text style={{ color: c.sub, fontSize: 12, marginTop: 14 }}>
+          <Text style={{ color: c.sub, fontSize: 12, marginTop: 16 }}>
             {tr.fbEditAfterSent}
           </Text>
         ) : null}
@@ -415,7 +415,7 @@ export function FeedbackForm({
             onPress={() => submit(true)}
             accessibilityRole="button"
             style={[st.btn, { marginTop: 8, backgroundColor: t.action.primary }]}>
-            <IconSymbol name="paperplane.fill" size={15} color={t.text.onAction} />
+            <IconSymbol name="paperplane.fill" size={16} color={t.text.onAction} />
             <Text style={{ color: t.text.onAction, fontFamily: fontFamily.semibold, marginLeft: 6 }}>
               {tr.fbSaveAndSend}
             </Text>
@@ -430,18 +430,18 @@ const st = StyleSheet.create({
   sheet:      { borderRadius: Atlas.radius.xxlarge, padding: 20, paddingTop: 4, overflow: 'hidden', flexShrink: 1 },
   sheetTitle: { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 12 },
   segment:    { flexDirection: 'row', borderRadius: 999, padding: 4, marginBottom: 4 },
-  segmentBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, minHeight: 40, borderRadius: 999 },
-  label:      { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 14 },
-  input:      { borderRadius: Atlas.radius.medium, padding: 13, minHeight: 44, fontSize: 14, fontFamily: fontFamily.regular, borderWidth: 1.5 },
+  segmentBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, minHeight: 40, borderRadius: 999 },
+  label:      { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 16 },
+  input:      { borderRadius: Atlas.radius.medium, padding: 12, minHeight: 44, fontSize: 14, fontFamily: fontFamily.regular, borderWidth: 1.5 },
   multi:      { minHeight: 84 },
   multiShort: { minHeight: 60 },
-  chip:       { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  chip:       { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
   weightBtn:  { flex: 1, paddingVertical: 10, minHeight: 40, borderRadius: 999, alignItems: 'center' },
   attRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, padding: 10, marginBottom: 6 },
   addAtt:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderRadius: Atlas.radius.medium, paddingVertical: 12, minHeight: 44 },
-  ctxBox:     { borderRadius: Atlas.radius.large, padding: 14, marginTop: 16 },
+  ctxBox:     { borderRadius: Atlas.radius.large, padding: 16, marginTop: 16 },
   ctxRow:     { flexDirection: 'row', gap: 8, paddingVertical: 2 },
   missing:    { color: '#E8543F', fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 12 },
-  actions:    { flexDirection: 'row', gap: 8, marginTop: 18 },
-  btn:        { paddingVertical: 13, borderRadius: 999, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', minHeight: 44 },
+  actions:    { flexDirection: 'row', gap: 8, marginTop: 20 },
+  btn:        { paddingVertical: 12, borderRadius: 999, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', minHeight: 44 },
 });

@@ -83,17 +83,17 @@ export const NotificationRow = React.memo(function NotificationRow({
           <View style={[styles.iconBox, selected
             ? { backgroundColor: t.action.primary }
             : { borderWidth: 1.5, borderColor: t.text.secondary }]}>
-            {selected ? <IconSymbol name="checkmark" size={15} color={t.text.onAction} /> : null}
+            {selected ? <IconSymbol name="checkmark" size={16} color={t.text.onAction} /> : null}
           </View>
         ) : (
           <View style={[styles.iconBox, { backgroundColor: look.color + '20' }]}>
-            <IconSymbol name={look.icon} size={17} color={look.color} />
+            <IconSymbol name={look.icon} size={16} color={look.color} />
           </View>
         )}
         <View style={styles.textCol}>
           <View style={styles.titleRow}>
             <Text
-              style={[styles.title, { color: colors.text, fontFamily: unread ? fontFamily.bold : fontFamily.semibold }]}
+              style={[styles.title, { color: colors.text, fontFamily: unread ? fontFamily.semibold : fontFamily.medium }]}
               numberOfLines={2}>
               {item.title}
             </Text>
@@ -138,14 +138,14 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'flex-start' },
   // Вирівняно з текстом картки: 12 (padding) + 34 (іконка) + 12 (відступ).
-  footer: { paddingLeft: 66, paddingRight: 16, paddingBottom: 16 },
+  footer: { paddingLeft: 64, paddingRight: 16, paddingBottom: 16 },
   main: { flex: 1, flexDirection: 'row', padding: 16, paddingRight: 4, minHeight: 44 },
   iconBox: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   textCol: { flex: 1, marginLeft: 12, minWidth: 0 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   title: { fontFamily: fontFamily.regular, flex: 1, fontSize: 14 },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
-  body: { fontFamily: fontFamily.regular, fontSize: 13, marginTop: 3, lineHeight: 18 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
+  body: { fontFamily: fontFamily.regular, fontSize: 13, marginTop: 4, lineHeight: 18 },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 6 },
   projectDot: { width: 7, height: 7, borderRadius: 4 },
   meta: { fontSize: 12, fontFamily: fontFamily.regular, flexShrink: 1, fontVariant: ['tabular-nums'] },

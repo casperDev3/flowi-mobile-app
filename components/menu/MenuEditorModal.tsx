@@ -134,7 +134,7 @@ export function MenuEditorModal({
           </View>
           <ScrollView
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }}>
+            contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 40 }}>
             {!!formError && (
               <Text accessibilityRole="alert" style={{ color: MENU_ERR }}>
                 {formError}
@@ -169,7 +169,7 @@ export function MenuEditorModal({
             )}
             {dishReadOnly ? (
               <>
-                <Text style={{ fontSize: 24, color: c.text, fontFamily: fontFamily.bold }}>{ed.title}</Text>
+                <Text style={{ fontSize: 24, color: c.text, fontFamily: fontFamily.semibold }}>{ed.title}</Text>
                 {text(dateLabel(ed.date) + ' · ' + meals[ed.meal], true)}
                 {text(ed.description || 'Без опису')}
                 {ed.photo && <Image source={{ uri: ed.photo }} style={{ height: 250 }} resizeMode="contain" />}

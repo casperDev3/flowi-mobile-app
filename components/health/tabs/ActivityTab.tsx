@@ -88,8 +88,8 @@ export function ActivityTab({ h }: HealthTabProps) {
             </View>
             <View style={{ width: 110 }}>
               <MiniBarChart values={h.charts.steps} color={ACCENT_STEPS} goal={goals.steps} height={50} />
-              <View style={{ flexDirection: 'row', marginTop: 3 }}>
-                {labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{l}</Text>)}
+              <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                {labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{l}</Text>)}
               </View>
             </View>
           </View>
@@ -129,7 +129,7 @@ export function ActivityTab({ h }: HealthTabProps) {
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>кк {tr.burned.toLowerCase()}</Text>
           </View>
           {cal.burned > today.calOut && (
-            <Text style={{ color: c.sub, fontSize: 11, marginTop: 3 }}>
+            <Text style={{ color: c.sub, fontSize: 11, marginTop: 4 }}>
               {tr.workoutsLabel}: +{cal.burned - today.calOut} кк
             </Text>
           )}
@@ -162,7 +162,7 @@ export function ActivityTab({ h }: HealthTabProps) {
                   {week.calories > 0 ? `${week.calories} кк ${tr.burned.toLowerCase()}` : tr.workoutsSub}
                 </Text>
               </View>
-              <IconSymbol name="chevron.right" size={13} color={c.sub} />
+              <IconSymbol name="chevron.right" size={14} color={c.sub} />
             </View>
           </HealthCard>
         </TouchableOpacity>
@@ -183,8 +183,8 @@ export function ActivityTab({ h }: HealthTabProps) {
           <HealthCard c={c} style={{ flexDirection: 'row', alignItems: 'center' }}>
             <IconSymbol name="heart.fill" size={16} color={ACCENT} />
             {/* Назва сервісу не перекладається; на Android це Health Connect. */}
-            <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold, flex: 1, marginLeft: 10 }}>{h.hk.label ?? 'Apple Health'}</Text>
-            <IconSymbol name="chevron.right" size={13} color={c.sub} />
+            <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 10 }}>{h.hk.label ?? 'Apple Health'}</Text>
+            <IconSymbol name="chevron.right" size={14} color={c.sub} />
           </HealthCard>
         </TouchableOpacity>
       ),

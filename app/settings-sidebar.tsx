@@ -114,7 +114,7 @@ export default function SettingsSidebarScreen() {
                         key={item.module}
                         style={[st.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: k.border.hairline }]}>
                         <View style={[st.iconBox, { backgroundColor: k.surface.subtle }]}>
-                          <IconSymbol name={item.icon} size={17} color={k.text.primary} />
+                          <IconSymbol name={item.icon} size={16} color={k.text.primary} />
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={[st.rowLabel, { color: k.text.primary }]}>{label}</Text>
@@ -151,10 +151,10 @@ export default function SettingsSidebarScreen() {
 const st = StyleSheet.create({
   intro:    { fontSize: 13, lineHeight: 19, marginTop: 4, marginBottom: 4 },
   card:     { marginTop: 16 },
-  cardHead: { paddingHorizontal: 16, paddingTop: 14, marginBottom: -4 },
-  row:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 12, minHeight: 56 },
+  cardHead: { paddingHorizontal: 16, paddingTop: 16, marginBottom: -4 },
+  row:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, gap: 12, minHeight: 56 },
   iconBox:  { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { fontSize: 14, fontFamily: fontFamily.medium },
-  rowSub:   { fontSize: 12, marginTop: 3 },
+  rowSub:   { fontSize: 12, marginTop: 4 },
   note:     { fontSize: 12, lineHeight: 17, marginTop: 16, paddingHorizontal: 4 },
 });

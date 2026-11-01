@@ -77,7 +77,7 @@ export function SpaceSwitcher({
       accessibilityRole="button"
       accessibilityLabel={text}
       style={[st.row, { backgroundColor: c.dim }]}>
-      <IconSymbol name={icon} size={15} color={c.accent} />
+      <IconSymbol name={icon} size={16} color={c.accent} />
       <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 10 }}>{text}</Text>
     </TouchableOpacity>
   );
@@ -95,11 +95,11 @@ export function SpaceSwitcher({
           st.chip,
           { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), opacity: disabled ? 0.5 : pressed ? 0.7 : 1 },
         ]}>
-        <IconSymbol name="person.2.fill" size={13} color={c.accent} />
+        <IconSymbol name="person.2.fill" size={12} color={c.accent} />
         <Text numberOfLines={1} style={[st.chipText, { color: c.text }]}>
           {label}
         </Text>
-        <IconSymbol name="chevron.down" size={11} color={c.sub} />
+        <IconSymbol name="chevron.down" size={12} color={c.sub} />
       </Pressable>
 
       <SheetModal visible={open} onClose={() => setOpen(false)}>
@@ -169,18 +169,18 @@ const st = StyleSheet.create({
     gap: 6,
     height: 36,
     maxWidth: 180,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     borderRadius: 999,
     flexShrink: 1,
   },
   chipText: { fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 },
   sheet: { borderRadius: Atlas.radius.xxlarge, padding: 20, gap: 10 },
-  sheetLabel: { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
+  sheetLabel: { fontSize: 12, fontFamily: fontFamily.semibold },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 52,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: Atlas.radius.large,
     borderWidth: 1.5,

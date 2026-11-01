@@ -104,7 +104,7 @@ export function AdSlot({
         </Text>
         <Text
           numberOfLines={1}
-          style={{ fontFamily: fontFamily.bold, color: theme[dark ? "dark" : "light"].text.primary }}
+          style={{ fontFamily: fontFamily.semibold, color: theme[dark ? "dark" : "light"].text.primary }}
         >
           {creative.title}
         </Text>

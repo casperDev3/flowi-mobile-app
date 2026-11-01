@@ -97,7 +97,7 @@ export function TimeFilterSheet({
                 <View style={[s.handle, { backgroundColor: c.t.text.muted }]} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
                   <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                    <IconSymbol name="xmark" size={17} color={c.sub} />
+                    <IconSymbol name="xmark" size={16} color={c.sub} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -182,7 +182,7 @@ export function TimeFilterSheet({
                 </Group>
               )}
 
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 22 }}>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 24 }}>
                 <TouchableOpacity onPress={onReset} style={[s.btn, { ...c.gl.subtle, flex: 1 }]}>
                   <Text style={{ ...dsType.label, color: c.t.action.secondaryText }}>{tr.reset}</Text>
                 </TouchableOpacity>
@@ -208,7 +208,7 @@ function sortLabel(value: TimeSort, tr: Translations): string {
 
 function Group({ label, c, children }: { label: string; c: TimeColors; children: React.ReactNode }) {
   return (
-    <View style={{ marginTop: 14 }}>
+    <View style={{ marginTop: 16 }}>
       <Text style={[s.label, { color: c.sub }]}>{label}</Text>
       {children}
     </View>
@@ -249,8 +249,8 @@ const s = StyleSheet.create({
   handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
   sheetTitle: { fontSize: 20, lineHeight: 26, fontFamily: fontFamily.semibold },
-  label: { fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  label: { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', maxWidth: '100%', minHeight: 36, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
+  chip: { flexDirection: 'row', alignItems: 'center', maxWidth: '100%', minHeight: 36, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 8 },
   btn: { minHeight: 48, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

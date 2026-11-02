@@ -131,6 +131,7 @@
       "expo-web-browser",
       "@bacons/apple-targets",
       "./modules/flowi-ios-bridge/app.plugin.js",
+      "./plugins/withSentryUploadToggle",
       "@sentry/react-native/expo",
       "expo-quick-actions"
     ],

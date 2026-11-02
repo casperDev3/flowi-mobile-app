@@ -14,7 +14,7 @@ module.exports = () => ({
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
   frameworks: ['SwiftUI', 'WatchConnectivity'],
-  icon: '../../assets/logo_app.png',
+  icon: '../../assets/images/icon.png',
   colors: {
     $accent: { light: '#7C3AED', dark: '#A78BFA' },
   },

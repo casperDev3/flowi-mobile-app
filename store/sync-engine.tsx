@@ -947,11 +947,14 @@ async function exchangeV2(
     // Рядок, пропущений через локальну незапушену правку, лишає стару ревізію
     // (див. applyPullResponse). Конфліктні рядки ревізію отримують: їх вирішує
     // гілка конфліктів нижче за потоком. Підтвердження — завжди: це наш запис.
-    revisions = applyRevisionUpdates(
-      revisions,
-      pulled.filter(change => !skippedDirty.has(syncRecordKey(change.collection, change.local_id))),
-      response.acknowledged,
+    const revisionChanges = pulled.filter(
+      change => !skippedDirty.has(syncRecordKey(change.collection, change.local_id)),
     );
+    // Нічого не прийшло й нічого не підтверджено — мапа та сама (той самий
+    // обʼєкт): doSync тоді не перезаписує її в сховище (див. persistedRevisions).
+    if (revisionChanges.length || response.acknowledged.length) {
+      revisions = applyRevisionUpdates(revisions, revisionChanges, response.acknowledged);
+    }
     conflicts.push(...response.conflicts);
     finalCursor = Math.max(finalCursor, response.cursor);
     serverCursor = response.cursor;
@@ -1134,6 +1137,14 @@ async function doSync(trigger: SyncTrigger): Promise<void> {
       revisions = await catchUpAddedCollections(cursor, revisions);
     }
 
+    // Що вже лежить у сховищі: обмін без змін (типовий фоновий синк —
+    // повернення з фону, 5-хв опитування, WS-сигнал) повертає ту саму мапу й
+    // той самий курсор, і перезаписувати їх нема чого. Мапа — по запису на
+    // кожну синхронізовану сутність (~0.5 МБ на 10k), тож це був повний
+    // stringify + запис AsyncStorage на КОЖЕН синк.
+    let persistedRevisions = revisions;
+    let persistedCursor = cursor;
+
     const fullOutbox = await loadOutbox();
     // Лічильник — по ВСІХ потоках (особистий + кожен проєкт): користувачу
     // важливо «скільки взагалі не відправлено», а не лише особисте. Сам обмін
@@ -1190,8 +1201,14 @@ async function doSync(trigger: SyncTrigger): Promise<void> {
       // старті. Інакше цей обмін лишає слід, який наступний холодний старт
       // прочитає як «вже синхронізувались» (див. коментар вище).
       if (!ownerUnresolvedAtStart) {
-        await setRevisionMap(revisions);
-        await setServerCursor(cursor);
+        if (revisions !== persistedRevisions) {
+          await setRevisionMap(revisions);
+          persistedRevisions = revisions;
+        }
+        if (cursor !== persistedCursor) {
+          await setServerCursor(cursor);
+          persistedCursor = cursor;
+        }
       }
       updatePendingFrom(await loadOutbox());
     }

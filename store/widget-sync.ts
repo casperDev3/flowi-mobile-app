@@ -15,6 +15,7 @@ import { useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { useAuth } from '@/store/auth';
+import { startupDeferRemaining } from '@/store/startup-defer';
 import { loadData, subscribeToStorage } from '@/store/storage';
 import {
   WIDGET_APP_GROUP,
@@ -160,13 +161,21 @@ export function useWidgetSnapshotWriter(): void {
     };
     const schedule = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(flush, DEBOUNCE_MS);
+      // Залогінений холодний старт — перший знімок не раніше ніж за кілька
+      // секунд після запуску (store/startup-defer.ts). Вихід/гість — одразу:
+      // дані з віджета треба прибрати без затримки.
+      timer = setTimeout(flush, Math.max(DEBOUNCE_MS, authed ? startupDeferRemaining() : 0));
     };
-    flush();
+    if (authed && startupDeferRemaining() > 0) schedule();
+    else flush();
     const keys: readonly string[] = WIDGET_SOURCE_KEYS;
     const unsubscribe = subscribeToStorage(key => { if (keys.includes(key)) schedule(); });
     const appState = AppState.addEventListener('change', state => {
-      if (state === 'background' || state === 'inactive' || state === 'active') flush();
+      // Фон — пишемо одразу (далі процес можуть заморозити). Повернення в
+      // застосунок — з дебаунсом: віджет зараз не видно, а повний розбір
+      // ключів саме в мить відкриття гальмував би перший кадр.
+      if (state === 'background' || state === 'inactive') flush();
+      else if (state === 'active') schedule();
     });
     return () => {
       cancelled = true;

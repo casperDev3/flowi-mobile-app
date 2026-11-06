@@ -341,6 +341,30 @@ export function projectColumnIdFor(
  * задача з чужим/видаленим id інакше завжди опинялась в першій колонці,
  * навіть якщо вона вже завершена).
  */
+// PERF: scopedTaskStatusColumn/personalDisplayColumn викликаються для КОЖНОГО
+// завдання в кожному проході (скоуп, лічильники, групування Today), а
+// mergeTaskStatusColumns щоразу фільтрує/мапить/сортує весь task_statuses —
+// O(завдань × колонок). Результат залежить лише від (масив колонок, projectId),
+// тож кешуємо його за ідентичністю масиву. Новий масив (перечитали
+// task_statuses) — новий ключ WeakMap, тож інвалідація автоматична.
+// Повернені масиви/колонки спільні — викликачі лише читають їх.
+const NO_PROJECT = '\u0000personal';
+const mergedColumnsCache = new WeakMap<readonly TaskStatusColumn[], Map<string, TaskStatusColumn[]>>();
+function cachedMergedColumns(allColumns: readonly TaskStatusColumn[], projectId?: string): TaskStatusColumn[] {
+  let byProject = mergedColumnsCache.get(allColumns);
+  if (!byProject) {
+    byProject = new Map();
+    mergedColumnsCache.set(allColumns, byProject);
+  }
+  const key = projectId === undefined ? NO_PROJECT : projectId;
+  let merged = byProject.get(key);
+  if (!merged) {
+    merged = mergeTaskStatusColumns([...allColumns], projectId);
+    byProject.set(key, merged);
+  }
+  return merged;
+}
+
 /**
  * Колонка ДЛЯ ПОКАЗУ завдання, коректна незалежно від того, з якого проєкту
  * воно (§3.7 «Особисте агрегує»): шукає серед колонок ВЛАСНОГО проєкту
@@ -355,11 +379,11 @@ export function scopedTaskStatusColumn(
   task: Pick<Task, 'status' | 'kanbanColumnId' | 'projectId'>,
   allColumns: readonly TaskStatusColumn[],
 ): TaskStatusColumn {
-  const scoped = mergeTaskStatusColumns([...allColumns], task.projectId);
+  const scoped = cachedMergedColumns(allColumns, task.projectId);
   if (scoped.length) return boardColumnForTask(task, scoped, allColumns) ?? scoped[0];
   // Легасі-проєкт без власних колонок (до цієї фази) — падаємо на особисті
   // дефолти, як і решта застосунку без цього поля.
-  return taskStatusColumn(task, mergeTaskStatusColumns([...allColumns]));
+  return taskStatusColumn(task, cachedMergedColumns(allColumns));
 }
 
 /**
@@ -377,7 +401,7 @@ export function personalDisplayColumn(
   task: Pick<Task, 'status' | 'kanbanColumnId' | 'projectId'>,
   allColumns: readonly TaskStatusColumn[],
 ): TaskStatusColumn {
-  const personal = mergeTaskStatusColumns([...allColumns]);
+  const personal = cachedMergedColumns(allColumns);
   if (!task.projectId) return taskStatusColumn(task, personal);
   const own = scopedTaskStatusColumn(task, allColumns);
   if (!own.projectId) return own;

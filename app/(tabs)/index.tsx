@@ -2,7 +2,7 @@ import { copyMeeting } from '@/utils/meetingSharing';
 import { Atlas } from '@/constants/atlas';
 import { AdSlot } from '@/components/advertising/Advertising';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -59,7 +59,7 @@ import { TaskQuickCreate } from '@/components/tasks/card/TaskQuickCreate';
 import { estimateDraft, recurrenceDraft } from '@/components/tasks/card/draftParts';
 import { LinkedNotesSection } from '@/components/notes/LinkedNotesSection';
 import { CommentsSection } from '@/components/shared/CommentsSection';
-import { loadData } from '@/store/storage';
+import { loadData, subscribeToStorage } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
 import { saveStatusLink } from '@/store/status-links';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
@@ -195,6 +195,9 @@ function getProgress(t: Task) {
 /** Стабільне посилання для проєктів без кешу команди (соло) — щоб
  *  assigneeLabelFor не створював новий масив щоразу. */
 const EMPTY_MEMBERS_LIST: MemberOut[] = [];
+
+/** Ключі loadOthers — див. тимчасову підписку першого читання в TasksScreen. */
+const FIRST_LOAD_OTHER_KEYS: readonly string[] = ['projects', 'meetings', 'task_statuses', 'sprints'];
 
 export default function TasksScreen() {
   const tabBarInset = useTabBarInset();
@@ -458,10 +461,36 @@ export default function TasksScreen() {
     setRefreshing(false);
   }, [loadAll]);
 
-  // Load from storage (useFocusEffect refreshes when returning from subtasks screen)
+  // Сховище читається ОДИН раз — на першому фокусі. Далі кожен ключ екрана
+  // має власну підписку (tasks — useSyncedList, projects/task_statuses/
+  // sprints і meetings — useStorageRefresh вище й нижче), а вони працюють і
+  // поки вкладка у фоні. Повне перечитування на КОЖЕН фокус лише давало
+  // свіжі масиви тих самих даних і перераховувало весь конвеєр (скоуп,
+  // лічильники, групування, meetingsOnDate) — ~0.5–1 с на телефоні при
+  // 2 000 завдань. Pull-to-refresh лишає повне перечитування.
+  //
+  // Підписки на projects/task_statuses/sprints/meetings вмикаються лише разом
+  // з initialized/meetingsInit — тобто ПІСЛЯ коміту першого читання. Запис у
+  // цьому вікні (типово — перший пул синку на холодному старті) раніше
+  // доганяв наступний фокус; тепер фокус не перечитує, тож такі сигнали
+  // ловимо тимчасовою підпискою й програємо, щойно постійні підписки увімкнулись.
+  const firstLoadStarted = useRef(false);
+  const firstLoadWatch = useRef<{ off: () => void; missed: boolean } | null>(null);
+  // Повторний фокус — лише один дешевий рендер (мемо на тих самих масивах не
+  // перераховуються): «зараз» для фаз сьогоднішніх зустрічей і KPI
+  // ефективності береться на рендері, а раніше його оновлювало перечитування.
+  const [, setFocusTick] = useState(0);
   useFocusEffect(useCallback(() => {
+    if (firstLoadStarted.current) { setFocusTick(n => n + 1); return; }
+    firstLoadStarted.current = true;
+    const watch = { off: () => {}, missed: false };
+    watch.off = subscribeToStorage(key => {
+      if (FIRST_LOAD_OTHER_KEYS.includes(key)) watch.missed = true;
+    });
+    firstLoadWatch.current = watch;
     loadAll().then(() => { setInitialized(true); setMeetingsInit(true); });
   }, [loadAll]));
+  useEffect(() => () => { firstLoadWatch.current?.off(); }, []);
 
   // Open create-task modal when navigated with ?create=1 (e.g. from Today quick actions)
   // ?projectId=&sprintId= — створення зі спринта в деталі проєкту: форма
@@ -599,6 +628,16 @@ export default function TasksScreen() {
     setMeetings(await loadData<Meeting[]>('meetings', []));
   }, []);
   const trackMeetingsWrite = useStorageRefresh(['meetings'], reloadMeetings, meetingsInit);
+  // Той самий коміт, що вмикає постійні підписки вище: між ними й зняттям
+  // тимчасової підписки сигнал загубитись не може.
+  useEffect(() => {
+    if (!initialized || !meetingsInit) return;
+    const watch = firstLoadWatch.current;
+    if (!watch) return;
+    firstLoadWatch.current = null;
+    watch.off();
+    if (watch.missed) void loadOthers();
+  }, [initialized, meetingsInit, loadOthers]);
   const meetingsWriteQueue = useRef<Promise<void>>(Promise.resolve());
   const mutateMeetings = useCallback((mutate: (list: Meeting[]) => Meeting[]) => {
     meetingsWriteQueue.current = meetingsWriteQueue.current
@@ -704,8 +743,13 @@ export default function TasksScreen() {
    * маршруту на екран «Всі (N)» — і там із нього будується рівно той самий
    * набір (utils/taskListView.ts), а не друга копія правил.
    */
+  // Пошук іде у фільтри ВІДКЛАДЕНО: поле вводу оновлюється одразу, а
+  // перерахунок списку, лічильників і груп (десятки мс на тисячах задач) —
+  // окремим рендером із низьким пріоритетом, який React перериває наступним
+  // натисканням. Без цього кожна літера чекала повного перерахунку.
+  const deferredSearch = useDeferredValue(search);
   const listQuery = useMemo<TaskListQuery>(() => ({
-    filter, sort, scope, search,
+    filter, sort, scope, search: deferredSearch,
     projectId: filterProject,
     priorities: filterPriorities,
     dateFilter,
@@ -718,7 +762,7 @@ export default function TasksScreen() {
     projectRoles,
     noDeadline: scope === 'all' && noDeadline,
     period: extraPeriod,
-  }), [filter, sort, scope, search, filterProject, filterPriorities, dateFilter, activeMonth, user?.id, projectRoles, noDeadline, extraPeriod]);
+  }), [filter, sort, scope, deferredSearch, filterProject, filterPriorities, dateFilter, activeMonth, user?.id, projectRoles, noDeadline, extraPeriod]);
 
   /**
    * Набір без урахування денного скоупу — тобто те, що людина побачила б,

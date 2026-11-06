@@ -34,6 +34,7 @@ import { useAuth } from './auth';
 import { applyDeviceActions } from './device-actions';
 import { useI18n } from './i18n';
 import { provisionWatchSession, revokeSession } from './sessions-api';
+import { startupDeferRemaining } from './startup-defer';
 import { loadData, removeData, saveData, subscribeToStorage } from './storage';
 
 export const WATCH_LINK_KEY = 'watch_link_v1';
@@ -475,9 +476,12 @@ export function useWatchLink(): void {
     };
     const schedule = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(flush, CONTEXT_DEBOUNCE_MS);
+      // Залогінений холодний старт — не раніше ніж за кілька секунд після
+      // запуску (store/startup-defer.ts); вихід — одразу.
+      timer = setTimeout(flush, Math.max(CONTEXT_DEBOUNCE_MS, authed ? startupDeferRemaining() : 0));
     };
-    flush();
+    if (authed && startupDeferRemaining() > 0) schedule();
+    else flush();
     // + зв'язок: відкликання з «Пристроїв» має одразу забрати дані з годинника.
     const keys: readonly string[] = [...WATCH_SNAPSHOT_KEYS, WATCH_LINK_KEY];
     const unsubscribe = subscribeToStorage(key => { if (keys.includes(key)) schedule(); });

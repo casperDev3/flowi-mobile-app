@@ -82,6 +82,58 @@ export function TransactionGroup({
   const incomeCodes = Object.keys(group.dayIncomeByCur).filter(k => group.dayIncomeByCur[k] > 0);
   const expenseCodes = Object.keys(group.dayExpenseByCur).filter(k => group.dayExpenseByCur[k] > 0);
 
+  /** Тло рядка: суцільне (щоб під свайпом не просвічували дії) + підсвітка вибору. */
+  function rowBg(id: string): string {
+    if (bulkIds?.has(id) || (!selectionMode && id === activeId)) return t.surface.subtle;
+    return t.surface.card;
+  }
+
+  /** Кружок категорії; у режимі вибору — галочка-чекбокс. */
+  function lead(id: string, size: number, icon: IconSymbolName, iconSize: number, color: string) {
+    if (selectionMode) {
+      const on = !!bulkIds?.has(id);
+      return (
+        <View style={{
+          width: size, height: size, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: on ? t.action.primary : 'transparent',
+          borderWidth: on ? 0 : 1.5, borderColor: t.text.secondary,
+        }}>
+          {on ? <IconSymbol name="checkmark" size={iconSize} color={t.text.onAction} /> : null}
+        </View>
+      );
+    }
+    return (
+      <View style={{ width: size, height: size, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '24' : '14') }}>
+        <IconSymbol name={icon} size={iconSize} color={color} />
+      </View>
+    );
+  }
+
+  /**
+   * Рядок: тап — деталі (або перемкнути вибір у режимі вибору), довгий
+   * дотик — масовий вибір, свайп уліво — дії. Ті самі дії VoiceOver отримує
+   * як accessibilityActions (свайп — лише прискорення).
+   */
+  function row(tx: Transaction, radiusPx: number, children: React.ReactNode) {
+    const actions = swipeActionsFor && !selectionMode ? swipeActionsFor(tx) : [];
+    const checked = !!bulkIds?.has(tx.id);
+    const body = (a11y?: SwipeRowA11y) => (
+      <TouchableOpacity
+        activeOpacity={0.75}
+        onPress={() => onSelect(tx)}
+        onLongPress={onLongPress ? () => onLongPress(tx) : undefined}
+        delayLongPress={350}
+        accessibilityRole="button"
+        accessibilityState={selectionMode ? { checked } : { selected: tx.id === activeId }}
+        accessibilityActions={a11y?.accessibilityActions}
+        onAccessibilityAction={a11y?.onAccessibilityAction}>
+        {children}
+      </TouchableOpacity>
+    );
+    if (actions.length === 0) return body();
+    return <SwipeRow actions={actions} radius={radiusPx}>{a11y => body(a11y)}</SwipeRow>;
+  }
+
   return (
     <View style={{ marginBottom: 16 }}>
       {/* Group header — денні підсумки без переказів (їх не рахує groupTransactions) */}
@@ -219,56 +271,4 @@ export function TransactionGroup({
       </View>
     </View>
   );
-
-  /** Тло рядка: суцільне (щоб під свайпом не просвічували дії) + підсвітка вибору. */
-  function rowBg(id: string): string {
-    if (bulkIds?.has(id) || (!selectionMode && id === activeId)) return t.surface.subtle;
-    return t.surface.card;
-  }
-
-  /** Кружок категорії; у режимі вибору — галочка-чекбокс. */
-  function lead(id: string, size: number, icon: IconSymbolName, iconSize: number, color: string) {
-    if (selectionMode) {
-      const on = !!bulkIds?.has(id);
-      return (
-        <View style={{
-          width: size, height: size, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
-          backgroundColor: on ? t.action.primary : 'transparent',
-          borderWidth: on ? 0 : 1.5, borderColor: t.text.secondary,
-        }}>
-          {on ? <IconSymbol name="checkmark" size={iconSize} color={t.text.onAction} /> : null}
-        </View>
-      );
-    }
-    return (
-      <View style={{ width: size, height: size, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '24' : '14') }}>
-        <IconSymbol name={icon} size={iconSize} color={color} />
-      </View>
-    );
-  }
-
-  /**
-   * Рядок: тап — деталі (або перемкнути вибір у режимі вибору), довгий
-   * дотик — масовий вибір, свайп уліво — дії. Ті самі дії VoiceOver отримує
-   * як accessibilityActions (свайп — лише прискорення).
-   */
-  function row(tx: Transaction, radiusPx: number, children: React.ReactNode) {
-    const actions = swipeActionsFor && !selectionMode ? swipeActionsFor(tx) : [];
-    const checked = !!bulkIds?.has(tx.id);
-    const body = (a11y?: SwipeRowA11y) => (
-      <TouchableOpacity
-        activeOpacity={0.75}
-        onPress={() => onSelect(tx)}
-        onLongPress={onLongPress ? () => onLongPress(tx) : undefined}
-        delayLongPress={350}
-        accessibilityRole="button"
-        accessibilityState={selectionMode ? { checked } : { selected: tx.id === activeId }}
-        accessibilityActions={a11y?.accessibilityActions}
-        onAccessibilityAction={a11y?.onAccessibilityAction}>
-        {children}
-      </TouchableOpacity>
-    );
-    if (actions.length === 0) return body();
-    return <SwipeRow actions={actions} radius={radiusPx}>{a11y => body(a11y)}</SwipeRow>;
-  }
 }

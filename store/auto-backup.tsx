@@ -10,6 +10,13 @@ import { loadData, saveData } from './storage';
 const AUTO_BACKUP_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3 години
 const LAST_BACKUP_KEY = 'last_backup_at';
 const AUTO_BACKUP_ENABLED_KEY = 'auto_backup_enabled';
+/**
+ * Автоперевірка бекапу — не в мить запуску/повернення в застосунок, а трохи
+ * згодом. Сам бекап розбирає ВСІ ключі й серіалізує їх на JS-потоці (сотні мс
+ * на телефоні з великими даними) — саме тоді, коли людина щойно відкрила
+ * застосунок і чекає на відгук.
+ */
+const AUTO_BACKUP_CHECK_DELAY_MS = 15_000;
 
 interface AutoBackupContextType {
   triggerBackup: () => Promise<string | null>;
@@ -46,7 +53,9 @@ export function AutoBackupProvider({ children }: { children: React.ReactNode }) 
       const fileName = `flowi-backup-${dateStr}.json`;
       const file = new File(Paths.document, fileName);
       file.create({ overwrite: true });
-      file.write(JSON.stringify(payload, null, 2));
+      // Без відступів: відновлення читає файл JSON.parse, а pretty-print
+      // робив серіалізацію повільнішою й файл більшим.
+      file.write(JSON.stringify(payload));
       await saveData(LAST_BACKUP_KEY, new Date().toISOString());
       return file.uri;
     } catch {
@@ -69,15 +78,21 @@ export function AutoBackupProvider({ children }: { children: React.ReactNode }) 
   }, [doBackup]);
 
   useEffect(() => {
-    checkAndBackup();
+    let delayed: ReturnType<typeof setTimeout> | null = null;
+    const checkLater = () => {
+      if (delayed) clearTimeout(delayed);
+      delayed = setTimeout(() => { delayed = null; void checkAndBackup(); }, AUTO_BACKUP_CHECK_DELAY_MS);
+    };
+    checkLater();
 
     intervalRef.current = setInterval(checkAndBackup, AUTO_BACKUP_INTERVAL_MS);
 
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
-      if (state === 'active') checkAndBackup();
+      if (state === 'active') checkLater();
     });
 
     return () => {
+      if (delayed) clearTimeout(delayed);
       if (intervalRef.current) clearInterval(intervalRef.current);
       sub.remove();
     };

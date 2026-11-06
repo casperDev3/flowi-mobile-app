@@ -44,7 +44,8 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
-import { loadDataResult, retryStorageRead } from '@/store/storage';
+import { loadDataResult, retryStorageRead, subscribeToStorage } from '@/store/storage';
+import { useToday } from '@/hooks/use-today';
 import {
   CategoryRow,
   categoryMapToRows,
@@ -405,8 +406,22 @@ export default function FinanceScreen() {
 
   // Load from storage — useFocusEffect ensures reload after data import or navigation
   const [txsInitialized, setTxsInitialized] = useState(false);
+  /**
+   * useStorageRefresh нижче вмикається лише з txsInitialized — ПІСЛЯ коміту
+   * першого читання. Запис у цьому вікні (типово — перший пул синку на
+   * холодному старті) раніше доганяв наступний фокус; тепер фокус не
+   * перечитує, тож сигнал ловимо тимчасовою підпискою і програємо нижче.
+   */
+  const firstLoadWatch = useRef<{ off: () => void; missed: boolean } | null>(null);
   useFocusEffect(useCallback(() => {
     if (!txsInitialized) {
+      if (!firstLoadWatch.current) {
+        const watch = { off: () => {}, missed: false };
+        watch.off = subscribeToStorage(key => {
+          if ((REFRESH_KEYS as readonly string[]).includes(key)) watch.missed = true;
+        });
+        firstLoadWatch.current = watch;
+      }
       Promise.all([loadTxs(), loadAccounts()]).then(([okTxs, okAccounts]) => {
         // Автозапис вмикаємо, лише коли ОБИДВА ключі справді прочитані.
         if (!okTxs || !okAccounts) { setLoadFailed(true); return; }
@@ -414,10 +429,12 @@ export default function FinanceScreen() {
         setInitialized(true);
         setAccountsInitialized(true);
       });
-    } else {
-      void loadTxs();
-      void loadAccounts();
     }
+    // Після першого читання повторно на фокусі НЕ читаємо: 'transactions' і
+    // 'accounts' слухає useStorageRefresh нижче (і поки вкладка у фоні), тож
+    // кожен запис повз екран уже підхоплено. Перечитування на кожен фокус
+    // лише давало новий масив тих самих даних і перераховувало огляд,
+    // підсумки та групи стрічки. Pull-to-refresh лишає повне перечитування.
   }, [txsInitialized, loadTxs, loadAccounts]));
 
   const reloadFromStorage = useCallback(async () => {
@@ -456,6 +473,16 @@ export default function FinanceScreen() {
    * сигнал від нього ж ігнорується, інакше збереження ганяло б себе по колу.
    */
   const trackWrite = useStorageRefresh(REFRESH_KEYS, reloadFromStorage, txsInitialized);
+  // Той самий коміт, що вмикає підписку вище: сигнал між ними не загубиться.
+  useEffect(() => {
+    if (!txsInitialized) return;
+    const watch = firstLoadWatch.current;
+    if (!watch) return;
+    firstLoadWatch.current = null;
+    watch.off();
+    if (watch.missed) void reloadFromStorage();
+  }, [txsInitialized, reloadFromStorage]);
+  useEffect(() => () => { firstLoadWatch.current?.off(); }, []);
 
   const { create: createParam } = searchParams;
 
@@ -650,9 +677,14 @@ export default function FinanceScreen() {
    * financeOverview, що й плитка «Сьогодні»: два екрани більше не рахують
    * «баланс» кожен по-своєму (utils/financeOverview.ts).
    */
+  // «Сьогодні», що оновлюється на фокусі/поверненні з фону/опівночі. Раніше
+  // огляд перераховувався з новим new Date() завдяки перечитуванню на кожен
+  // фокус; без нього баланс «на сьогодні» і місячний оборот застигали б у
+  // вчорашній добі. financeOverview рахує по добі, тож момент доби не важить.
+  const financeToday = useToday();
   const overview = useMemo(
-    () => financeOverview({ txs, accounts, primary: primaryCurrency, now: new Date() }),
-    [txs, accounts, primaryCurrency],
+    () => financeOverview({ txs, accounts, primary: primaryCurrency, now: financeToday }),
+    [txs, accounts, primaryCurrency, financeToday],
   );
   const accountBalances = overview.balances;
   /** Фільтр стрічки «лише операції без рахунку» — з попередження над рахунками. */

@@ -235,8 +235,8 @@ export function taskPeriodCounts<T extends ListViewTask>(
 }
 
 /** Прострочене окремою секцією — лише у списку і не для фільтра «Виконані». */
-export function overdueForList<T extends ListViewTask>(filtered: readonly T[], filter: Filter, listMode: boolean): T[] {
-  return filter !== 'done' && listMode ? filtered.filter(t => isOverdue(t)) : [];
+export function overdueForList<T extends ListViewTask>(filtered: readonly T[], filter: Filter, listMode: boolean, now: Date = new Date()): T[] {
+  return filter !== 'done' && listMode ? filtered.filter(t => isOverdue(t, now)) : [];
 }
 
 export function buildTaskGroups<T extends ListViewTask>(
@@ -351,8 +351,8 @@ export function buildTaskListView<T extends ListViewTask>(
 ): TaskListView<T> {
   const filteredAll = filterTasksForList(sortTasksForList(tasks, q.sort), q);
   const filtered = applyTaskScope(filteredAll, q, columns, today, now);
-  const overdue = overdueForList(filtered, q.filter, listMode);
-  const groupsSource = overdue.length > 0 ? filtered.filter(t => !isOverdue(t)) : filtered;
+  const overdue = overdueForList(filtered, q.filter, listMode, now);
+  const groupsSource = overdue.length > 0 ? filtered.filter(t => !isOverdue(t, now)) : filtered;
   const groups = buildTaskGroups(groupsSource, q, columns, today, labels, locale);
   return { filteredAll, filtered, overdue, groups };
 }

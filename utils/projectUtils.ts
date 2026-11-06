@@ -42,6 +42,8 @@ export interface ProjectLike {
    */
   template?: ProjectTemplate;
   modules?: ProjectModules;
+  /** Клієнт проєкту (utils/clients.ts): рядок, null — відʼєднано. */
+  clientId?: string | null;
 }
 
 export function isProjectArchived(project: Pick<ProjectLike, 'archivedAt'>): boolean {

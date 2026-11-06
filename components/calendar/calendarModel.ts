@@ -163,6 +163,8 @@ export interface CalendarProject {
   id: string;
   name: string;
   color: string;
+  /** Клієнт проєкту (utils/clients.ts) — є лише в локальному записі власника. */
+  clientId?: string | null;
 }
 
 export function matchesProjectFilter(projectId: string | undefined | null, filter: ProjectFilter): boolean {
@@ -177,7 +179,7 @@ export function matchesProjectFilter(projectId: string | undefined | null, filte
  * Архівні не показуємо — ні в фільтрі, ні смугами спринтів.
  */
 export function mergeCalendarProjects(
-  local: readonly { id: string; name: string; color: string; archivedAt?: string }[],
+  local: readonly { id: string; name: string; color: string; archivedAt?: string; clientId?: string | null }[],
   summaries: readonly { id: string; name: string; color: string; archived_at?: string | null }[],
 ): CalendarProject[] {
   const out = new Map<string, CalendarProject>();
@@ -185,7 +187,7 @@ export function mergeCalendarProjects(
   for (const p of local ?? []) {
     if (!p?.id) continue;
     if (p.archivedAt) { archived.add(p.id); continue; }
-    out.set(p.id, { id: p.id, name: p.name, color: p.color || '#7C3AED' });
+    out.set(p.id, { id: p.id, name: p.name, color: p.color || '#7C3AED', ...(p.clientId ? { clientId: p.clientId } : {}) });
   }
   for (const s of summaries ?? []) {
     if (!s?.id || out.has(s.id) || archived.has(s.id)) continue;

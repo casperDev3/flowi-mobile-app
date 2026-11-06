@@ -18,6 +18,19 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(async () => {}),
 }));
 jest.mock('expo-web-browser', () => ({ openAuthSessionAsync: jest.fn() }));
+// Google Calendar — серверний OAuth; мережі в тесті немає, тож хук — заглушка,
+// а тест лише перевіряє, що екран просить тихий синк на фокусі.
+const mockGcalSyncOnOpen = jest.fn();
+jest.mock('@/components/calendar/useGoogleCalendarSync', () => ({
+  useGoogleCalendarSync: () => ({
+    status: null, loaded: true, busy: '', syncing: false, error: '', notice: '', calendars: null,
+    selection: { import: [], export: null }, savedSelection: { import: [], export: null }, setSelection: jest.fn(),
+    conflicts: null, refresh: jest.fn(async () => null), syncOnOpen: mockGcalSyncOnOpen, connect: jest.fn(),
+    loadCalendars: jest.fn(), closeCalendars: jest.fn(), saveCalendars: jest.fn(), syncNow: jest.fn(),
+    loadConflicts: jest.fn(), closeConflicts: jest.fn(), resolve: jest.fn(), restore: jest.fn(),
+    disconnect: jest.fn(), clearMessages: jest.fn(),
+  }),
+}));
 jest.mock('expo-av', () => ({ Audio: null }));
 // Аудіо наради вантажить нативні модулі через import() — у jest їх немає.
 jest.mock('@/components/meetings/MeetingAudio', () => ({ MeetingAudio: () => null }));
@@ -110,6 +123,12 @@ describe('CalendarScreen', () => {
     expect(sheet.props.visible).toBe(true);
     expect(sheet.props.initial).toBeNull();
     expect(sheet.props.presetDate).toBe('2026-11-03');
+  });
+
+  it('відкриття календаря просить тихий синк Google Calendar', async () => {
+    mockGcalSyncOnOpen.mockClear();
+    await mount(390);
+    expect(mockGcalSyncOnOpen).toHaveBeenCalled();
   });
 
   it('телефон: місяць + список дня із зустріччю, дедлайном і спринтом', async () => {

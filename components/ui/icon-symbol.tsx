@@ -192,6 +192,7 @@ const MAPPING: Record<string, MaterialIconName> = {
   // Calendar (missing)
   'calendar.badge.checkmark': 'event-available',
   'calendar.badge.plus': 'event-note',
+  'calendar.badge.clock': 'edit-calendar',
   'calendar.circle.fill': 'calendar-month',
   // Charts (missing)
   'chart.pie.fill': 'pie-chart',
@@ -278,6 +279,9 @@ const MAPPING: Record<string, MaterialIconName> = {
   'keyboard.chevron.compact.down': 'keyboard-hide',
   'photo': 'image',
   'camera': 'photo-camera',
+  // Клієнти: пункт меню й дії контактів (лист).
+  'person.crop.rectangle.stack': 'contacts',
+  'envelope': 'mail-outline',
 };
 
 export type IconSymbolName = keyof typeof MAPPING;

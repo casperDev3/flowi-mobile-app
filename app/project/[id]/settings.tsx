@@ -37,6 +37,9 @@ import {
 import { fontFamily, radius, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 import { BentoCard } from '@/components/ds';
+import { ClientChips } from '@/components/clients/ClientChips';
+import { useClients } from '@/hooks/use-clients';
+import { sanitizeClientId, withProjectClient } from '@/utils/clients';
 
 /** Дебаунс запису назви статусу (мс) — див. коментар над `changeStatusName`. */
 const STATUS_NAME_COMMIT_DELAY = 500;
@@ -115,6 +118,20 @@ export default function ProjectSettingsScreen() {
       if (__DEV__) console.warn('[project/settings] запис не вдався:', e);
     }
   }, [projectId, name, color, description, deadline]);
+
+  // Клієнт проєкту — лише власнику (клієнти особисті; сервер віддає й
+  // приймає звʼязок тільки від власника). Пишеться одразу, як перемикач
+  // розділу; відʼєднання — явний null (withProjectClient).
+  const { clients } = useClients();
+  const setProjectClient = useCallback(async (clientId: string | null) => {
+    if (!projectId || !isOwner) return;
+    try {
+      await updateSynced<Project>('projects', fresh => fresh.map(p => (p.id !== projectId ? p : withProjectClient(p, clientId))));
+      haptic.light();
+    } catch (e) {
+      if (__DEV__) console.warn('[project/settings] клієнт не записався:', e);
+    }
+  }, [projectId, isOwner]);
 
   const toggleModule = useCallback(async (key: keyof ProjectModules) => {
     if (!projectId) return;
@@ -348,6 +365,32 @@ export default function ProjectSettingsScreen() {
           {tr.projectTemplateLabel}: {project?.template === 'simple' ? tr.projectTemplateSimple : tr.projectTemplateWork}
         </Text>
         </BentoCard>
+
+        {isOwner && project && (clients.length > 0 || sanitizeClientId(project.clientId)) ? (
+          <BentoCard title={tr.clientsUi.field} icon="person.crop.rectangle.stack" accent="lavender" style={{ marginBottom: 16 }}>
+            <ClientChips
+              clients={clients}
+              value={sanitizeClientId(project.clientId) ?? null}
+              onChange={id => { void setProjectClient(id); }}
+              isDark={isDark}
+              label={null}
+              hint={tr.clientsUi.projectClientHint}
+              testID="project-settings-client"
+            />
+            {sanitizeClientId(project.clientId) ? (
+              <TouchableOpacity
+                onPress={() => router.push(`/client/${encodeURIComponent(sanitizeClientId(project.clientId)!)}` as never)}
+                accessibilityRole="button"
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, backgroundColor: tk.surface.subtle, minHeight: 44, paddingHorizontal: 16, marginTop: 10 }}>
+                <IconSymbol name="person.crop.rectangle.stack" size={16} color={c.sub} />
+                <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
+                  {clients.find(cl => cl.id === project.clientId)?.name ?? tr.clientsUi.field}
+                </Text>
+                <IconSymbol name="chevron.right" size={14} color={c.sub} />
+              </TouchableOpacity>
+            ) : null}
+          </BentoCard>
+        ) : null}
 
         {projectId ? <BentoCard compact style={{ marginBottom: 16, gap: 8 }}>
         {/* Команда (WORKSPACE_PROJECTS_PLAN.md §4) — видно всім ролям: власник

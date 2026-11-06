@@ -73,6 +73,7 @@ const TOOL_ROWS: readonly {
   module: ModuleId;
 }[] = [
   // `as never`: типи маршрутів згенеруються з новим /calendar лише на `expo start`.
+  { route: '/clients' as never, icon: 'person.crop.rectangle.stack', iconColor: '#0EA5E9', labelKey: 'navClients', module: 'clients' },
   { route: '/calendar' as never, icon: 'calendar',         iconColor: '#6D4CF5', labelKey: 'calendar',         module: 'meetings' },
   { route: '/menu',          icon: 'fork.knife',       iconColor: '#F6B93B', labelKey: 'menuNavLabel',     module: 'menu' },
   { route: '/(tabs)/time',   icon: 'timer',            iconColor: '#6D4CF5', labelKey: 'navTimeTracker',   module: 'time' },

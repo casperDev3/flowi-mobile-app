@@ -160,6 +160,8 @@ import { appendHistory, makeHistoryEvent } from '@/utils/taskHistory';
 import { monthGrid } from '@/utils/dateUtils';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
+import { useClients } from '@/hooks/use-clients';
+import { withClientId } from '@/utils/clients';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
 import { fontFamily, radius } from '@/constants/theme';
 import { BentoArrowButton, BentoCard, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
@@ -1640,7 +1642,7 @@ export default function TasksScreen() {
   const openEditMeeting = useCallback((m: Meeting) => {
     setMeetingFormInitial({ id: m.id, title: m.title, date: m.date, time: m.time,
       durationMinutes: m.durationMinutes, location: m.location, link: m.link,
-      notes: m.notes, color: m.color, recurrence: m.recurrence, projectId: m.projectId });
+      notes: m.notes, color: m.color, recurrence: m.recurrence, projectId: m.projectId, clientId: m.clientId });
     setMeetingFormPreset(undefined);
     setShowMeetingForm(true);
   }, []);
@@ -1649,17 +1651,17 @@ export default function TasksScreen() {
     if (data.id) {
       // Проєкт — рівень серії (лише оригінал); порожній — ключ видаляється.
       const id = data.id;
-      mutateMeetings(p => p.map(m => m.id !== id ? m : withMeetingProject({
+      mutateMeetings(p => p.map(m => m.id !== id ? m : withClientId(withMeetingProject({
         ...m, title: data.title, date: data.date, time: data.time,
         durationMinutes: data.durationMinutes, location: data.location,
         link: data.link, notes: data.notes, color: data.color, recurrence: data.recurrence,
-      }, data.projectId)));
+      }, data.projectId), data.clientId)));
     } else {
-      const created = withMeetingProject<Meeting>({
+      const created = withClientId(withMeetingProject<Meeting>({
         id: Date.now().toString(), title: data.title, date: data.date, time: data.time,
         durationMinutes: data.durationMinutes, location: data.location,
         link: data.link, notes: data.notes, color: data.color, recurrence: data.recurrence,
-      }, data.projectId);
+      }, data.projectId), data.clientId);
       mutateMeetings(p => [...p, created]);
     }
     setShowMeetingForm(false);
@@ -1678,6 +1680,7 @@ export default function TasksScreen() {
   // існує лише в потоці проєкту, особисті задачі коментарів не мають.
   const selectedTaskRole = useProjectRole(selectedTask?.projectId);
   const meetingFormRole = useProjectRole(meetingFormInitial?.projectId);
+  const { clients } = useClients();
   // Contract §4.1: глядач читає задачу, але не редагує, не видаляє й не
   // відмічає — ✎/✕-кнопки й чекбокс у деталі ховаються (review finding:
   // спільний редактор `(tabs)/index.tsx` раніше не питав роль ВЗАГАЛІ, тож
@@ -2682,6 +2685,7 @@ export default function TasksScreen() {
       { key: 'archive', label: tr.archive, icon: 'archivebox.fill', onPress: () => router.push('/archive') },
       { key: 'filters', label: tr.filtersAndSort, icon: 'line.3.horizontal.decrease', onPress: () => setShowFilterSheet(true) },
       { key: 'projects', label: tr.projects, icon: 'folder.fill', onPress: () => router.push('/projects') },
+      { key: 'clients', label: tr.navClients, icon: 'person.crop.rectangle.stack', onPress: () => router.push('/clients' as never) },
       { key: 'notes', label: tr.notes, icon: 'note.text', onPress: () => router.push('/notes') },
     ],
   };
@@ -2848,6 +2852,7 @@ export default function TasksScreen() {
         projects={projects}
         currentUserId={user?.id ? String(user.id) : null}
         isProjectOwner={meetingFormRole === 'owner'}
+        clients={clients}
       />
 
       {projectTaskSheet}

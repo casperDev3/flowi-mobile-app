@@ -24,6 +24,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useProject } from '@/hooks/use-project';
+import { sanitizeClientId, withClientId } from '@/utils/clients';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
@@ -147,9 +148,13 @@ export default function ProjectBudgetScreen() {
   const addTransaction = useCallback(async (tx: Transaction) => {
     setTxBusy(true);
     setTxError(null);
+    // Клієнт проєкту підставляється в операцію (utils/clients.ts): бюджетні
+    // колекції зберігають clientId і в потоці проєкту, тож картка клієнта
+    // бачить операцію навіть після відʼєднання проєкту від клієнта.
+    const withClient = tx.clientId ? tx : withClientId(tx, sanitizeClientId(project?.clientId));
     try {
       await trackWrite(async () => {
-        const next = await updateSynced<Transaction>('transactions', fresh => [...fresh, tx]);
+        const next = await updateSynced<Transaction>('transactions', fresh => [...fresh, withClient]);
         setTransactions(next);
       });
       haptic.success();
@@ -160,7 +165,7 @@ export default function ProjectBudgetScreen() {
     } finally {
       setTxBusy(false);
     }
-  }, [trackWrite, tr]);
+  }, [trackWrite, tr, project?.clientId]);
 
   /** Підписки проєкту: живі (без архівних) + сума за місяць по кожній валюті. */
   const projectSubscriptions = useMemo(() => {

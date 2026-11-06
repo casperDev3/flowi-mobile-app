@@ -25,6 +25,17 @@ import { totalTrackedSeconds, type TimeEntry } from './taskTimer';
 
 export interface Meeting {
   integrationCancelled?: boolean;
+  /**
+   * Google Calendar (сервер): лише для читання — мутацію, що його змінює,
+   * сервер відхиляє (`integration_metadata_read_only`). Невідомі ключі
+   * зустрічі зберігаються спредом.
+   */
+  integration?: { provider: string; linkId: string; calendarId?: string; state: string; url?: string };
+  /** Кошик: видалено в Google чи у Flowi (м'яке видалення, з відновленням). */
+  deletedAt?: string;
+  /** 'google' | 'google_relink' (дублікат після прив'язки) | інше — Flowi. */
+  deletedSource?: string;
+  cancelled?: boolean;
   integrationOccurrences?: { date: string; time: string; durationMinutes: number }[];
   id: string;
   title: string;
@@ -54,10 +65,40 @@ export interface Meeting {
    * НЕ переписує (CONTRACT §C.1).
    */
   projectId?: string;
+  /**
+   * Клієнт (utils/clients.ts) — лише для зустрічі БЕЗ проєкту. Для зустрічі
+   * проєкту клієнт виводиться з проєкту (derivedClientId): у потоці проєкту
+   * сервер цього поля не зберігає.
+   */
+  clientId?: string;
+  /**
+   * Винятки серії повторів: ключ — ПЕРВІСНА дата екземпляра ('YYYY-MM-DD',
+   * та, що дає правило), значення — що в ньому інакше. «Перенести лише цю»
+   * пише сюди, а не створює окрему зустріч: серія лишається одним записом
+   * (один LWW-рядок у синку), і правка серії не губить перенесених.
+   * Лежить лише на оригіналі; для звичайної зустрічі не вживається.
+   */
+  recurrenceOverrides?: Record<string, MeetingOccurrenceOverride>;
   /** Лише в памʼяті: позначка розгорнутого екземпляра повтору. */
   _origId?: string;
+  /**
+   * Лише в памʼяті: первісна дата екземпляра повтору (ключ recurrenceOverrides).
+   * Після перенесення `date` уже інша, а адресувати виняток треба цією.
+   */
+  _occurrenceDate?: string;
   /** Проставляє saveSynced — основа LWW. */
   updatedAt?: string;
+}
+
+/** Виняток одного екземпляра серії (див. Meeting.recurrenceOverrides). */
+export interface MeetingOccurrenceOverride {
+  /** Нова дата екземпляра, 'YYYY-MM-DD'. Немає — та сама, що дає правило. */
+  date?: string;
+  /** Новий час 'HH:MM'. Немає — час серії. */
+  time?: string;
+  durationMinutes?: number;
+  /** Екземпляр скасовано (у серії його немає). */
+  cancelled?: boolean;
 }
 
 /** Префікс local_id таймера наради. Публічний, бо за ним читають чужі записи. */
@@ -242,8 +283,8 @@ function dayDiff(from: Date, to: Date): number {
  * Інтервал < 1 чи не число трактується як 1 (як на вебі) — інакше цикл без
  * поступу.
  */
-export function expandRecurring(meeting: Meeting, fromDate: Date, toDate: Date): Meeting[] {
-  if (meeting.integrationCancelled) return [];
+export function expandRecurring(meeting: Meeting, fromDate: Date, toDate: Date, withMovedIn = true): Meeting[] {
+  if (meeting.integrationCancelled || meeting.deletedAt) return [];
   if (!meeting.recurrence) return [meeting];
   const { freq, daysOfWeek, until } = meeting.recurrence;
   const interval = Math.max(1, Math.floor(Number(meeting.recurrence.interval)) || 1);
@@ -255,9 +296,25 @@ export function expandRecurring(meeting: Meeting, fromDate: Date, toDate: Date):
     : toDate.getTime();
   const limit = new Date(limitTs);
   const fromDay = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate(), 0, 0, 0, 0);
+  const overrides = meeting.recurrenceOverrides;
+  let moved = false;
   const push = (d: Date) => {
     const dateStr = toDateStr(d);
-    instances.push({ ...meeting, id: `${meeting.id}_${dateStr}`, date: dateStr, _origId: meeting.id });
+    // id лишається від ПЕРВІСНОЇ дати: перенесений екземпляр — той самий
+    // екземпляр (вибір у деталі, ключі списків не стрибають).
+    const base = { ...meeting, id: `${meeting.id}_${dateStr}`, date: dateStr, _origId: meeting.id, _occurrenceDate: dateStr };
+    const ov = overrides?.[dateStr];
+    if (!ov) { instances.push(base); return; }
+    if (ov.cancelled) return;
+    const date = ov.date && /^\d{4}-\d{2}-\d{2}$/.test(ov.date) ? ov.date : dateStr;
+    if (date !== dateStr) moved = true;
+    instances.push({
+      ...base,
+      date,
+      time: typeof ov.time === 'string' ? ov.time : meeting.time,
+      durationMinutes: Number.isFinite(ov.durationMinutes) && (ov.durationMinutes as number) > 0
+        ? (ov.durationMinutes as number) : meeting.durationMinutes,
+    });
   };
 
   if (freq === 'weekly' && daysOfWeek && daysOfWeek.length > 0) {
@@ -310,6 +367,31 @@ export function expandRecurring(meeting: Meeting, fromDate: Date, toDate: Date):
       }
     }
   }
+  // Екземпляри, ПЕРЕНЕСЕНІ у вікно з-поза нього (первісна дата поза вікном або
+  // поза лімітом кроків): розгортаємо добу первісної дати окремо, як веб
+  // lib/meeting-schedule.ts expandMeetings. Вкладений виклик — без цього кроку
+  // (інакше два екземпляри, переставлені місцями, зациклили б розгортання).
+  if (withMovedIn && overrides) {
+    const fromKey = toDateStr(fromDay);
+    const toKey = toDateStr(toDate);
+    const have = new Set(instances.map(i => i.id));
+    for (const [origDate, ov] of Object.entries(overrides)) {
+      if (!ov || ov.cancelled || typeof ov.date !== 'string' || ov.date === origDate) continue;
+      if (ov.date < fromKey || ov.date > toKey || have.has(`${meeting.id}_${origDate}`)) continue;
+      const src = parseDateKey(origDate);
+      if (!src) continue;
+      const srcEnd = new Date(src.getFullYear(), src.getMonth(), src.getDate(), 23, 59, 59, 999);
+      for (const inst of expandRecurring(meeting, src, srcEnd, false)) {
+        if (inst._occurrenceDate === origDate && inst.date === ov.date && !have.has(inst.id)) {
+          have.add(inst.id);
+          instances.push(inst);
+          moved = true;
+        }
+      }
+    }
+  }
+  // Перенесений екземпляр міг стати перед сусідом: виклики чекають порядку дат.
+  if (moved) instances.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''));
   return instances;
 }
 
@@ -317,7 +399,7 @@ export function expandRecurring(meeting: Meeting, fromDate: Date, toDate: Date):
 export function expandMeetings(meetings: Meeting[], from: Date, to: Date): Meeting[] {
   const result: Meeting[] = [];
   for (const m of meetings) {
-    if (m.integrationCancelled) continue;
+    if (m.integrationCancelled || m.deletedAt) continue;
     if (!m.recurrence) result.push(m);
     else for (const inst of expandRecurring(m, from, to)) result.push(inst);
   }
@@ -331,13 +413,29 @@ export function meetingsOnDate(meetings: Meeting[], day: Date): Meeting[] {
   const to = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999);
   const result: Meeting[] = [];
   for (const m of meetings) {
-    if (m.integrationCancelled) continue;
+    if (m.integrationCancelled || m.deletedAt) continue;
     if (!m.recurrence) {
       if (m.date === key) result.push(m);
       continue;
     }
+    const seen = new Set<string>();
     for (const inst of expandRecurring(m, from, to)) {
-      if (inst.date === key) result.push(inst);
+      if (inst.date === key && !seen.has(inst.id)) { seen.add(inst.id); result.push(inst); }
+    }
+    // Екземпляри, ПЕРЕНЕСЕНІ на цей день з іншого: правило їх у вікно цього
+    // дня не дає (хіба що серія молода й дає ранні кроки), тож розгортаємо
+    // добу первісної дати окремо; дубль за id відсікаємо.
+    for (const [origDate, ov] of Object.entries(m.recurrenceOverrides ?? {})) {
+      if (ov?.cancelled || ov?.date !== key || origDate === key) continue;
+      const src = parseDateKey(origDate);
+      if (!src) continue;
+      const srcEnd = new Date(src.getFullYear(), src.getMonth(), src.getDate(), 23, 59, 59, 999);
+      for (const inst of expandRecurring(m, src, srcEnd)) {
+        if (inst._occurrenceDate === origDate && inst.date === key && !seen.has(inst.id)) {
+          seen.add(inst.id);
+          result.push(inst);
+        }
+      }
     }
   }
   return result;

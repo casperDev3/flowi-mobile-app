@@ -88,6 +88,11 @@ export const SYNC_ARRAY_KEYS = [
   // (flowi-server-app/docs/specs/training-module.md §4). local_id похідний
   // (`ts-{assignmentId}-{week}-{dayOfWeek}`). Адитивно — версія лишається 2.
   'training_sessions',
+  // Клієнти (CRM-картка, utils/clients.ts): особиста колекція, id ВИПАДКОВИЙ
+  // (`cl-<uuid4>`). Видно лише власнику — у спільні проєкти клієнт не
+  // потрапляє (сервер тримає звʼязок проєкту в Project.client_id і віддає
+  // його лише власнику). Адитивно — SYNC_CONTRACT_VERSION лишається 2.
+  'clients',
 ] as const;
 
 export type SyncArrayKey = (typeof SYNC_ARRAY_KEYS)[number];

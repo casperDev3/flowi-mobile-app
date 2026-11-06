@@ -1,4 +1,7 @@
 import { Atlas } from '@/constants/atlas';
+import { ClientChips } from '@/components/clients/ClientChips';
+import { useClients } from '@/hooks/use-clients';
+import { sanitizeClientId } from '@/utils/clients';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 import { OverlayScrim } from '@/components/ds/OverlaySurface';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -269,6 +272,9 @@ export default function FinanceScreen() {
   const [formAccountId, setFormAccountId] = useState<string | null>(null);
   const [formToAccountId, setFormToAccountId] = useState<string | null>(null);
   const [toAmount, setToAmount] = useState('');
+  /** Клієнт операції (utils/clients.ts); переказ клієнта не має. */
+  const [txClientId, setTxClientId] = useState<string | null>(null);
+  const { clients } = useClients();
   /** День операції 'YYYY-MM-DD' (локальний). Нова — сьогодні, правка — день запису. */
   const [txDateKey, setTxDateKey] = useState(() => txDayKey(undefined));
   /** Людина сама обрала день (інакше нова операція бере «сьогодні» на момент збереження). */
@@ -796,6 +802,7 @@ export default function FinanceScreen() {
     setEditingId(null);
     setTxType(mode);
     setAmount(''); setCategory(''); setNote(''); setToAmount('');
+    setTxClientId(null);
     setTxDateKey(txDayKey(undefined));
     setTxDatePicked(false);
     const accId = defaultAccountId(accounts, lastAccountRef.current);
@@ -837,6 +844,7 @@ export default function FinanceScreen() {
       setAmount(String(tx.amount));
       setCategory(tx.category);
       setNote(tx.note);
+      setTxClientId(sanitizeClientId(tx.clientId) ?? null);
       // Операція без рахунку (дані до міграції або запис із клієнта, де рахунків
       // немає) отримує рахунок ТІЄЇ Ж валюти — або нічого. Типовий гаманець
       // підставляти не можна: saveTx пише валюту рахунку, і правка примітки
@@ -909,6 +917,7 @@ export default function FinanceScreen() {
       // У межах однієї валюти зарахована сума не зберігається — див.
       // creditedAmount() в utils/accounts.ts.
       toAmount: transferForm && crossCurrency ? credited : undefined,
+      clientId: transferForm ? undefined : txClientId ?? undefined,
     };
 
     if (editingId) {
@@ -1105,6 +1114,7 @@ export default function FinanceScreen() {
   const resetTxDraft = () => {
     setEditingId(null);
     setAmount(''); setCategory(''); setNote(''); setToAmount('');
+    setTxClientId(null);
     setTxDateKey(txDayKey(undefined));
     setTxDatePicked(false);
     setFormToAccountId(null);
@@ -2221,6 +2231,18 @@ export default function FinanceScreen() {
                       tr={tr}
                     />
                   )}
+
+                  {clients.length > 0 && txType !== 'transfer' ? (
+                    <View style={{ marginTop: 16 }}>
+                      <ClientChips
+                        clients={clients}
+                        value={txClientId}
+                        onChange={setTxClientId}
+                        isDark={isDark}
+                        testID="tx-form-client"
+                      />
+                    </View>
+                  ) : null}
 
                   {/* Note */}
                   <Text style={[s.label, { color: c.sub }]}>{tr.note}</Text>

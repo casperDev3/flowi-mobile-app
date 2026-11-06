@@ -22,6 +22,10 @@ import { useSheetSurface } from '@/hooks/use-content-width';
 import { fontFamily } from '@/constants/theme';
 import { dsTheme as dsTokens, glassOf, glassRimFor, glassRim } from '@/components/shared/dsTheme';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { TimeSlotPicker } from '@/components/shared/TimeSlotPicker';
+import { MEETING_DURATION_PRESETS } from '@/utils/meetingReschedule';
+import { ClientChips } from '@/components/clients/ClientChips';
+import { projectClientId, type Client } from '@/utils/clients';
 
 // ─── Exported types ────────────────────────────────────────────────────────────
 
@@ -51,6 +55,12 @@ export interface MeetingFormData {
    * повертає id як був, поки людина сама не обере інше.
    */
   projectId?: string;
+  /**
+   * Клієнт (utils/clients.ts) — лише для зустрічі БЕЗ проєкту. Зустріч
+   * проєкту бере клієнта з проєкту: у потоці проєкту сервер власного
+   * clientId зустрічі не зберігає, тож форма його тоді й не повертає.
+   */
+  clientId?: string;
 }
 
 /** Мінімум проєкту для вибору в формі зустрічі. */
@@ -59,12 +69,17 @@ export interface MeetingFormProject {
   name: string;
   color: string;
   archivedAt?: string;
+  /** Клієнт проєкту — підставляється в поле «Клієнт», коли обрано проєкт. */
+  clientId?: string | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const MEETING_COLORS = ['#6366F1', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
-const DUR_PRESETS = [15, 30, 45, 60, 90, 120];
+// Чипи тривалості: 30 хв / 1 год / 1.5 год / 2 год + «Своя» (поле хвилин).
+const DUR_PRESETS: readonly number[] = MEETING_DURATION_PRESETS;
+const durChipLabel = (d: number, isUk: boolean) =>
+  d < 60 ? `${d}${isUk ? 'хв' : 'm'}` : `${String(d / 60).replace('.', isUk ? ',' : '.')}${isUk ? 'год' : 'h'}`;
 const WD_SHORT_UK = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 const WD_SHORT_EN = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 const MONTHS_UK = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
@@ -86,7 +101,8 @@ interface CalGridProps {
   lang: string;
 }
 
-function CalGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNextMonth, onSelectDay, accent, border, sub, text, lang }: CalGridProps) {
+/** Місячна сітка вибору дня. Експортована для «Перенести → Інша дата…». */
+export function CalGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNextMonth, onSelectDay, accent, border, sub, text, lang }: CalGridProps) {
   // DS v2: вибраний день — коло action.primary, сьогодні — обвідка text.primary.
   // Схема — за кольором тексту з палітри батька (text.primary світлої теми = #111113).
   const t = dsTokens(text !== dsTokens(false).text.primary);
@@ -178,14 +194,17 @@ interface Props {
   currentUserId?: string | null;
   /** Моя роль у проєкті наради — контракт §4.1: власник видаляє чужі коментарі. */
   isProjectOwner?: boolean;
+  /** Клієнти для поля «Клієнт». Без пропа (чи порожній список) поля немає. */
+  clients?: readonly Client[];
 }
 
 const NO_PROJECTS: readonly MeetingFormProject[] = [];
+const NO_CLIENTS: readonly Client[] = [];
 
 export function MeetingFormSheet({
   visible, initial, presetDate, onClose, onSave, onDelete,
   isDark, lang, tr, markedDays = new Set(), projects = NO_PROJECTS, presetProjectId,
-  currentUserId = null, isProjectOwner = false,
+  currentUserId = null, isProjectOwner = false, clients = NO_CLIENTS,
 }: Props) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -214,7 +233,10 @@ export function MeetingFormSheet({
   const [fNotes, setFNotes] = useState("");
   const [fColor, setFColor] = useState(MEETING_COLORS[0]);
   const [fProjectId, setFProjectId] = useState<string | undefined>(undefined);
+  const [fClientId, setFClientId] = useState<string | undefined>(undefined);
   const [showCal, setShowCal] = useState(false);
+  const [showTimes, setShowTimes] = useState(false);
+  const [customDur, setCustomDur] = useState(false);
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
 
@@ -235,12 +257,15 @@ export function MeetingFormSheet({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const m = initial;
+    setShowTimes(false);
+    setCustomDur(!!m && !DUR_PRESETS.includes(m.durationMinutes));
     if (m) {
       setFTitle(m.title); setFDate(m.date); setFTime(m.time);
       setFDuration(m.durationMinutes); setFDurationText(String(m.durationMinutes));
       setFLocation(m.location ?? ''); setFLink(m.link ?? '');
       setFNotes(m.notes ?? ''); setFColor(m.color); setShowCal(false);
       setFProjectId(m.projectId || undefined);
+      setFClientId(m.clientId || undefined);
       const d = new Date(m.date + 'T00:00');
       setCalYear(d.getFullYear()); setCalMonth(d.getMonth());
       const rule = m.recurrence;
@@ -260,6 +285,7 @@ export function MeetingFormSheet({
       setFLocation(''); setFLink(''); setFNotes('');
       setFColor(MEETING_COLORS[0]); setShowCal(false);
       setFProjectId(presetProjectId || undefined);
+      setFClientId(undefined);
       const d = presetDate ? new Date(presetDate + 'T00:00') : today;
       setCalYear(d.getFullYear()); setCalMonth(d.getMonth());
       setFRepeat(false); setFRepeatFreq('weekly'); setFRepeatInterval(1); setFRepeatDays([]);
@@ -285,6 +311,7 @@ export function MeetingFormSheet({
       notes: fNotes.trim() || undefined,
       color: fColor, recurrence,
       projectId: fProjectId,
+      clientId: fProjectId ? undefined : fClientId,
     });
   };
 
@@ -316,7 +343,8 @@ export function MeetingFormSheet({
     fTitle.trim() !== initial.title.trim() || fDate !== initial.date || fTime !== initial.time
     || fDuration !== initial.durationMinutes || fLocation.trim() !== (initial.location ?? '').trim()
     || fLink.trim() !== (initial.link ?? '').trim() || fNotes.trim() !== (initial.notes ?? '').trim()
-    || fColor !== initial.color || (fProjectId ?? '') !== (initial.projectId ?? ''));
+    || fColor !== initial.color || (fProjectId ?? '') !== (initial.projectId ?? '')
+    || (fProjectId ? '' : fClientId ?? '') !== (initial.projectId ? '' : initial.clientId ?? ''));
 
   /**
    * «+ Нотатка» з форми: друга модалка поверх цієї на iOS не показується
@@ -396,7 +424,7 @@ export function MeetingFormSheet({
 
                 {/* Date + Time */}
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                  <TouchableOpacity onPress={() => { Keyboard.dismiss(); setShowCal(v => !v); }} style={{ flex: 1 }}>
+                  <TouchableOpacity onPress={() => { Keyboard.dismiss(); setShowTimes(false); setShowCal(v => !v); }} style={{ flex: 1 }}>
                     <View style={[s.pill, { borderColor: fDate ? fColor + '55' : c.border, backgroundColor: fDate ? fColor + '10' : c.dim }]}>
                       <IconSymbol name="calendar" size={16} color={fDate ? fColor : c.sub} />
                       <Text style={{ color: fDate ? fColor : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 8, flex: 1 }} numberOfLines={1}>
@@ -405,22 +433,33 @@ export function MeetingFormSheet({
                       <IconSymbol name={showCal ? 'chevron.up' : 'chevron.down'} size={12} color={c.sub} />
                     </View>
                   </TouchableOpacity>
-                  <View style={[s.pill, { width: 82, borderColor: c.border, backgroundColor: c.dim }]}>
+                  {/* Час — слоти по 30 хв замість набору з клавіатури. */}
+                  <TouchableOpacity
+                    testID="meeting-form-time"
+                    onPress={() => { Keyboard.dismiss(); setShowCal(false); setShowTimes(v => !v); }}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: showTimes }}
+                    accessibilityLabel={`${tr?.mtgTime ?? (isUk ? 'Час' : 'Time')}: ${fTime || (tr?.mtgNoTime ?? (isUk ? 'Без часу' : 'No time'))}`}
+                    style={[s.pill, { width: 104, borderColor: c.border, backgroundColor: fTime ? fColor + '10' : c.dim }]}>
                     <IconSymbol name="clock" size={16} color={fTime ? fColor : c.sub} />
-                    <TextInput
-                      placeholder="09:00" placeholderTextColor={t.text.muted} value={fTime}
-                      onChangeText={v => {
-                        const clean = v.replace(/[^0-9:]/g, '').slice(0, 5);
-                        const digits = clean.replace(/:/g, '');
-                        if (!clean.includes(':') && digits.length >= 3) {
-                          setFTime(digits.slice(0, 2) + ':' + digits.slice(2, 4));
-                        } else setFTime(clean);
-                      }}
-                      keyboardType="numbers-and-punctuation" maxLength={5}
-                      style={{ color: fTime ? fColor : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 8, flex: 1, padding: 0 }}
+                    <Text style={{ color: fTime ? fColor : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginLeft: 8, flex: 1 }} numberOfLines={1}>
+                      {fTime || '--:--'}
+                    </Text>
+                    <IconSymbol name={showTimes ? 'chevron.up' : 'chevron.down'} size={12} color={c.sub} />
+                  </TouchableOpacity>
+                </View>
+
+                {showTimes && (
+                  <View style={{ marginBottom: 8 }}>
+                    <TimeSlotPicker
+                      testID="meeting-form-slots"
+                      value={fTime}
+                      onChange={v => { setFTime(v); setShowTimes(false); }}
+                      isDark={isDark}
+                      noTimeLabel={tr?.mtgNoTime ?? (isUk ? 'Без часу' : 'No time')}
                     />
                   </View>
-                </View>
+                )}
 
                 {showCal && (
                   <View style={{ marginBottom: 8 }}>
@@ -439,21 +478,33 @@ export function MeetingFormSheet({
                 <View style={{ marginBottom: 8 }}>
                   <View style={{ flexDirection: 'row', gap: 4, marginBottom: 4 }}>
                     {DUR_PRESETS.map(d => {
-                      const on = fDuration === d;
+                      const on = !customDur && fDuration === d;
                       return (
-                        <TouchableOpacity key={d} onPress={() => { setFDuration(d); setFDurationText(String(d)); }} style={{ flex: 1 }}>
-                          <View style={{ paddingVertical: 8, alignItems: 'center', borderRadius: Atlas.radius.medium,
+                        <TouchableOpacity key={d} onPress={() => { setCustomDur(false); setFDuration(d); setFDurationText(String(d)); }} style={{ flex: 1 }}
+                          accessibilityRole="button" accessibilityState={{ selected: on }}
+                          accessibilityLabel={`${tr?.mtgDuration ?? (isUk ? 'Тривалість' : 'Duration')}: ${durChipLabel(d, isUk)}`}>
+                          <View style={{ minHeight: 36, justifyContent: 'center', alignItems: 'center', borderRadius: Atlas.radius.medium,
                             backgroundColor: on ? t.action.primary : c.dim }}>
                             <Text style={{ color: on ? t.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>
-                              {d >= 60 ? `${d / 60}г` : `${d}хв`}
+                              {durChipLabel(d, isUk)}
                             </Text>
                           </View>
                         </TouchableOpacity>
                       );
                     })}
+                    <TouchableOpacity testID="meeting-form-duration-custom" onPress={() => setCustomDur(true)} style={{ flex: 1 }}
+                      accessibilityRole="button" accessibilityState={{ selected: customDur }}
+                      accessibilityLabel={`${tr?.mtgDuration ?? (isUk ? 'Тривалість' : 'Duration')}: ${tr?.mtgDurationCustom ?? (isUk ? 'Своя' : 'Custom')}`}>
+                      <View style={{ minHeight: 36, justifyContent: 'center', alignItems: 'center', borderRadius: Atlas.radius.medium,
+                        backgroundColor: customDur ? t.action.primary : c.dim }}>
+                        <Text style={{ color: customDur ? t.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>
+                          {tr?.mtgDurationCustom ?? (isUk ? 'Своя' : 'Custom')}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
                   </View>
-                  <View style={[s.pill, { borderColor: !DUR_PRESETS.includes(fDuration) ? fColor + '55' : c.border, backgroundColor: !DUR_PRESETS.includes(fDuration) ? fColor + '10' : c.dim }]}>
-                    <IconSymbol name="timer" size={16} color={!DUR_PRESETS.includes(fDuration) ? fColor : c.sub} />
+                  {customDur && <View style={[s.pill, { borderColor: fColor + '55', backgroundColor: fColor + '10' }]}>
+                    <IconSymbol name="timer" size={16} color={fColor} />
                     <TextInput
                       placeholder={isUk ? 'Своя тривалість' : 'Custom'} placeholderTextColor={t.text.muted}
                       value={fDurationText}
@@ -464,12 +515,12 @@ export function MeetingFormSheet({
                         if (!isNaN(n) && n > 0) setFDuration(n);
                       }}
                       keyboardType="number-pad"
-                      style={{ color: !DUR_PRESETS.includes(fDuration) ? fColor : c.text, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 8, flex: 1, padding: 0 }}
+                      style={{ color: fColor, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 8, flex: 1, padding: 0 }}
                     />
                     <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>
                       {isUk ? "хв" : "min"}
                     </Text>
-                  </View>
+                  </View>}
                 </View>
 
                 {/* Details: location / link / notes */}
@@ -544,6 +595,21 @@ export function MeetingFormSheet({
                         })}
                       </View>
                     </ScrollView>
+                  </View>
+                )}
+
+                {/* Клієнт: без проєкту — вибір; з проєктом — клієнт проєкту, без вибору. */}
+                {clients.length > 0 && (
+                  <View style={{ marginBottom: 12 }}>
+                    <ClientChips
+                      clients={clients}
+                      value={fClientId}
+                      onChange={id => setFClientId(id ?? undefined)}
+                      isDark={isDark}
+                      lockedId={fProjectId ? (projectClientId(projects, fProjectId) ?? null) : undefined}
+                      hint={fProjectId ? tr?.clientsUi?.fromProject : undefined}
+                      testID="meeting-form-client"
+                    />
                   </View>
                 )}
 

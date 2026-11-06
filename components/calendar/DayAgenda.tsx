@@ -45,6 +45,8 @@ export interface DayAgendaProps {
   onMeetingPress: (m: Meeting) => void;
   onMeetingDelete?: (m: Meeting) => void;
   onMeetingRecord?: (m: Meeting) => void;
+  /** «Перенести» на картці зустрічі; не передано (лише читання) — кнопки немає. */
+  onMeetingReschedule?: (m: Meeting) => void;
   onSprintPress: (bar: SprintBar) => void;
   /**
    * «+» у заголовку дня. Не передано — кнопки немає: на телефоні «+» один
@@ -63,7 +65,7 @@ function shortDate(key: string): string {
 
 export function DayAgenda({
   day, title, tasks, meetings, sprints, c, isDark, tr, selectedMeetingKey, runningMeetingIds,
-  meetingProject, onTaskPress, onMeetingPress, onMeetingDelete, onMeetingRecord, onSprintPress, onAdd, compactTitle,
+  meetingProject, onTaskPress, onMeetingPress, onMeetingDelete, onMeetingRecord, onMeetingReschedule, onSprintPress, onAdd, compactTitle,
 }: DayAgendaProps) {
   const empty = tasks.length === 0 && meetings.length === 0 && sprints.length === 0;
 
@@ -166,6 +168,8 @@ export function DayAgenda({
               onPress={onMeetingPress}
               onDelete={onMeetingDelete}
               onRecord={onMeetingRecord}
+              onReschedule={onMeetingReschedule}
+              rescheduleLabel={tr.mtgReschedule}
               deleteLabel={tr.delete}
               recordLabel={tr.calRecordAudio}
             />

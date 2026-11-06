@@ -2671,31 +2671,71 @@ export interface Translations {
   calRecAudio: string;
   calRecStop: string;
   calRecStart: string;
-  gcalAuthTitle: string;
-  gcalAuthBody: string;
   gcalSyncErrorTitle: string;
-  gcalTryLater: string;
   gcalOfflineTitle: string;
   gcalOfflineBody: string;
   gcalConnectErrorTitle: string;
-  gcalTryAgain: string;
   gcalDisconnectTitle: string;
   gcalDisconnectBody: string;
   gcalDisconnect: string;
   gcalConnected: string;
-  gcalClientIdSet: string;
-  gcalSetup: string;
-  gcalStep1: string;
-  gcalStep2: string;
-  gcalStep3: string;
-  gcalStep4: string;
-  gcalSaveClientId: string;
   gcalConnectHint: string;
   gcalConnectGoogle: string;
-  gcalChangeClientId: string;
   gcalLastSync: string;
-  gcalNewCount: string;
   gcalSyncNow: string;
+  gcalNotConfigured: string;
+  gcalTwoWayHint: string;
+  gcalChecking: string;
+  gcalGoogleAccount: string;
+  gcalStateDraft: string;
+  gcalStateActive: string;
+  gcalStateRetry: string;
+  gcalStateAttention: string;
+  gcalStateDisconnected: string;
+  gcalNeverSynced: string;
+  gcalImportFrom: string;
+  gcalExportTo: string;
+  gcalNoExport: string;
+  gcalCalendars: string;
+  gcalChooseCalendars: string;
+  gcalCalendarsHint: string;
+  gcalNoCalendars: string;
+  gcalPrimary: string;
+  gcalReadOnly: string;
+  gcalExportHere: string;
+  gcalDontExport: string;
+  gcalSaveSelection: string;
+  gcalSavedCalendars: string;
+  gcalSyncQueued: string;
+  gcalSyncFresh: string;
+  gcalConflicts: string;
+  gcalConflictsTitle: string;
+  gcalConflictsHint: string;
+  gcalNoConflicts: string;
+  gcalKeepFlowi: string;
+  gcalTakeGoogle: string;
+  gcalFieldTitle: string;
+  gcalFieldTime: string;
+  gcalFieldDescription: string;
+  gcalFieldLocation: string;
+  gcalFieldRecurrence: string;
+  gcalFieldCancelled: string;
+  gcalYes: string;
+  gcalNo: string;
+  gcalAllDay: string;
+  gcalMinutes: string;
+  gcalTrash: string;
+  gcalTrashHint: string;
+  gcalDeletedInGoogle: string;
+  gcalDeletedDuplicate: string;
+  gcalDeletedInFlowi: string;
+  gcalRestore: string;
+  gcalRestored: string;
+  gcalConnectedNotice: string;
+  gcalCancelledNotice: string;
+  gcalDisconnectedNotice: string;
+  gcalUntitled: string;
+  gcalCardTitle: string;
   // m-card
   cardTabMain: string;
   cardTabDetails: string;
@@ -2820,6 +2860,19 @@ export interface Translations {
   calSearchUpcoming: string;
   calSearchPast: string;
   calJoin: string;
+  mtgReschedule: string;
+  mtgReschedulePlus30: string;
+  mtgReschedulePlus60: string;
+  mtgRescheduleTomorrow: string;
+  mtgRescheduleNextWeek: string;
+  mtgRescheduleOther: string;
+  mtgRescheduleOnlyThis: string;
+  mtgRescheduledTo: string;
+  mtgTime: string;
+  mtgNoTime: string;
+  mtgDuration: string;
+  mtgDurationCustom: string;
+  calDragHint: string;
   calProjectAdd: string;
   // ── end area: m-calendar ──
   // ── area: m-tasks ──
@@ -2860,6 +2913,88 @@ export interface Translations {
   subPayNow: string;
   subNotifOverdueBodyPay: string;
   // ── end area: m-audit-p2 ──
+  // ── area: m-clients ──
+  navClients: string;
+  clientsUi: {
+    title: string;
+    newClient: string;
+    editClient: string;
+    searchPlaceholder: string;
+    empty: string;
+    emptyCaption: string;
+    noMatch: string;
+    loadFailed: string;
+    filterAll: string;
+    filterActive: string;
+    filterPotential: string;
+    filterArchived: string;
+    statusActive: string;
+    statusPotential: string;
+    statusArchived: string;
+    name: string;
+    namePlaceholder: string;
+    color: string;
+    status: string;
+    website: string;
+    address: string;
+    links: string;
+    linksHint: string;
+    tags: string;
+    tagsHint: string;
+    contacts: string;
+    addContact: string;
+    removeContact: string;
+    contactName: string;
+    contactRole: string;
+    phone: string;
+    email: string;
+    telegram: string;
+    call: string;
+    writeEmail: string;
+    openTelegram: string;
+    openLink: string;
+    requisites: string;
+    legalName: string;
+    edrpou: string;
+    ipn: string;
+    iban: string;
+    bank: string;
+    legalAddress: string;
+    copyAll: string;
+    copied: string;
+    projects: string;
+    meetings: string;
+    finances: string;
+    income: string;
+    expense: string;
+    openTasks: string;
+    notes: string;
+    addNote: string;
+    noteTitle: string;
+    noteBody: string;
+    noProjects: string;
+    noMeetings: string;
+    noFinances: string;
+    noTasks: string;
+    noNotes: string;
+    showMore: string;
+    archive: string;
+    unarchive: string;
+    delete: string;
+    deleteTitle: string;
+    deleteBody: string;
+    notFound: string;
+    field: string;
+    none: string;
+    fromProject: string;
+    projectClientHint: string;
+    nameRequired: string;
+    saveFailed: string;
+    noContacts: string;
+    noRequisites: string;
+    details: string;
+  };
+  // ── end area: m-clients ──
   // ── area: wf-1007 ──
   healthTabBodyShort: string;
   menu: {
@@ -2932,6 +3067,14 @@ export interface Translations {
     invalid_resolution: string;
     conflicts_pending: string;
     invalid_oauth_state: string;
+    not_connected: string;
+    calendars_required: string;
+    reauth_required: string;
+    invalid_return_to: string;
+    invalid_selection: string;
+    too_many_calendars: string;
+    not_linked: string;
+    integration_metadata_read_only: string;
     integration_internal_error: string;
     generic: string;
     attention: string;
@@ -5505,31 +5648,71 @@ const uk: Translations = {
   calRecAudio: 'Аудіозапис',
   calRecStop: 'Зупинити',
   calRecStart: 'Почати запис',
-  gcalAuthTitle: 'Потрібна авторизація',
-  gcalAuthBody: 'Підключіть Google Calendar.',
   gcalSyncErrorTitle: 'Помилка синхронізації',
-  gcalTryLater: 'Спробуйте пізніше.',
   gcalOfflineTitle: 'Офлайн',
   gcalOfflineBody: 'Недоступно в офлайн-режимі',
   gcalConnectErrorTitle: 'Помилка підключення',
-  gcalTryAgain: 'Спробуйте ще раз.',
   gcalDisconnectTitle: 'Відключити Google Calendar?',
-  gcalDisconnectBody: 'Вже імпортовані зустрічі залишаться.',
+  gcalDisconnectBody: 'Зустрічі залишаться у Flowi, доступ до Google буде відкликано.',
   gcalDisconnect: 'Відключити',
   gcalConnected: 'Підключено',
-  gcalClientIdSet: 'Client ID налаштовано',
-  gcalSetup: 'Налаштуйте підключення',
-  gcalStep1: 'Відкрийте console.cloud.google.com',
-  gcalStep2: 'Увімкніть Google Calendar API',
-  gcalStep3: 'Створіть OAuth 2.0 Client ID\n(тип: iOS, Bundle ID: com.casper3.f-tracking-app)',
-  gcalStep4: 'Скопіюйте Client ID і вставте нижче',
-  gcalSaveClientId: 'Зберегти Client ID',
-  gcalConnectHint: 'Підключіть Google Calendar, щоб автоматично імпортувати зустрічі.',
+  gcalConnectHint: 'Підключіть Google, щоб зустрічі синхронізувались в обидва боки: зміни у Flowi одразу йдуть у Google, а з Google підтягуються щочверть години.',
   gcalConnectGoogle: 'Підключити Google',
-  gcalChangeClientId: 'Змінити Client ID',
   gcalLastSync: 'Остання синхронізація',
-  gcalNewCount: '+{n} нових',
   gcalSyncNow: 'Синхронізувати зараз',
+  gcalNotConfigured: 'Підключення ще не налаштоване адміністратором',
+  gcalTwoWayHint: 'Зустрічі синхронізуються в обидва боки',
+  gcalChecking: 'Перевіряємо підключення…',
+  gcalGoogleAccount: 'Акаунт Google',
+  gcalStateDraft: 'Оберіть календарі',
+  gcalStateActive: 'Синхронізується',
+  gcalStateRetry: 'Повторюємо синхронізацію',
+  gcalStateAttention: 'Потрібна увага',
+  gcalStateDisconnected: 'Відключено',
+  gcalNeverSynced: 'ще не було',
+  gcalImportFrom: 'Імпорт',
+  gcalExportTo: 'Експорт',
+  gcalNoExport: 'не експортується',
+  gcalCalendars: 'Календарі',
+  gcalChooseCalendars: 'Обрати календарі',
+  gcalCalendarsHint: 'Зустрічі імпортуються з усіх позначених календарів. Нові зустрічі Flowi потрапляють в один календар експорту.',
+  gcalNoCalendars: 'У цьому акаунті немає календарів.',
+  gcalPrimary: 'Основний',
+  gcalReadOnly: 'Лише читання',
+  gcalExportHere: 'Експорт сюди',
+  gcalDontExport: 'Не експортувати зустрічі Flowi в Google',
+  gcalSaveSelection: 'Зберегти вибір',
+  gcalSavedCalendars: 'Календарі збережено. Перша синхронізація вже йде у фоні.',
+  gcalSyncQueued: 'Синхронізацію запущено.',
+  gcalSyncFresh: 'Щойно синхронізовано.',
+  gcalConflicts: 'Конфлікти · {n}',
+  gcalConflictsTitle: 'Конфлікти синхронізації',
+  gcalConflictsHint: 'Зустріч змінено і у Flowi, і в Google. Оберіть, яку версію залишити.',
+  gcalNoConflicts: 'Конфліктів немає.',
+  gcalKeepFlowi: 'Залишити версію Flowi',
+  gcalTakeGoogle: 'Взяти версію Google',
+  gcalFieldTitle: 'Назва',
+  gcalFieldTime: 'Час',
+  gcalFieldDescription: 'Опис',
+  gcalFieldLocation: 'Місце',
+  gcalFieldRecurrence: 'Повторення',
+  gcalFieldCancelled: 'Видалення',
+  gcalYes: 'Так',
+  gcalNo: 'Ні',
+  gcalAllDay: 'увесь день',
+  gcalMinutes: '{n} хв',
+  gcalTrash: 'Кошик · {n}',
+  gcalTrashHint: 'Видалені зустрічі. Відновлення повертає й подію в Google.',
+  gcalDeletedInGoogle: 'Видалено в Google',
+  gcalDeletedDuplicate: 'Дублікат',
+  gcalDeletedInFlowi: 'Видалено у Flowi',
+  gcalRestore: 'Відновити',
+  gcalRestored: 'Зустріч відновлено.',
+  gcalConnectedNotice: 'Google Calendar підключено.',
+  gcalCancelledNotice: 'Підключення Google скасовано.',
+  gcalDisconnectedNotice: 'Google Calendar відключено. Зустрічі залишились у Flowi.',
+  gcalUntitled: 'Без назви',
+  gcalCardTitle: 'Google Calendar · зустрічі',
   // m-card
   cardTabMain: 'Основне',
   cardTabDetails: 'Деталі',
@@ -5653,6 +5836,19 @@ const uk: Translations = {
   calSearchUpcoming: 'Найближчі',
   calSearchPast: 'Історія',
   calJoin: 'Приєднатися',
+  mtgReschedule: 'Перенести',
+  mtgReschedulePlus30: '+30 хв',
+  mtgReschedulePlus60: '+1 год',
+  mtgRescheduleTomorrow: 'Завтра в той самий час',
+  mtgRescheduleNextWeek: 'Наступного тижня',
+  mtgRescheduleOther: 'Інша дата…',
+  mtgRescheduleOnlyThis: 'Переноситься лише ця зустріч серії',
+  mtgRescheduledTo: 'Перенесено: {when}',
+  mtgTime: 'Час',
+  mtgNoTime: 'Без часу',
+  mtgDuration: 'Тривалість',
+  mtgDurationCustom: 'Своя',
+  calDragHint: 'Утримуйте й тягніть, щоб перенести',
   calProjectAdd: 'Додати в календар проєкту',
   // ── end area: m-calendar ──
   // ── area: m-tasks ──
@@ -5693,6 +5889,88 @@ const uk: Translations = {
   subPayNow: 'Оплатити',
   subNotifOverdueBodyPay: '{name}: {amount}. Натисніть «Оплатити», коли оплатите.',
   // ── end area: m-audit-p2 ──
+  // ── area: m-clients ──
+  navClients: 'Клієнти',
+  clientsUi: {
+    title: 'Клієнти',
+    newClient: 'Новий клієнт',
+    editClient: 'Редагувати клієнта',
+    searchPlaceholder: 'Пошук клієнтів',
+    empty: 'Клієнтів ще немає',
+    emptyCaption: 'Тримайте контакти, реквізити, проєкти й зустрічі клієнта в одному місці.',
+    noMatch: 'Нічого не знайдено',
+    loadFailed: 'Не вдалося прочитати клієнтів',
+    filterAll: 'Усі',
+    filterActive: 'Активні',
+    filterPotential: 'Потенційні',
+    filterArchived: 'Архів',
+    statusActive: 'Активний',
+    statusPotential: 'Потенційний',
+    statusArchived: 'В архіві',
+    name: 'Назва',
+    namePlaceholder: 'Назва клієнта або компанії',
+    color: 'Колір',
+    status: 'Статус',
+    website: 'Сайт',
+    address: 'Адреса',
+    links: 'Посилання',
+    linksHint: 'По одному на рядок',
+    tags: 'Теги',
+    tagsHint: 'Через кому',
+    contacts: 'Контакти',
+    addContact: 'Додати контакт',
+    removeContact: 'Прибрати контакт',
+    contactName: 'Ім\'я',
+    contactRole: 'Посада / роль',
+    phone: 'Телефон',
+    email: 'Email',
+    telegram: 'Telegram',
+    call: 'Подзвонити',
+    writeEmail: 'Написати листа',
+    openTelegram: 'Відкрити Telegram',
+    openLink: 'Відкрити посилання',
+    requisites: 'Реквізити',
+    legalName: 'Юридична назва',
+    edrpou: 'ЄДРПОУ',
+    ipn: 'ІПН',
+    iban: 'IBAN',
+    bank: 'Банк',
+    legalAddress: 'Юридична адреса',
+    copyAll: 'Скопіювати все',
+    copied: 'Скопійовано',
+    projects: 'Проєкти',
+    meetings: 'Зустрічі',
+    finances: 'Фінанси',
+    income: 'Доходи',
+    expense: 'Витрати',
+    openTasks: 'Відкриті завдання',
+    notes: 'Нотатки',
+    addNote: 'Нова нотатка',
+    noteTitle: 'Заголовок',
+    noteBody: 'Текст нотатки',
+    noProjects: 'Проєктів ще немає — привʼяжіть клієнта в налаштуваннях проєкту',
+    noMeetings: 'Зустрічей немає',
+    noFinances: 'Операцій немає',
+    noTasks: 'Відкритих завдань немає',
+    noNotes: 'Нотаток немає',
+    showMore: 'Показати ще {n}',
+    archive: 'В архів',
+    unarchive: 'Повернути з архіву',
+    delete: 'Видалити клієнта',
+    deleteTitle: 'Видалити клієнта?',
+    deleteBody: 'Проєкти, зустрічі, операції й нотатки лишаться, але більше не показуватимуться в картці клієнта.',
+    notFound: 'Клієнта не знайдено',
+    field: 'Клієнт',
+    none: 'Без клієнта',
+    fromProject: 'Клієнт береться з проєкту',
+    projectClientHint: 'Клієнта бачите лише ви — учасники проєкту його не бачать.',
+    nameRequired: 'Вкажіть назву',
+    saveFailed: 'Не вдалося зберегти',
+    noContacts: 'Контактів немає',
+    noRequisites: 'Реквізитів немає',
+    details: 'Дані',
+  },
+  // ── end area: m-clients ──
   // ── area: wf-1007 ──
   healthTabBodyShort: 'Тіло',
   menu: {
@@ -5768,6 +6046,14 @@ const uk: Translations = {
     invalid_resolution: 'Оберіть варіант розв’язання конфлікту.',
     conflicts_pending: 'Спершу синхронізуйте зміни, що очікують',
     invalid_oauth_state: 'Сеанс авторизації застарів — спробуйте ще раз',
+    not_connected: 'Google Calendar не підключено.',
+    calendars_required: 'Оберіть календарі для синхронізації.',
+    reauth_required: 'Доступ до Google завершився. Підключіть Google повторно.',
+    invalid_return_to: 'Не вдалося почати вхід у Google. Оновіть сторінку й спробуйте ще раз.',
+    invalid_selection: 'Перевірте вибір календарів.',
+    too_many_calendars: 'Можна обрати не більше 20 календарів.',
+    not_linked: 'Ця зустріч не пов’язана з Google Calendar.',
+    integration_metadata_read_only: 'Дані зв’язку з Google змінює лише сервер. Оновіть дані й спробуйте ще раз.',
     integration_internal_error: 'Внутрішня помилка сервера інтеграцій. Спробуйте пізніше.',
     generic: 'Не вдалося виконати дію інтеграції. Спробуйте ще раз.',
     attention: 'Потрібно перевірити підключення.',
@@ -8336,31 +8622,71 @@ const en: Translations = {
   calRecAudio: 'Audio recording',
   calRecStop: 'Stop',
   calRecStart: 'Start recording',
-  gcalAuthTitle: 'Authorization required',
-  gcalAuthBody: 'Connect Google Calendar.',
   gcalSyncErrorTitle: 'Sync error',
-  gcalTryLater: 'Please try again later.',
   gcalOfflineTitle: 'Offline',
   gcalOfflineBody: 'Not available in offline mode',
   gcalConnectErrorTitle: 'Connection error',
-  gcalTryAgain: 'Please try again.',
   gcalDisconnectTitle: 'Disconnect Google Calendar?',
-  gcalDisconnectBody: 'Meetings already imported will stay.',
+  gcalDisconnectBody: 'Meetings stay in Flowi; Google access will be revoked.',
   gcalDisconnect: 'Disconnect',
   gcalConnected: 'Connected',
-  gcalClientIdSet: 'Client ID configured',
-  gcalSetup: 'Set up the connection',
-  gcalStep1: 'Open console.cloud.google.com',
-  gcalStep2: 'Enable the Google Calendar API',
-  gcalStep3: 'Create an OAuth 2.0 Client ID\n(type: iOS, Bundle ID: com.casper3.f-tracking-app)',
-  gcalStep4: 'Copy the Client ID and paste it below',
-  gcalSaveClientId: 'Save Client ID',
-  gcalConnectHint: 'Connect Google Calendar to import meetings automatically.',
+  gcalConnectHint: 'Connect Google to sync meetings both ways: Flowi changes go to Google right away, Google changes come in every 15 minutes.',
   gcalConnectGoogle: 'Connect Google',
-  gcalChangeClientId: 'Change Client ID',
   gcalLastSync: 'Last sync',
-  gcalNewCount: '+{n} new',
   gcalSyncNow: 'Sync now',
+  gcalNotConfigured: 'Not configured by the administrator yet',
+  gcalTwoWayHint: 'Meetings sync both ways',
+  gcalChecking: 'Checking connection…',
+  gcalGoogleAccount: 'Google account',
+  gcalStateDraft: 'Choose calendars',
+  gcalStateActive: 'Syncing',
+  gcalStateRetry: 'Retrying sync',
+  gcalStateAttention: 'Needs attention',
+  gcalStateDisconnected: 'Disconnected',
+  gcalNeverSynced: 'not yet',
+  gcalImportFrom: 'Import',
+  gcalExportTo: 'Export',
+  gcalNoExport: 'not exported',
+  gcalCalendars: 'Calendars',
+  gcalChooseCalendars: 'Choose calendars',
+  gcalCalendarsHint: 'Meetings are imported from every checked calendar. New Flowi meetings go to one export calendar.',
+  gcalNoCalendars: 'This account has no calendars.',
+  gcalPrimary: 'Primary',
+  gcalReadOnly: 'Read-only',
+  gcalExportHere: 'Export here',
+  gcalDontExport: 'Do not export Flowi meetings to Google',
+  gcalSaveSelection: 'Save selection',
+  gcalSavedCalendars: 'Calendars saved. The first sync is running in the background.',
+  gcalSyncQueued: 'Sync started.',
+  gcalSyncFresh: 'Just synced.',
+  gcalConflicts: 'Conflicts · {n}',
+  gcalConflictsTitle: 'Sync conflicts',
+  gcalConflictsHint: 'The meeting changed both in Flowi and in Google. Choose which version to keep.',
+  gcalNoConflicts: 'No conflicts.',
+  gcalKeepFlowi: 'Keep Flowi version',
+  gcalTakeGoogle: 'Take Google version',
+  gcalFieldTitle: 'Title',
+  gcalFieldTime: 'Time',
+  gcalFieldDescription: 'Description',
+  gcalFieldLocation: 'Location',
+  gcalFieldRecurrence: 'Recurrence',
+  gcalFieldCancelled: 'Deletion',
+  gcalYes: 'Yes',
+  gcalNo: 'No',
+  gcalAllDay: 'all day',
+  gcalMinutes: '{n} min',
+  gcalTrash: 'Trash · {n}',
+  gcalTrashHint: 'Deleted meetings. Restoring also brings the Google event back.',
+  gcalDeletedInGoogle: 'Deleted in Google',
+  gcalDeletedDuplicate: 'Duplicate',
+  gcalDeletedInFlowi: 'Deleted in Flowi',
+  gcalRestore: 'Restore',
+  gcalRestored: 'Meeting restored.',
+  gcalConnectedNotice: 'Google Calendar connected.',
+  gcalCancelledNotice: 'Google connection cancelled.',
+  gcalDisconnectedNotice: 'Google Calendar disconnected. Meetings stay in Flowi.',
+  gcalUntitled: 'Untitled',
+  gcalCardTitle: 'Google Calendar · meetings',
   // m-card
   cardTabMain: 'Main',
   cardTabDetails: 'Details',
@@ -8484,6 +8810,19 @@ const en: Translations = {
   calSearchUpcoming: 'Upcoming',
   calSearchPast: 'History',
   calJoin: 'Join',
+  mtgReschedule: 'Reschedule',
+  mtgReschedulePlus30: '+30 min',
+  mtgReschedulePlus60: '+1 hr',
+  mtgRescheduleTomorrow: 'Tomorrow, same time',
+  mtgRescheduleNextWeek: 'Next week',
+  mtgRescheduleOther: 'Other date…',
+  mtgRescheduleOnlyThis: 'Only this occurrence of the series moves',
+  mtgRescheduledTo: 'Moved: {when}',
+  mtgTime: 'Time',
+  mtgNoTime: 'No time',
+  mtgDuration: 'Duration',
+  mtgDurationCustom: 'Custom',
+  calDragHint: 'Long-press and drag to move',
   calProjectAdd: 'Add to project calendar',
   // ── end area: m-calendar ──
   // ── area: m-tasks ──
@@ -8524,6 +8863,88 @@ const en: Translations = {
   subPayNow: 'Pay',
   subNotifOverdueBodyPay: '{name}: {amount}. Tap “Pay” once paid.',
   // ── end area: m-audit-p2 ──
+  // ── area: m-clients ──
+  navClients: 'Clients',
+  clientsUi: {
+    title: 'Clients',
+    newClient: 'New client',
+    editClient: 'Edit client',
+    searchPlaceholder: 'Search clients',
+    empty: 'No clients yet',
+    emptyCaption: 'Keep a client\'s contacts, requisites, projects and meetings in one place.',
+    noMatch: 'Nothing found',
+    loadFailed: 'Couldn\'t read clients',
+    filterAll: 'All',
+    filterActive: 'Active',
+    filterPotential: 'Potential',
+    filterArchived: 'Archive',
+    statusActive: 'Active',
+    statusPotential: 'Potential',
+    statusArchived: 'Archived',
+    name: 'Name',
+    namePlaceholder: 'Client or company name',
+    color: 'Color',
+    status: 'Status',
+    website: 'Website',
+    address: 'Address',
+    links: 'Links',
+    linksHint: 'One per line',
+    tags: 'Tags',
+    tagsHint: 'Comma-separated',
+    contacts: 'Contacts',
+    addContact: 'Add contact',
+    removeContact: 'Remove contact',
+    contactName: 'Name',
+    contactRole: 'Role',
+    phone: 'Phone',
+    email: 'Email',
+    telegram: 'Telegram',
+    call: 'Call',
+    writeEmail: 'Send email',
+    openTelegram: 'Open Telegram',
+    openLink: 'Open link',
+    requisites: 'Requisites',
+    legalName: 'Legal name',
+    edrpou: 'EDRPOU',
+    ipn: 'Tax ID',
+    iban: 'IBAN',
+    bank: 'Bank',
+    legalAddress: 'Legal address',
+    copyAll: 'Copy all',
+    copied: 'Copied',
+    projects: 'Projects',
+    meetings: 'Meetings',
+    finances: 'Finances',
+    income: 'Income',
+    expense: 'Expenses',
+    openTasks: 'Open tasks',
+    notes: 'Notes',
+    addNote: 'New note',
+    noteTitle: 'Title',
+    noteBody: 'Note text',
+    noProjects: 'No projects yet — link the client in project settings',
+    noMeetings: 'No meetings',
+    noFinances: 'No transactions',
+    noTasks: 'No open tasks',
+    noNotes: 'No notes',
+    showMore: 'Show {n} more',
+    archive: 'Archive',
+    unarchive: 'Restore from archive',
+    delete: 'Delete client',
+    deleteTitle: 'Delete client?',
+    deleteBody: 'Projects, meetings, transactions and notes stay, but no longer show in the client card.',
+    notFound: 'Client not found',
+    field: 'Client',
+    none: 'No client',
+    fromProject: 'Client comes from the project',
+    projectClientHint: 'Only you see the client — project members don\'t.',
+    nameRequired: 'Enter a name',
+    saveFailed: 'Couldn\'t save',
+    noContacts: 'No contacts',
+    noRequisites: 'No requisites',
+    details: 'Details',
+  },
+  // ── end area: m-clients ──
   // ── area: wf-1007 ──
   healthTabBodyShort: 'Body',
   menu: {
@@ -8599,6 +9020,14 @@ const en: Translations = {
     invalid_resolution: 'Choose how to resolve the conflict.',
     conflicts_pending: 'Sync pending changes first',
     invalid_oauth_state: 'Authorization session expired — try again',
+    not_connected: 'Google Calendar is not connected.',
+    calendars_required: 'Choose calendars to sync.',
+    reauth_required: 'Google access expired. Connect Google again.',
+    invalid_return_to: 'Could not start Google sign-in. Refresh the page and try again.',
+    invalid_selection: 'Check the calendar selection.',
+    too_many_calendars: 'You can choose up to 20 calendars.',
+    not_linked: 'This meeting is not linked to Google Calendar.',
+    integration_metadata_read_only: 'Only the server changes Google link data. Refresh and try again.',
     integration_internal_error: 'Integration server error. Try again later.',
     generic: 'The integration action failed. Try again.',
     attention: 'Check the connection.',

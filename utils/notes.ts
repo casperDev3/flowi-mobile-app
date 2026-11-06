@@ -33,6 +33,12 @@ export interface Note {
   createdAt: string;
   updatedAt: string;
   projectId?: string;
+  /**
+   * Клієнт (utils/clients.ts) — лише для ОСОБИСТОЇ нотатки без projectId:
+   * нотатка проєкту бере клієнта з проєкту, а потік проєкту цього поля не
+   * зберігає.
+   */
+  clientId?: string;
   /** Теги запису. Порожній список не зберігаємо зовсім. */
   tags?: string[];
   /** Закріплена нотатка йде першою в будь-якому порядку. */
@@ -68,6 +74,7 @@ export interface NoteInput {
   createdAt?: string;
   updatedAt?: string;
   projectId?: string;
+  clientId?: string;
   tags?: string[];
   pinned?: boolean;
   linkedTaskId?: string;
@@ -254,6 +261,8 @@ export function normalizeNote(raw: unknown, now: string = new Date().toISOString
 
   const projectId = asFilled(source.projectId);
   if (projectId) note.projectId = projectId;
+  const clientId = asFilled(source.clientId);
+  if (clientId) note.clientId = clientId;
   const tags = normalizeTagList(source.tags);
   if (tags.length) note.tags = tags;
   if (source.pinned === true) note.pinned = true;

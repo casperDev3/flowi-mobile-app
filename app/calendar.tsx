@@ -27,7 +27,10 @@
  * тапнули слот сітки). Завдання створюється тут же, аркушем поверх
  * календаря (CalendarTaskCreate — та сама коротка форма TaskQuickCreate, що й
  * на «Завданнях»), тож після збереження людина лишається в календарі.
- * Перетягування — лише на вебі.
+ * Перетягування: у «Дні»/«Тижні» з погодинною сіткою — довге натискання на
+ * нараду й тягнути (крок 30 хв, між днями тижня), з тостом «Скасувати».
+ * «Перенести» (картка дня, деталь) — пресети без форми й «Інша дата…».
+ * Екземпляр повтору переноситься лише сам (виняток серії).
  *
  * Лупа в шапці — пошук по зустрічах (разом з історією) і завданнях.
  * Список дня у статичній зоні планшета — лише для читання.
@@ -56,8 +59,10 @@ import { GoogleCalendarSheet } from '@/components/calendar/GoogleCalendarSheet';
 import { MonthGrid } from '@/components/calendar/MonthGrid';
 import { PERSONAL_TASK_COLOR, useCalendarColors } from '@/components/calendar/palette';
 import { RecordingModal } from '@/components/calendar/RecordingModal';
+import { RescheduleSheet, slotLabel } from '@/components/calendar/RescheduleSheet';
 import { TimeGrid } from '@/components/calendar/TimeGrid';
-import { useGoogleCalendar } from '@/components/calendar/useGoogleCalendar';
+import { useGoogleCalendarSync } from '@/components/calendar/useGoogleCalendarSync';
+import { isTrashedMeeting, restoredMeeting } from '@/utils/googleCalendar';
 import { CalendarStaticPane } from '@/components/calendar/CalendarStaticPane';
 import { useCalendarZoneStrings } from '@/components/calendar/calendarZoneStrings';
 import { setZonePrefs, useZonePrefs, ZoneLayout, zoneWidths, type ZonePanel } from '@/components/layout-zones';
@@ -67,6 +72,7 @@ import { useInPlaceProjectTask } from '@/components/projects/ProjectTaskSheet';
 import { DetailPane } from '@/components/shared/DetailPane';
 import { MEETING_COLORS, MeetingFormSheet, type MeetingFormData } from '@/components/shared/MeetingFormSheet';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
+import { useUndoToast } from '@/components/shared/UndoToast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { fontFamily, radius, shadow } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
@@ -75,6 +81,8 @@ import { useProjectRole } from '@/hooks/use-project-role';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
+import { useClients } from '@/hooks/use-clients';
+import { withClientId } from '@/utils/clients';
 import { useTodayKey } from '@/hooks/use-today-key';
 import { setAdvertisingRecording } from '@/store/advertising-safety';
 import { useAuth } from '@/store/auth';
@@ -87,6 +95,9 @@ import {
   expandMeetings, findTimerForMeeting, meetingProject, pickMeetingInstanceToOpen, resolveOriginalMeeting,
   withMeetingProject, withMeetingRecording, type Meeting,
 } from '@/utils/meetings';
+import {
+  rescheduleMeeting, restoreMeetingSchedule, scheduleSnapshot, type MeetingScheduleSnapshot, type MeetingSlot,
+} from '@/utils/meetingReschedule';
 import type { Sprint } from '@/utils/sprintUtils';
 import { isTaskDoneByType, type TaskStatusColumn } from '@/utils/taskStatuses';
 import type { Task } from '@/utils/taskUtils';
@@ -94,7 +105,7 @@ import { KpiCounter, MeshBackground } from '@/components/ds';
 import { AppHeader } from '@/components/shared/AppHeader';
 
 /** Мінімум локального проєкту: чип, поле «Проєкт» форми, фільтр, колір смуг. */
-interface LocalProject { id: string; name: string; color: string; archivedAt?: string }
+interface LocalProject { id: string; name: string; color: string; archivedAt?: string; clientId?: string | null }
 interface ProjectSummaryLite { id: string; name: string; color: string; archived_at?: string | null }
 
 /** Що й куди створюємо з «+»: день завжди, година — якщо тапнули слот. */
@@ -127,7 +138,7 @@ export default function CalendarScreen() {
   // `?open=<id>` — deep link ftrackingapp://meeting/{id} / тап по сповіщенню;
   // `?date=YYYY-MM-DD` — відкрити на дні; `?view=` — вид;
   // `?create=meeting[&date=]` — одразу форма нової події (iOS-віджет «Додати подію»).
-  const params = useLocalSearchParams<{ open?: string; date?: string; view?: string; create?: string }>();
+  const params = useLocalSearchParams<{ open?: string; date?: string; view?: string; create?: string; gcal?: string }>();
 
   const { activeTimers, startMeetingTimer, stopTimer, meetingsRevision } = useTimerContext();
 
@@ -155,7 +166,7 @@ export default function CalendarScreen() {
   // (патерн «Сьогодні»). Раніше кожне повернення (напр. з картки завдання)
   // перечитувало всі шість ключів і заново розгортало повтори на 3 роки,
   // хоча підписка нижче вже тримала стан актуальним.
-  const gcalRef = useRef<{ load: () => void } | null>(null);
+  const gcalRef = useRef<{ syncOnOpen: () => void } | null>(null);
   const focusedRef = useRef(false);
   const firstLoadDone = useRef(false);
   const dirtyKeys = useRef(new Set<string>());
@@ -173,7 +184,8 @@ export default function CalendarScreen() {
       Promise.all(keys.map(k => reloadKey(k)))
         .catch(e => { if (__DEV__) console.warn('[calendar] перечитування не вдалося:', e); });
     }
-    gcalRef.current?.load();
+    // Google Calendar: статус + тихий синк на кожному відкритті екрана.
+    gcalRef.current?.syncOnOpen();
     return () => { focusedRef.current = false; };
   }, [reloadKey]));
 
@@ -209,9 +221,17 @@ export default function CalendarScreen() {
     });
   }, [meetingsRevision, initialized]);
 
-  const gcal = useGoogleCalendar(mutateMeetings);
+  const gcal = useGoogleCalendarSync();
   gcalRef.current = gcal;
   const [showGcalSheet, setShowGcalSheet] = useState(false);
+  // Повернення з Google посиланням (app/integrations/google.tsx → ?gcal=…).
+  useEffect(() => { if (params.gcal) setShowGcalSheet(true); }, [params.gcal]);
+  const gcalTrash = useMemo(() => meetings.filter(isTrashedMeeting), [meetings]);
+  const restoreLocalMeeting = useCallback((m: Meeting) => {
+    mutateMeetings(list => list.map(x => (x.id === m.id ? restoredMeeting(x) : x)));
+  }, [mutateMeetings]);
+  const gcalConn = gcal.status?.connection ?? null;
+  const gcalAttention = !!gcalConn && (gcalConn.conflicts > 0 || gcalConn.needs_setup || gcalConn.state === 'attention' || gcalConn.error_code === 'reauth_required');
 
   // ─── Вид і фільтри ────────────────────────────────────────────────────────
   const initialView = (['month', 'week', 'day'] as const).find(v => v === params.view);
@@ -330,6 +350,7 @@ export default function CalendarScreen() {
   const [formInitial, setFormInitial] = useState<MeetingFormData | null>(null);
   const [formPresetDate, setFormPresetDate] = useState<string | undefined>(undefined);
   const formProjectRole = useProjectRole(formInitial?.projectId);
+  const { clients } = useClients();
   const presetProjectId = filter && filter !== PERSONAL_FILTER ? filter : undefined;
 
   const openAddMeeting = useCallback((target: CreateTarget) => {
@@ -347,7 +368,7 @@ export default function CalendarScreen() {
   const openEdit = useCallback((m: Meeting) => {
     setFormInitial({ id: m.id, title: m.title, date: m.date, time: m.time, durationMinutes: m.durationMinutes,
       location: m.location, link: m.link, notes: m.notes, color: m.color, recurrence: m.recurrence,
-      projectId: m.projectId });
+      projectId: m.projectId, clientId: m.clientId });
     setFormPresetDate(undefined);
     setShowForm(true);
   }, []);
@@ -357,16 +378,16 @@ export default function CalendarScreen() {
     if (data.id) {
       cancelMeetingNotification(data.id);
       const id = data.id;
-      mutateMeetings(list => list.map(m => m.id !== id ? m : withMeetingProject({
+      mutateMeetings(list => list.map(m => m.id !== id ? m : withClientId(withMeetingProject({
         ...m, title: data.title, date: data.date, time: data.time, durationMinutes: data.durationMinutes,
         location: data.location, link: data.link, notes: data.notes, color: data.color, recurrence: data.recurrence,
-      }, data.projectId)));
+      }, data.projectId), data.clientId)));
       savedId = data.id;
     } else {
       savedId = Date.now().toString();
-      const created = withMeetingProject<Meeting>({ id: savedId, title: data.title, date: data.date, time: data.time,
+      const created = withClientId(withMeetingProject<Meeting>({ id: savedId, title: data.title, date: data.date, time: data.time,
         durationMinutes: data.durationMinutes, location: data.location, link: data.link,
-        notes: data.notes, color: data.color, recurrence: data.recurrence }, data.projectId);
+        notes: data.notes, color: data.color, recurrence: data.recurrence }, data.projectId), data.clientId);
       mutateMeetings(list => [...list, created]);
     }
     if (!data.recurrence && data.time) scheduleMeetingNotification(savedId, data.title, data.date, data.time);
@@ -379,7 +400,13 @@ export default function CalendarScreen() {
       { text: tr.cancel, style: 'cancel' },
       { text: tr.delete, style: 'destructive', onPress: () => {
         cancelMeetingNotification(id);
-        mutateMeetings(fresh => fresh.filter(m => m.id !== id));
+        // Зустріч, пов'язана з Google, іде в кошик (м'яке видалення): сервер
+        // скасує подію в Google, а з кошика її можна відновити (аркуш Google).
+        const at = new Date().toISOString();
+        mutateMeetings(fresh => fresh.flatMap(m => {
+          if (m.id !== id) return [m];
+          return m.integration?.provider === 'google' ? [{ ...m, deletedAt: at, deletedSource: 'flowi' }] : [];
+        }));
       }},
     ]);
   }, [mutateMeetings, tr]);
@@ -574,6 +601,48 @@ export default function CalendarScreen() {
 
   const onMeetingRecord = useCallback((m: Meeting) => setRecordingMtgId(resolveOrig(m).id), [resolveOrig]);
 
+  // ─── «Перенести» і перетягування ─────────────────────────────────────────
+  // Обидва шляхи сходяться тут: перенос (екземпляр повтору — лише він,
+  // через виняток серії) + тост «Скасувати», що повертає ЛИШЕ розклад.
+  const { show: showUndo, element: undoElement, visible: undoVisible } = useUndoToast(false);
+  const [rescheduleMtg, setRescheduleMtg] = useState<Meeting | null>(null);
+  const applyReschedule = useCallback((instance: Meeting, target: MeetingSlot) => {
+    if (instance.projectId && roles[instance.projectId] === 'viewer') return;
+    const origId = instance._origId ?? instance.id;
+    const single = !instance._origId;
+    const box: { snap: MeetingScheduleSnapshot | null } = { snap: null };
+    setRescheduleMtg(null);
+    mutateMeetings(list => {
+      const orig = list.find(m => m.id === origId);
+      box.snap = orig ? scheduleSnapshot(orig) : null;
+      return rescheduleMeeting(list, instance, target);
+    });
+    // Нагадування є лише в звичайної зустрічі (повтори їх не мають).
+    const title = instance.title;
+    if (single) {
+      cancelMeetingNotification(origId);
+      if (target.time) scheduleMeetingNotification(origId, title, target.date, target.time);
+    }
+    showUndo(tr.mtgRescheduledTo.replace('{when}', slotLabel(target, locale)), () => {
+      const snap = box.snap;
+      if (!snap) return;
+      mutateMeetings(list => restoreMeetingSchedule(list, snap));
+      if (single) {
+        cancelMeetingNotification(origId);
+        if (snap.time) scheduleMeetingNotification(origId, title, snap.date, snap.time);
+      }
+    });
+  }, [mutateMeetings, showUndo, tr, locale, roles]);
+  // Глядач проєкту зустріч не міняє (сервер відхилив би правку).
+  const canRescheduleMeeting = useCallback((m: Meeting) => !m.projectId || roles[m.projectId] !== 'viewer', [roles]);
+  const onMeetingReschedule = useCallback((m: Meeting) => {
+    if (canRescheduleMeeting(m)) setRescheduleMtg(m);
+  }, [canRescheduleMeeting]);
+  const applyRescheduleFromSheet = useCallback((m: Meeting, target: MeetingSlot) => {
+    applyReschedule(m, target);
+    setAnchor(target.date);
+  }, [applyReschedule]);
+
   // ─── Зони планшета (Layout System v2.4) ──────────────────────────────────
   // Телефон: isWide=false → статичної зони й панелі немає, усе як раніше.
   // Чи стоїть зона поруч, вирішують типові ширини (zoneWidths) — так само,
@@ -624,6 +693,7 @@ export default function CalendarScreen() {
       onMeetingPress={onMeetingPress}
       onMeetingDelete={readOnly ? undefined : onMeetingDelete}
       onMeetingRecord={readOnly ? undefined : onMeetingRecord}
+      onMeetingReschedule={readOnly ? undefined : onMeetingReschedule}
       onSprintPress={openSprint}
     />
   );
@@ -741,6 +811,8 @@ export default function CalendarScreen() {
           onTaskPress={openTask}
           onSlotPress={onSlotPress}
           onSprintPress={openSprint}
+          onMeetingDrop={applyReschedule}
+          canDragMeeting={canRescheduleMeeting}
           c={c}
           tr={tr}
         />
@@ -786,9 +858,12 @@ export default function CalendarScreen() {
             <HeaderButton
               onPress={() => setShowGcalSheet(true)}
               accessibilityLabel="Google Calendar">
-              {gcal.importing
+              {gcal.syncing || gcal.busy === 'sync'
                 ? <ActivityIndicator size="small" color={dsTokens(isDark).status.success} />
-                : <IconSymbol name={gcal.token ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={18} color={gcal.token ? dsTokens(isDark).status.success : c.text} />}
+                : <IconSymbol
+                    name={gcalAttention ? 'exclamationmark.triangle.fill' : gcalConn ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'}
+                    size={18}
+                    color={gcalAttention ? dsTokens(isDark).status.warning : gcalConn ? dsTokens(isDark).status.success : c.text} />}
             </HeaderButton>
           </>
         }
@@ -816,7 +891,8 @@ export default function CalendarScreen() {
     </SafeAreaView>
   );
 
-  const fabButton = !searchOpen ? (
+  // Тост «Скасувати» стоїть там само, де FAB, — поки він видно, FAB ховаємо.
+  const fabButton = !searchOpen && !undoVisible ? (
     <TouchableOpacity
       onPress={() => openCreate({ day: anchor })}
       activeOpacity={0.85}
@@ -855,6 +931,9 @@ export default function CalendarScreen() {
       playingUri={playingUri}
       // Аркуш (телефон / вузький iPad) закриваємо перед відкриттям нотатки, панель — ні.
       onBeforeOpenNote={detailIsPanel ? undefined : () => setSelectedKey(null)}
+      onReschedule={selectedMtg && canRescheduleMeeting(selectedMtg)
+        ? () => { const inst = selectedMtg; openOverDetail(() => setRescheduleMtg(inst)); }
+        : undefined}
       colors={c}
       tr={tr}
       locale={locale}
@@ -956,6 +1035,7 @@ export default function CalendarScreen() {
         projects={projects as readonly CalendarProject[]}
         currentUserId={myUserId}
         isProjectOwner={formProjectRole === 'owner'}
+        clients={clients}
       />
 
       <CalendarTaskCreate
@@ -973,7 +1053,8 @@ export default function CalendarScreen() {
         c={c}
       />
 
-      <GoogleCalendarSheet visible={showGcalSheet} onClose={() => setShowGcalSheet(false)} gcal={gcal} isDark={isDark} c={c} />
+      <GoogleCalendarSheet visible={showGcalSheet} onClose={() => { setShowGcalSheet(false); gcal.clearMessages(); }} gcal={gcal} isDark={isDark} c={c}
+        trash={gcalTrash} onRestoreLocal={restoreLocalMeeting} />
 
       <RecordingModal
         visible={!!recordingMtgId}
@@ -986,7 +1067,20 @@ export default function CalendarScreen() {
         c={c}
       />
 
+      <RescheduleSheet
+        meeting={rescheduleMtg}
+        onClose={() => setRescheduleMtg(null)}
+        onApply={applyRescheduleFromSheet}
+        isDark={isDark}
+        wide={isWide}
+        lang={lang}
+        c={c}
+        tr={tr}
+        markedDays={markedDays}
+      />
+
       {projectTaskSheet}
+      {undoElement}
     </View>
   );
 }

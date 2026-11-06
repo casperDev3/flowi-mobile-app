@@ -6,18 +6,28 @@
  * години 00–24 з нарадами, що стоять за часом і тривалістю; наради, що
  * перекриваються, діляться шириною колонки.
  *
- * Тап по порожній годині — створити запис на цей день і час. Перетягування
- * на мобільному немає навмисно (рішення власника): воно лише на вебі.
+ * Тап по порожній годині — створити запис на цей день і час.
+ *
+ * Перетягування (рішення власника 11.2026, коли передано onMeetingDrop):
+ * довге натискання на нараду «піднімає» її (вібро, прокрутка сітки
+ * замикається), далі тягнемо — по вертикалі з прив'язкою до 30 хв, по
+ * горизонталі між днями тижня; кожен новий крок — легкий тік. Відпустили —
+ * onMeetingDrop з новою датою й часом (екран переносить і показує
+ * «Скасувати»). Для екземпляра повтору екран переносить лише його.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+
+import { haptic } from '@/utils/haptics';
+import { dropTarget, formatTimeMinutes, SLOT_MINUTES, type MeetingSlot } from '@/utils/meetingReschedule';
 
 import type { Translations } from '@/store/translations';
 import type { Meeting } from '@/utils/meetings';
 import type { Task } from '@/utils/taskUtils';
 
 import {
-  keyToDate, layoutDayMeetings, layoutSprintRow, type CalendarTaskItem, type SprintBar,
+  keyToDate, layoutDayMeetings, layoutSprintRow, meetingStartMinutes, type CalendarTaskItem, type SprintBar,
 } from './calendarModel';
 import { pct } from './MonthGrid';
 import type { CalendarColors } from './palette';
@@ -40,6 +50,10 @@ export interface TimeGridProps {
   onTaskPress: (task: Task) => void;
   onSlotPress: (day: string, hour: number) => void;
   onSprintPress?: (bar: SprintBar) => void;
+  /** Перетягування нарад довгим натисканням; не передано — без перетягування. */
+  onMeetingDrop?: (m: Meeting, target: MeetingSlot) => void;
+  /** Чи можна тягнути саме цю нараду (глядач проєкту — ні). Не передано — усі. */
+  canDragMeeting?: (m: Meeting) => boolean;
   c: CalendarColors;
   tr: Translations;
   hourHeight?: number;
@@ -80,9 +94,14 @@ function hourLabel(h: number): string {
 
 export function TimeGrid({
   days, todayKey, selectedKey, tasksByDay, meetingsByDay, sprintBars, selectedMeetingKey,
-  onSelectDay, onMeetingPress, onTaskPress, onSlotPress, onSprintPress, c, tr, hourHeight = 52,
+  onSelectDay, onMeetingPress, onTaskPress, onSlotPress, onSprintPress, onMeetingDrop, canDragMeeting, c, tr, hourHeight = 52,
 }: TimeGridProps) {
   const single = days.length === 1;
+  // Колонка, у якій зараз «піднята» нарада: прокрутка замкнена, а колонка
+  // стоїть поверх сусідніх (інакше блок, перетягнутий праворуч, ховався б
+  // під наступним днем).
+  const [dragCol, setDragCol] = useState<number | null>(null);
+  const [colWidth, setColWidth] = useState(0);
   const scrollRef = useRef<ScrollView | null>(null);
   const [now, setNow] = useState(() => new Date());
 
@@ -231,6 +250,7 @@ export function TimeGrid({
         contentOffset={{ x: 0, y: initialHour * hourHeight }}
         onLayout={e => { viewportHeight.current = e.nativeEvent.layout.height; tryInitialScroll(); }}
         onContentSizeChange={(_w, h) => { contentHeight.current = h; tryInitialScroll(); }}
+        scrollEnabled={dragCol === null}
         showsVerticalScrollIndicator={false}>
         {/* marginTop: підпис години стоїть на 6pt ВИЩЕ своєї лінії, і на
             стартовій прокрутці перша видима година (10:00) ховалась
@@ -244,7 +264,10 @@ export function TimeGrid({
           {days.map((day, colIdx) => {
             const positioned = layoutDayMeetings(meetingsByDay[day] ?? []);
             return (
-              <View key={day} style={{ flex: 1, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: c.grid }}>
+              <View
+                key={day}
+                onLayout={colIdx === 0 ? e => setColWidth(e.nativeEvent.layout.width) : undefined}
+                style={{ flex: 1, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: c.grid, zIndex: dragCol === colIdx ? 10 : 0 }}>
                 {Array.from({ length: 24 }, (_, h) => (
                   <TouchableOpacity
                     key={h}
@@ -259,14 +282,16 @@ export function TimeGrid({
                   const height = Math.max(20, ((p.endMin - p.startMin) / 60) * hourHeight - 2);
                   const m = p.meeting;
                   const sel = m.id === selectedMeetingKey;
-                  return (
+                  const draggable = !!onMeetingDrop && (!canDragMeeting || canDragMeeting(m));
+                  const block = (
                     <TouchableOpacity
                       key={m.id}
                       onPress={() => onMeetingPress(m)}
                       accessibilityRole="button"
                       accessibilityState={{ selected: sel }}
                       accessibilityLabel={`${m.time || ''} ${m.title}`.trim()}
-                      style={[st.event, {
+                      accessibilityHint={draggable ? tr.calDragHint : undefined}
+                      style={draggable ? st.fill : [st.event, {
                         top, height,
                         left: pct((p.col / p.cols) * 100),
                         width: pct((1 / p.cols) * 100),
@@ -287,6 +312,24 @@ export function TimeGrid({
                       </View>
                     </TouchableOpacity>
                   );
+                  if (!draggable || !onMeetingDrop) return block;
+                  return (
+                    <DraggableMeeting
+                      key={m.id}
+                      meeting={m}
+                      day={day}
+                      colIdx={colIdx}
+                      dayCount={days.length}
+                      colWidth={colWidth}
+                      hourHeight={hourHeight}
+                      frame={{ top, height, left: pct((p.col / p.cols) * 100), width: pct((1 / p.cols) * 100) }}
+                      color={m.color}
+                      textColor={c.text}
+                      onDragChange={setDragCol}
+                      onDrop={onMeetingDrop}>
+                      {block}
+                    </DraggableMeeting>
+                  );
                 })}
                 {colIdx === todayIndex ? (
                   <View pointerEvents="none" style={[st.nowLine, { top: (nowMinutes / 60) * hourHeight }]}>
@@ -299,6 +342,117 @@ export function TimeGrid({
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+/** Скільки тримати палець, щоб «підняти» нараду. */
+const LIFT_MS = 350;
+
+interface DraggableMeetingProps {
+  meeting: Meeting;
+  day: string;
+  colIdx: number;
+  dayCount: number;
+  colWidth: number;
+  hourHeight: number;
+  frame: { top: number; height: number; left: `${number}%`; width: `${number}%` };
+  color: string;
+  textColor: string;
+  onDragChange: (col: number | null) => void;
+  onDrop: (m: Meeting, target: MeetingSlot) => void;
+  children: React.ReactNode;
+}
+
+/**
+ * Блок наради, який можна перетягнути. Тап лишається на TouchableOpacity
+ * всередині (onPress деталі): щойно жест «підняв» блок, RNGH скасовує
+ * JS-дотик, тож відпускання після перетягування не відкриває деталь.
+ * Стан зсуву міняється лише на новому кроці (30 хв / день), не щокадру.
+ */
+function DraggableMeeting({
+  meeting, day, colIdx, dayCount, colWidth, hourHeight, frame, color, textColor, onDragChange, onDrop, children,
+}: DraggableMeetingProps) {
+  const [offset, setOffset] = useState<{ days: number; minutes: number } | null>(null);
+  const offsetRef = useRef<{ days: number; minutes: number } | null>(null);
+  const latest = useRef({ meeting, day, colIdx, dayCount, colWidth, hourHeight, onDragChange, onDrop });
+  latest.current = { meeting, day, colIdx, dayCount, colWidth, hourHeight, onDragChange, onDrop };
+
+  const lift = () => {
+    if (offsetRef.current) return;
+    offsetRef.current = { days: 0, minutes: 0 };
+    setOffset(offsetRef.current);
+    latest.current.onDragChange(latest.current.colIdx);
+    haptic.medium();
+  };
+  const drop = () => {
+    if (!offsetRef.current) return;
+    const o = offsetRef.current;
+    offsetRef.current = null;
+    setOffset(null);
+    latest.current.onDragChange(null);
+    if (o.days === 0 && o.minutes === 0) return;
+    const { meeting: m, day: d, onDrop: done } = latest.current;
+    haptic.success();
+    done(m, dropTarget({ date: d, time: m.time ?? '' }, o.days, o.minutes));
+  };
+
+  const hold = Gesture.LongPress()
+    .runOnJS(true)
+    .minDuration(LIFT_MS)
+    // Після «підйому» палець їде далеко — довге натискання не мусить через це зірватись.
+    .maxDistance(100_000)
+    .onStart(lift)
+    .onFinalize(() => { if (offsetRef.current && offsetRef.current.days === 0 && offsetRef.current.minutes === 0) drop(); });
+
+  const pan = Gesture.Pan()
+    .runOnJS(true)
+    .withTestId(`meeting-drag-${meeting.id}`)
+    .activateAfterLongPress(LIFT_MS)
+    .onStart(lift)
+    .onUpdate(e => {
+      if (!offsetRef.current) return;
+      const L = latest.current;
+      const start = meetingStartMinutes(L.meeting);
+      const half = L.hourHeight * (SLOT_MINUTES / 60);
+      const rawMin = Math.round(e.translationY / half) * SLOT_MINUTES;
+      const minutes = Math.max(-start, Math.min(24 * 60 - SLOT_MINUTES - start, rawMin));
+      const rawDays = L.colWidth > 0 ? Math.round(e.translationX / L.colWidth) : 0;
+      const days = Math.max(-L.colIdx, Math.min(L.dayCount - 1 - L.colIdx, rawDays));
+      const prev = offsetRef.current;
+      if (prev.days !== days || prev.minutes !== minutes) {
+        offsetRef.current = { days, minutes };
+        setOffset(offsetRef.current);
+        haptic.selection();
+      }
+    })
+    .onFinalize(drop);
+
+  const lifted = offset !== null;
+  const start = meetingStartMinutes(meeting);
+  return (
+    <GestureDetector gesture={Gesture.Simultaneous(hold, pan)}>
+      <View
+        style={[st.event, {
+          top: frame.top, height: frame.height, left: frame.left, width: frame.width,
+          zIndex: lifted ? 20 : 1,
+          opacity: lifted ? 0.92 : 1,
+          transform: lifted ? [
+            { translateX: offset.days * colWidth },
+            { translateY: (offset.minutes / 60) * hourHeight },
+            { scale: 1.03 },
+          ] : [],
+        }]}>
+        {children}
+        {lifted ? (
+          <View pointerEvents="none" style={[st.dragBadge, { backgroundColor: color }]}>
+            <Text style={{ color: '#fff', fontSize: 10, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
+              {formatTimeMinutes(start + offset.minutes)}
+            </Text>
+          </View>
+        ) : null}
+        {lifted ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: 8, borderWidth: 1.5, borderColor: textColor }]} /> : null}
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -318,6 +472,8 @@ const st = StyleSheet.create({
   taskChip: { height: 20, justifyContent: 'center', borderRadius: 6, paddingHorizontal: 4 },
   hourLabel: { position: 'absolute', right: 6, fontSize: 10, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
   event: { position: 'absolute', paddingHorizontal: 1, paddingVertical: 1 },
+  fill: { flex: 1 },
+  dragBadge: { position: 'absolute', top: -20, left: 2, paddingHorizontal: 6, height: 18, borderRadius: 9, justifyContent: 'center' },
   // «Зараз» — тонкий coral-тік (DS: accent.coral для індикаторів).
   nowLine: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: theme.light.accent.coral },
   nowDot: { position: 'absolute', left: -4, top: -3, width: 8, height: 8, borderRadius: 4, backgroundColor: theme.light.accent.coral },

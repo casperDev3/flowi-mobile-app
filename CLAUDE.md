@@ -262,6 +262,7 @@ constants/
 | `'active_timers'` | `ActiveTimer[]` | Таймери, що йдуть просто зараз (id `task:<id>` для задач) |
 | `'sprints'` | `Sprint[]` | Спринти проєкту (`sprint.projectId`) |
 | `'subscriptions'` | `Subscription[]` | Регулярні платежі (опційний `projectId` — бюджет проєкту) |
+| `'clients'` | `Client[]` | Клієнти (CRM, `utils/clients.ts`): id `cl-<uuid4>`, контакти/реквізити/статус; лише власнику. Звʼязки: `project.clientId` (відʼєднання = явний `null`), `clientId` на зустрічі/нотатці БЕЗ проєкту та на операції; екрани `app/clients.tsx`, `app/client/[id].tsx` |
 | `'timer_dial_prefs'` | `{version,defaultDial,timers}` | Вибір циферблата таймерів — **синхронізується** як singleton |
 
 ### Workspace / проєкти / команда (контракт `WORKSPACE_PROJECTS_CONTRACT.md` §9.1)

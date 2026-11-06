@@ -64,7 +64,7 @@ const ALL_KEYS = [
 // місця й речі). `media_assets` (метадані фото без байтів) і
 // `training_sessions` (розгортає сервер із програми групи) у файл свідомо не
 // йдуть — див. NOT_IN_JSON_EXPORT у __tests__/backup-keys.test.ts.
-const EXPORT_ONLY_KEYS = ['recurring_incomes', 'container_places', 'container_items'] as const;
+const EXPORT_ONLY_KEYS = ['recurring_incomes', 'container_places', 'container_items', 'clients'] as const;
 
 // export key maps storage key → JSON key (snake_case → camelCase where needed)
 const EXPORT_KEY_MAP: Record<string, string> = {
@@ -78,6 +78,7 @@ const EXPORT_KEY_MAP: Record<string, string> = {
   health_vaccines: 'healthVaccines', health_habits: 'healthHabits',
   subscriptions: 'subscriptions',
   recurring_incomes: 'recurringIncomes', container_places: 'containerPlaces', container_items: 'containerItems',
+  clients: 'clients',
 };
 const IMPORT_KEY_MAP: Record<string, string> = {
   tasks: 'tasks', taskStatuses: 'task_statuses', transactions: 'transactions', accounts: 'accounts', timeEntries: 'time_entries',
@@ -90,6 +91,7 @@ const IMPORT_KEY_MAP: Record<string, string> = {
   healthVaccines: 'health_vaccines', healthHabits: 'health_habits',
   subscriptions: 'subscriptions',
   recurringIncomes: 'recurring_incomes', containerPlaces: 'container_places', containerItems: 'container_items',
+  clients: 'clients',
   // categories is an object — handled separately
   categories: 'categories',
 };

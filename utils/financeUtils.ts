@@ -61,6 +61,12 @@ export interface Transaction {
    * сервері (§3.4 «бюджетна фільтрація»), тут поле лише розмічає запис.
    */
   projectId?: string;
+  /**
+   * Клієнт (utils/clients.ts). Зберігається і в особистому потоці, і в потоці
+   * проєкту (бюджетні колекції — owner-only). Операція проєкту без власного
+   * clientId належить клієнту проєкту (transactionClientId).
+   */
+  clientId?: string;
 }
 
 /** Append chronologically; detail screens may reverse a copy for newest-first UI. */

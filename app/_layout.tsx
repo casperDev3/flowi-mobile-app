@@ -430,6 +430,8 @@ function RootLayoutContent() {
           <Stack.Screen name="account" options={{ headerShown: false }} />
           <Stack.Screen name="devices" options={{ headerShown: false }} />
           <Stack.Screen name="projects" options={{ headerShown: false }} />
+          <Stack.Screen name="clients" options={{ headerShown: false }} />
+          <Stack.Screen name="client/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="notes" options={{ headerShown: false }} />
           <Stack.Screen name="archive" options={{ headerShown: false }} />
           <Stack.Screen name="feedback" options={{ headerShown: false }} />
@@ -469,6 +471,7 @@ function RootLayoutContent() {
           <Stack.Screen name="notifications" options={{ headerShown: false }} />
           <Stack.Screen name="integrations" options={{ headerShown: false }} />
           <Stack.Screen name="integrations/settings" options={{ headerShown: false }} />
+          <Stack.Screen name="integrations/google" options={{ headerShown: false, animation: 'none' }} />
           <Stack.Screen name="settings-notifications" options={{ headerShown: false }} />
           <Stack.Screen name="settings-modules" options={{ headerShown: false }} />
           <Stack.Screen name="training" options={{ headerShown: false }} />

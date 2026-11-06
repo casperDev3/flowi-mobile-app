@@ -49,7 +49,7 @@ import type { Translations } from '@/store/translations';
  * як є).
  */
 export type ModuleId =
-  | 'tasks' | 'projects' | 'meetings' | 'time' | 'notes' | 'integrations'
+  | 'tasks' | 'projects' | 'clients' | 'meetings' | 'time' | 'notes' | 'integrations'
   | 'finance' | 'budget' | 'subscriptions' | 'banks' | 'health'
   | 'health_summary' | 'health_profile' | 'prevention' | 'workouts' | 'training'
   | "menu"
@@ -137,6 +137,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { route: '/(tabs)/today',   icon: 'house.fill',   labelKey: 'tabToday' },
       { route: '/(tabs)',         icon: 'checklist',    labelKey: 'tabTasks',     module: 'tasks' },
       { route: '/projects',       icon: 'folder',       labelKey: 'projects',     module: 'projects' },
+      // Клієнти — окремий розділ поруч із Проєктами (не вкладка в них).
+      { route: '/clients',        icon: 'person.crop.rectangle.stack', labelKey: 'navClients', module: 'clients' },
       // «Наради» стали «Календарем»: зустрічі + дедлайни завдань + спринти.
       // Модуль лишився 'meetings' — це ключ ui_preferences, спільний із вебом;
       // старий /meetings редиректить сюди й теж підсвічує пункт.
@@ -493,6 +495,7 @@ export const TAB_ROUTE_MODULES: Readonly<Record<string, ModuleId>> = Object.free
  */
 export const STACK_ROUTE_MODULES: Readonly<Record<string, ModuleId>> = Object.freeze({
   '/projects': 'projects',
+  '/clients': 'clients',
   '/integrations': 'integrations',
   '/calendar': 'meetings',
   '/meetings': 'meetings',
@@ -515,6 +518,7 @@ export const STACK_ROUTE_MODULES: Readonly<Record<string, ModuleId>> = Object.fr
 /** Префікси Stack-маршрутів: простір проєкту і сторінки хаба «Здоров'я». */
 const STACK_PREFIX_MODULES: readonly (readonly [string, ModuleId])[] = [
   ['/project/', 'projects'],
+  ['/client/', 'clients'],
   ['/integrations/', 'integrations'],
   ['/health-', 'health'],
 ];

@@ -175,7 +175,8 @@ describe('buildTaskListView + findTaskListGroup', () => {
     const past = new Date(2026, 8, 1, 12).toISOString();
     const later = new Date(2026, 9, 20, 12).toISOString();
     const tasks = [task({ id: 'o1', deadline: past }), task({ id: 'a1', deadline: later })];
-    const view = buildTaskListView(tasks, BASE, COLUMNS, TODAY, LABELS, 'uk-UA');
+    // `now` — той самий TODAY: інакше «пізніше» з часом саме стає простроченим.
+    const view = buildTaskListView(tasks, BASE, COLUMNS, TODAY, LABELS, 'uk-UA', true, TODAY);
     expect(view.overdue.map(t => t.id)).toEqual(['o1']);
     const overdue = findTaskListGroup(view, OVERDUE_GROUP_KEY, LABELS)!;
     expect(overdue.label).toBe('Прострочені');

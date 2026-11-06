@@ -29,13 +29,15 @@ export function meetingDurationLabel(minutes: number, units: DurationUnits): str
 }
 
 export const MeetingCard = React.memo(function MeetingCard({
-  mtg, onPress, onDelete, onRecord, isDark, c, isRecurring = false, selected = false, tracking = false, project = null,
-  deleteLabel, recordLabel,
+  mtg, onPress, onDelete, onRecord, onReschedule, isDark, c, isRecurring = false, selected = false, tracking = false, project = null,
+  deleteLabel, recordLabel, rescheduleLabel,
 }: {
   mtg: Meeting;
   onPress: (m: Meeting) => void;
   onDelete?: (m: Meeting) => void;
   onRecord?: (m: Meeting) => void;
+  /** «Перенести» без форми (RescheduleSheet). Не передано — кнопки немає. */
+  onReschedule?: (m: Meeting) => void;
   isDark: boolean;
   c: CalendarColors;
   isRecurring?: boolean;
@@ -46,6 +48,7 @@ export const MeetingCard = React.memo(function MeetingCard({
   project?: MeetingChipProject | null;
   deleteLabel: string;
   recordLabel: string;
+  rescheduleLabel?: string;
 }) {
   const { tr, lang } = useI18n();
   const dur = meetingDurationLabel(mtg.durationMinutes, { hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute });
@@ -106,6 +109,17 @@ export const MeetingCard = React.memo(function MeetingCard({
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={lang === 'en' ? 'Copy meeting details' : 'Копіювати інформацію про зустріч'} onPress={e => { e.stopPropagation(); void copyMeeting(mtg, lang === 'en'); }} style={[st.iconBtn, { backgroundColor: c.dim }]}>
             <IconSymbol name="doc.on.doc" size={16} color={c.sub} />
           </TouchableOpacity>
+          {onReschedule && (
+            <TouchableOpacity
+              testID="meeting-card-reschedule"
+              onPress={e => { e.stopPropagation(); onReschedule(mtg); }}
+              hitSlop={HIT}
+              accessibilityRole="button"
+              accessibilityLabel={rescheduleLabel ?? tr.mtgReschedule}
+              style={[st.iconBtn, { backgroundColor: c.dim }]}>
+              <IconSymbol name="calendar.badge.clock" size={14} color={c.sub} />
+            </TouchableOpacity>
+          )}
           {onRecord && (
             <TouchableOpacity
               onPress={e => { e.stopPropagation(); onRecord(mtg); }}

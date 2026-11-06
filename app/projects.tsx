@@ -95,6 +95,9 @@ import {
   isProjectAtRisk, keyProjectTasks, roleSummary, upcomingDeadlines,
 } from '@/components/projects/projectsZoneModel';
 import { useProjectZoneStrings } from '@/components/projects/projectZoneStrings';
+import { ClientChips } from '@/components/clients/ClientChips';
+import { useClients } from '@/hooks/use-clients';
+import { sanitizeClientId, withProjectClient } from '@/utils/clients';
 
 export interface Project {
   appearance?: import("@/utils/projectAppearance").ProjectAppearance;
@@ -125,6 +128,12 @@ export interface Project {
    */
   template?: ProjectTemplate;
   modules?: ProjectModules;
+  /**
+   * Клієнт проєкту (utils/clients.ts). Для спільного проєкту сервер тримає
+   * звʼязок окремо й віддає ключ лише власнику (завжди: рядок або null);
+   * відʼєднати — записати явний null, бо відсутній ключ = «лишити як є».
+   */
+  clientId?: string | null;
 }
 
 interface Task {
@@ -574,6 +583,9 @@ export default function ProjectsScreen() {
   const [showArchived, setShowArchived] = useState(false);
   const [deadline, setDeadline] = useState('');
   const [description, setDescription] = useState('');
+  /** Клієнт проєкту (utils/clients.ts) — лише власнику: клієнти особисті. */
+  const [clientId, setClientId] = useState<string | null>(null);
+  const { clients } = useClients();
 
   const loadAll = useCallback(async () => {
     const [p, t, columns, sp] = await Promise.all([
@@ -757,6 +769,7 @@ export default function ProjectsScreen() {
     setTemplate('simple');
     setDeadline('');
     setDescription('');
+    setClientId(null);
     setShowModal(true);
   }, []);
 
@@ -771,6 +784,7 @@ export default function ProjectsScreen() {
     setColor(p.color);
     setDeadline(isoToLocalDateInput(p.deadline));
     setDescription(p.description ?? '');
+    setClientId(sanitizeClientId(p.clientId) ?? null);
     setShowModal(true);
   }, [isProjectOwner]);
 
@@ -805,10 +819,13 @@ export default function ProjectsScreen() {
 
     if (editing) {
       const trimmed = name.trim();
-      void mutateProjects(prev => prev.map(p =>
-        p.id === editing.id
-          ? { ...p, name: trimmed, color, deadline: deadlineIso, description: descr }
-          : p));
+      void mutateProjects(prev => prev.map(p => {
+        if (p.id !== editing.id) return p;
+        const next = { ...p, name: trimmed, color, deadline: deadlineIso, description: descr };
+        // Клієнта пишемо лише коли його справді змінили: відʼєднання — явний
+        // null (utils/clients.ts withProjectClient).
+        return (sanitizeClientId(p.clientId) ?? null) === clientId ? next : withProjectClient(next, clientId);
+      }));
       closeModal();
     } else {
       // Контракт §0.5: нові проєкти — `p-<uuid4>`, а не легасі-формат
@@ -824,6 +841,7 @@ export default function ProjectsScreen() {
         description: descr,
         template,
         modules: MODULES_BY_TEMPLATE[template],
+        ...(clientId ? { clientId } : {}),
       };
       // ПОСЛІДОВНО, не паралельно (`void` кожного окремо) — review finding:
       // `getMyProjectIds()` (маршрутизація outbox, `store/project-sync.ts`)
@@ -1489,6 +1507,19 @@ export default function ProjectsScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+
+                {clients.length > 0 ? (
+                  <View style={{ marginTop: 16 }}>
+                    <ClientChips
+                      clients={clients}
+                      value={clientId}
+                      onChange={setClientId}
+                      isDark={isDark}
+                      hint={tr.clientsUi.projectClientHint}
+                      testID="project-form-client"
+                    />
+                  </View>
+                ) : null}
 
                 {/* Шаблон — лише при СТВОРЕННІ (план §3): «Робочий» вмикає
                     всі розділи простору проєкту, «Простий» — лише Огляд і

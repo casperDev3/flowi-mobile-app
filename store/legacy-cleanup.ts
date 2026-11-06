@@ -22,13 +22,23 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 import { notifyStorageChanged } from './storage';
 
 /** Ключ конфігу видаленого модуля «Агент»: хост, порт і токен LLM-шлюзу. */
 const REMOVED_AGENT_CONFIG_KEY = 'agent_config';
 
-const REMOVED_MODULE_KEYS = [REMOVED_AGENT_CONFIG_KEY] as const;
+/**
+ * Клієнтський PKCE-імпорт Google Calendar (components/calendar/useGoogleCalendar.ts)
+ * замінено серверним OAuth: Client ID, позначка синку і старі копії токенів
+ * в AsyncStorage більше нікому не потрібні. Refresh-токен Google — довгоживучий
+ * доступ до календаря, тож його стираємо й із SecureStore.
+ */
+const REMOVED_GCAL_CLIENT_KEYS = ['gcal_client_id', 'gcal_last_sync', 'gcal_access_token', 'gcal_refresh_token', 'gcal_token_expiry'] as const;
+const REMOVED_GCAL_SECURE_KEYS = ['gcal_access_token', 'gcal_refresh_token', 'gcal_token_expiry'] as const;
+
+const REMOVED_MODULE_KEYS = [REMOVED_AGENT_CONFIG_KEY, ...REMOVED_GCAL_CLIENT_KEYS] as const;
 
 /**
  * Стирає локальні ключі модулів, яких у застосунку більше немає.
@@ -45,5 +55,10 @@ export async function clearRemovedModuleStorage(): Promise<void> {
     for (const key of REMOVED_MODULE_KEYS) notifyStorageChanged(key);
   } catch (e) {
     if (__DEV__) console.warn('[legacy-cleanup] не вдалося прибрати ключі видалених модулів:', e);
+  }
+  try {
+    await Promise.all(REMOVED_GCAL_SECURE_KEYS.map(key => SecureStore.deleteItemAsync(key)));
+  } catch (e) {
+    if (__DEV__) console.warn('[legacy-cleanup] не вдалося прибрати старі токени Google:', e);
   }
 }

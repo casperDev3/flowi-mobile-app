@@ -155,6 +155,8 @@ export interface MeetingDetailBodyProps {
    * повʼязаної нотатки. На широкому (колонка) — не передавати.
    */
   onBeforeOpenNote?: () => void;
+  /** «Перенести» без форми (екземпляр повтору — лише він). Не передано — кнопки немає. */
+  onReschedule?: () => void;
   colors: MeetingDetailColors;
   tr: Translations;
   locale: string;
@@ -162,7 +164,7 @@ export interface MeetingDetailBodyProps {
 
 export function MeetingDetailBody({
   meeting, original, project, timer, onToggleTimer, onEdit, onRecord, onPlayRecording, onDeleteRecording, playingUri,
-  onBeforeOpenNote, colors: c, tr, locale,
+  onBeforeOpenNote, onReschedule, colors: c, tr, locale,
 }: MeetingDetailBodyProps) {
   const t = dsTokensForText(c.text);
   const ACCENT = accentFor(t === theme.dark);
@@ -345,6 +347,16 @@ export function MeetingDetailBody({
             style={[st.btn, { flex: 1, gap: 6, backgroundColor: t.action.primary }]}>
             <IconSymbol name="mic.fill" size={16} color={t.text.onAction} />
             <Text style={{ color: t.text.onAction, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.meetingRecord}</Text>
+          </TouchableOpacity>
+        ) : null}
+        {onReschedule ? (
+          <TouchableOpacity
+            testID="meeting-detail-reschedule"
+            onPress={onReschedule}
+            accessibilityRole="button"
+            style={[st.btn, { flex: 1, gap: 6, backgroundColor: t.surface.subtle }]}>
+            <IconSymbol name="calendar.badge.clock" size={16} color={t.action.secondaryText} />
+            <Text style={{ color: t.action.secondaryText, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.mtgReschedule}</Text>
           </TouchableOpacity>
         ) : null}
         <TouchableOpacity

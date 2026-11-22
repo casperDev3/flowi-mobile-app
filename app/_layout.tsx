@@ -49,7 +49,7 @@ import { getPendingRegistration, type PendingRegistration } from '@/store/regist
 import { clearPendingInvite, getPendingInvite } from '@/store/invite-link';
 import { getDeepLinkIntent } from '@/store/deep-link-intent';
 import { subscribeToStorage } from '@/store/storage';
-import { needsAppUpdate } from '@/store/api-config';
+import { canonicalCloudOrigin, needsAppUpdate } from '@/store/api-config';
 import { ThemeProvider } from '@/store/theme-context';
 import { TimerProvider } from '@/store/timer-context';
 import {
@@ -352,7 +352,8 @@ function PendingInviteAutoJoin() {
       const pending = await getPendingInvite();
       if (!pending) return;
       const config = cachedWorkspaceConfig();
-      if (!config || config.origin !== pending.ws) return; // /invite сам розбереться зі зміною workspace
+      // `canonicalCloudOrigin` — pending_invite, збережений старою збіркою з легасі-хостом (rc1).
+      if (!config || config.origin !== canonicalCloudOrigin(pending.ws)) return; // /invite сам розбереться зі зміною workspace
       if (!cameFromAuthFlowThisSession) {
         // Холодний старт уже автентифікованим (race з `/invite`, review
         // finding) — людина ще не бачила прев'ю й не тиснула «Приєднатися».

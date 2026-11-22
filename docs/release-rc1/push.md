@@ -40,7 +40,20 @@
 3. `addPushTokenListener` підключено в `setupPushInteractionHandlers`. Коли токен змінюється, клієнт робить POST з `previous_token`.
 4. Сервер N-1 відповідає 400 на `kind` (або 404, якщо модуля немає). Тоді клієнт реєструє Expo-токен, як до rc1. Будь-яка інша 400 (наприклад, `bundle_id`) фолбеку не запускає.
 5. Під час виходу викликається `unregisterPushToken` → DELETE. Якщо мережі немає, запит стає в чергу `push_pending_unregister` з origin.
-6. `getRegistrationPushToken` (заявка на реєстрацію до входу) і далі повертає **Expo**-токен, бо `registration_decision` шле `core/expo_push.py`, який у межі цієї задачі не входить. Без `extra.eas.projectId` токена не буде, і заявник дізнається про рішення через поллінг.
+6. `getRegistrationPushToken` (заявка на реєстрацію до входу) повертає **нативний** токен ОС (`getDevicePushTokenAsync`) разом із `kind` (`apns` на iOS, `fcm` на Android). EAS `projectId` для цього не потрібен. Без дозволу на сповіщення токена немає, і заявник дізнається про рішення через поллінг (кожні 65 с). Деталі в розділі «Пуш рішення про реєстрацію».
+
+## Пуш рішення про реєстрацію (заявник до входу)
+
+Спільний контракт сервера й мобільного (rc1). Назви полів збігаються з `accounts/views.py` і `core/expo_push.py::resolve_registration_push`:
+
+| Запит | Поля (усі опційні) |
+|---|---|
+| `POST /api/auth/register/` (створює заявку) | `push_kind` (`'fcm'` або `'apns'`), `push_token` (нативний токен), `push_platform` (`ios` або `android`) |
+| `POST /api/auth/register/status/` (поллінг) | ті самі поля. Сервер оновлює прив'язку, тільки якщо пара `(push_token, push_kind)` змінилась, тож клієнт шле їх при кожному поллінгу. Це покриває дозвіл, наданий уже після подання заявки, і зміну токена ОС |
+
+- Якщо є `push_kind` і нативний `push_token`, сервер шле `registration_decision` через FCM v1 або APNs.
+- Легасі-клієнти (до rc1) шлють Expo-токен у `push_token` без `push_kind` або в `expo_push_token`. Для них сервер і далі використовує Expo. Нативний токен через Expo сервер не шле ніколи.
+- Мобільний код: `store/push.ts::getRegistrationPushToken`, `store/auth.tsx::register`, `store/registration.ts::pollRegistrationStatus`. Тести: `__tests__/push-native.test.ts` (iOS/Android, без projectId, без дозволу), `__tests__/auth.test.ts` (тіло `register`), `__tests__/registration-push.test.ts` (тіло поллінгу).
 
 ## Що летить на пристрій
 
@@ -98,6 +111,6 @@
 
 ## Відомі обмеження
 
-- `registration_decision` (заявник до входу) і далі йде через Expo (`core/expo_push.py`, `accounts`).
+- `registration_decision` для заявника до входу йде нативно, якщо клієнт rc1 надіслав `push_kind`/`push_token`. Через Expo він іде лише для легасі-заявок (див. «Пуш рішення про реєстрацію»). На Android без `google-services.json` нативного токена немає, тож лишається тільки поллінг.
 - `core/workspace_views.py::_notifications_capabilities` перелічує канали явно, тому `push_native` у `GET /workspace/` не з'явиться. Мобільному клієнту він не потрібен, бо клієнт завжди пробує нативну реєстрацію. Сам канал видно в `preferences.available_channels`.
 - Один телефон зі старим (`com.casper3.*`, Expo) і новим застосунком одночасно отримає два пуші. Це два різні застосунки, і сервер не може їх зв'язати.

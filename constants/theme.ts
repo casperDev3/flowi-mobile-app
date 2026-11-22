@@ -132,12 +132,27 @@ export const darkScale = {
   elevated: '#232327',
   hover: '#2C2C31',
   border: '#34343A',
-  /** Межа полів вводу й контролів. */
+  /** Сильніша межа вкладених блоків і чипів (декоративна, не контрол). */
   borderStrong: '#45454C',
+  /**
+   * WCAG 1.4.11 (rc1): межа полів вводу й контролів форм. ТОЙ САМИЙ hex, що
+   * веб `--ds-control-border` (flowi-web-app/app/globals.css): ≥ 3:1 на canvas
+   * (4.28), card (3.86), elevated (3.48) і hover (#2C2C31 → 3.08).
+   * Таблиця — docs/release-rc1/dark-theme.md.
+   */
+  controlBorder: '#76767E',
   textPrimary: '#F2F2F3',
   textSecondary: '#B9B9BF',
   textMuted: '#93939B',
 } as const;
+
+/**
+ * Межа поля вводу / контролу форми для схеми: темна — 1 px {@link darkScale.controlBorder}
+ * (WCAG 1.4.11), світла — `null` (світлу тему не змінюємо, рішення власника).
+ */
+export function darkControlBorder(isDark: boolean): { borderWidth: number; borderColor: string } | null {
+  return isDark ? { borderWidth: 1, borderColor: darkScale.controlBorder } : null;
+}
 
 /** Кольори фінансів у ТЕМНІЙ темі (світла бере status.success / status.danger). */
 export const financeDark = {

@@ -26,7 +26,7 @@ import {
 import { OverlaySurface } from '@/components/ds/OverlaySurface';
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { fontFamily, radius } from '@/constants/theme';
+import { darkScale, fontFamily, radius } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useResponsive } from '@/hooks/use-responsive';
 
@@ -62,6 +62,8 @@ function useControlColors() {
     t, isDark, rt,
     idle: rt ? t.surface.subtle : g.surfaceSubtle,
     border: t.border.hairline,
+    /** Межа самих контролів (пілюлі, пошук): темна — ≥ 3:1 (WCAG 1.4.11, rc1), світла — як була. */
+    control: isDark ? darkScale.controlBorder : t.border.hairline,
   };
 }
 
@@ -138,7 +140,7 @@ export interface SegmentedProps<V extends string = string> {
 export function Segmented<V extends string = string>({
   label, value, options, onChange, semantics = 'radiogroup', stretch, iconOnly, style, testID,
 }: SegmentedProps<V>) {
-  const { t, idle, border } = useControlColors();
+  const { t, idle, control } = useControlColors();
   const reduceMotion = useReduceMotion();
   const [frames, setFrames] = useState<Record<string, { x: number; w: number }>>({});
   const thumbX = useRef(new Animated.Value(0)).current;
@@ -170,7 +172,7 @@ export function Segmented<V extends string = string>({
       accessibilityLabel={label}
       style={[st.track, stretch ? st.stretch : null, style]}>
       {/* Видима доріжка 36pt; сам рядок 44pt — це і є зона дотику (не hitSlop). */}
-      <View pointerEvents="none" style={[st.trackFill, { backgroundColor: idle, borderColor: border }]} />
+      <View pointerEvents="none" style={[st.trackFill, { backgroundColor: idle, borderColor: control }]} />
       {frame ? (
         <Animated.View
           pointerEvents="none"
@@ -280,7 +282,7 @@ export function FilterSelect<V extends string = string>(props: FilterSelectProps
     label, options, allLabel = 'Усі', placeholder, searchable, resetLabel = 'Скинути', hideLabel, icon,
     disabled, stretch, style, testID,
   } = props;
-  const { t, idle, border } = useControlColors();
+  const { t, idle, border, control } = useControlColors();
   const triggerRef = useRef<View>(null);
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<MenuAnchor | null>(null);
@@ -334,7 +336,7 @@ export function FilterSelect<V extends string = string>(props: FilterSelectProps
           disabled ? { opacity: 0.5 } : null,
           style,
         ]}>
-        <View style={[st.pill, { backgroundColor: idle, borderColor: active ? t.text.secondary : border }, stretch ? st.pillStretch : null]}>
+        <View style={[st.pill, { backgroundColor: idle, borderColor: active ? t.text.secondary : control }, stretch ? st.pillStretch : null]}>
           {renderIcon(icon, t.text.secondary)}
           <Text numberOfLines={1} maxFontSizeMultiplier={1.4} style={[st.pillText, stretch ? { flex: 1 } : { flexShrink: 1 }]}>
             {text.prefix && !hideLabel ? <Text style={{ color: t.text.secondary }}>{`${text.prefix}: `}</Text> : null}
@@ -463,10 +465,10 @@ export function FilterSearch({
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }) {
-  const { t, idle, border } = useControlColors();
+  const { t, idle, control } = useControlColors();
   return (
     <View style={[st.hit, st.search, style]}>
-      <View style={[st.pill, st.searchPill, { backgroundColor: idle, borderColor: border }]}>
+      <View style={[st.pill, st.searchPill, { backgroundColor: idle, borderColor: control }]}>
       <IconSymbol name="magnifyingglass" size={14} color={t.text.secondary} />
       <TextInput
         testID={testID}
@@ -525,7 +527,7 @@ export interface FilterBarProps {
 export function FilterBar({
   label, items, search, actions, overflowLabel = 'Фільтри', onReset, resetLabel = 'Скинути', style, testID,
 }: FilterBarProps) {
-  const { t, idle, border } = useControlColors();
+  const { t, idle, control } = useControlColors();
   const [available, setAvailable] = useState(0);
   const [widths, setWidths] = useState<Record<string, number>>({});
   const [overflowW, setOverflowW] = useState(0);
@@ -580,7 +582,7 @@ export function FilterBar({
           ))}
           <View style={st.itemSlot} onLayout={(e: LayoutChangeEvent) => setOverflowW(Math.ceil(e.nativeEvent.layout.width))}>
             <View style={st.hit}>
-              <View style={[st.pill, { borderColor: border }]}>
+              <View style={[st.pill, { borderColor: control }]}>
                 <IconSymbol name="line.3.horizontal.decrease" size={14} color={t.text.secondary} />
                 <Text style={st.pillText}>{overflowTriggerText(overflowLabel, 99)}</Text>
               </View>
@@ -599,7 +601,7 @@ export function FilterBar({
             accessibilityLabel={hiddenActive ? `${overflowLabel}, активних: ${hiddenActive}` : overflowLabel}
             accessibilityState={{ expanded: open }}
             style={({ pressed }) => [st.hit, pressed ? { opacity: 0.7 } : null]}>
-            <View style={[st.pill, { backgroundColor: idle, borderColor: hiddenActive ? t.text.secondary : border }]}>
+            <View style={[st.pill, { backgroundColor: idle, borderColor: hiddenActive ? t.text.secondary : control }]}>
               <IconSymbol name="line.3.horizontal.decrease" size={14} color={t.text.secondary} />
               <Text numberOfLines={1} style={[st.pillText, { color: t.text.primary }]}>
                 {overflowTriggerText(overflowLabel, hiddenActive)}

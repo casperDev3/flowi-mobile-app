@@ -509,3 +509,40 @@ describe('refreshProfile — курсор синку вже рухався ци�
     expect(mockApiFetch).toHaveBeenCalledWith('/sync/user/v2/', expect.anything());
   });
 });
+
+// rc1, спільний контракт реєстраційного пушу: заявка несе НАТИВНИЙ токен.
+describe('register() — push_kind/push_token нативного токена (rc1)', () => {
+  const { getRegistrationPushToken: mockGetRegToken } =
+    jest.requireMock('@/store/push') as { getRegistrationPushToken: jest.Mock };
+
+  afterEach(() => {
+    mockGetRegToken.mockImplementation(async () => null);
+    mockApiFetch.mockImplementation(async () => ({}));
+  });
+
+  async function mountAndRegister() {
+    mockApiFetch.mockClear();
+    mockApiFetch.mockImplementation(async (path: string) => (path === '/auth/register/'
+      ? { status: 'pending', request_id: 'r-1', request_token: 'tok', detail: '' }
+      : {}));
+    await act(async () => {
+      TestRenderer.create(React.createElement(AuthProvider, null, React.createElement(Probe)));
+    });
+    await act(async () => { await authApi.register('a@b.test', 'secret123'); });
+    const call = mockApiFetch.mock.calls.find(([path]) => path === '/auth/register/');
+    return (call?.[1] as { body: Record<string, string> }).body;
+  }
+
+  it('є нативний токен — тіло має push_kind, push_token, push_platform', async () => {
+    mockGetRegToken.mockImplementation(async () => ({ kind: 'apns', token: 'ab12', platform: 'ios' }));
+    const body = await mountAndRegister();
+    expect(body).toMatchObject({ push_kind: 'apns', push_token: 'ab12', push_platform: 'ios' });
+    expect(body).not.toHaveProperty('expo_push_token');
+  });
+
+  it('токена нема (дозволу не давали) — push-полів у тілі нема', async () => {
+    const body = await mountAndRegister();
+    expect(body).not.toHaveProperty('push_kind');
+    expect(body).not.toHaveProperty('push_token');
+  });
+});

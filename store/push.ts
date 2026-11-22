@@ -41,7 +41,7 @@ import {
 import { notificationRoute, type PushLinkData } from '@/utils/pushLink';
 
 import { apiFetch } from './api';
-import { CLIENT_VERSION, getApiBase } from './api-config';
+import { canonicalCloudOrigin, CLIENT_VERSION, getApiBase } from './api-config';
 import { loadData, saveData } from './storage';
 import { cachedWorkspaceConfig } from './workspace';
 
@@ -222,6 +222,13 @@ async function loadPendingUnregister(): Promise<PendingUnregisterEntry[]> {
   return raw.map(entry => typeof entry === 'string' ? { token: entry, origin: getApiBase() } : entry);
 }
 
+/** `{origin}/api` з легасі-хостом Flowi Cloud, переведеним на новий. */
+function canonicalApiBase(apiBase: string): string {
+  const base = String(apiBase || '').replace(/\/+$/, '');
+  if (!/\/api$/i.test(base)) return base;
+  return `${canonicalCloudOrigin(base.replace(/\/api$/i, ''))}/api`;
+}
+
 /**
  * Дожимає `DELETE /push/tokens/`, що впав при попередньому виході (офлайн) —
  * викликається з `registerPushToken`, бо той запускається на холодному
@@ -243,10 +250,12 @@ async function loadPendingUnregister(): Promise<PendingUnregisterEntry[]> {
 async function flushPendingUnregister(skipToken?: string): Promise<void> {
   const pending = await loadPendingUnregister();
   if (!pending.length) return;
-  const activeOrigin = getApiBase();
+  const activeOrigin = canonicalApiBase(getApiBase());
   const remaining: PendingUnregisterEntry[] = [];
   for (const entry of pending) {
-    if (entry.token === skipToken || entry.origin !== activeOrigin) {
+    // rc1: запис, поставлений у чергу на легасі-хості Flowi Cloud, належить
+    // тому самому серверу — порівнюємо канонічні адреси.
+    if (entry.token === skipToken || canonicalApiBase(entry.origin) !== activeOrigin) {
       remaining.push(entry);
       continue;
     }
@@ -467,16 +476,30 @@ export async function ensurePushTokenRegistered(): Promise<void> {
   }
 }
 
+/** Токен заявника для `POST /auth/register/` (контракт §2.4, rc1). */
+export interface RegistrationPushToken {
+  kind: 'fcm' | 'apns';
+  token: string;
+  platform: 'ios' | 'android';
+}
+
 /**
- * Токен для необов'язкових `push_token`/`push_platform` у тілі
+ * Токен для необов'язкових `push_kind`/`push_token`/`push_platform` у тілі
  * `POST /auth/register/` (контракт §2.4) — заявник у режимі «за
  * погодженням» ще не автентифікований, тож звичайний `registerPushToken`
- * (потребує auth-запит `/push/tokens/`) тут не підходить: сервер сам
+ * (потребує auth-запит `/notifications/devices/`) тут не підходить: сервер сам
  * прив'яже токен до `RegistrationRequest` і надішле `registration_decision`
  * напряму, без окремого виклику після approve.
+ *
+ * rc1 (docs/release-rc1/push.md): НАТИВНИЙ токен ОС (`getDevicePushTokenAsync`
+ * — APNs на iOS, FCM на Android) + `kind`, без EAS projectId. Сервер rc1 шле
+ * рішення через FCM v1/APNs; Expo-токен у `push_token` без `push_kind` — це
+ * легасі-форма клієнтів до rc1, і сервер трактує її як Expo.
  */
-export async function getRegistrationPushToken(): Promise<{ token: string; platform: 'ios' | 'android' } | null> {
-  return getLocalPushToken();
+export async function getRegistrationPushToken(): Promise<RegistrationPushToken | null> {
+  const native = await getNativePushToken();
+  if (!native || native.kind === 'expo') return null;
+  return { kind: native.kind, token: native.token, platform: native.platform };
 }
 
 /**

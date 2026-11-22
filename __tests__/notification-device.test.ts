@@ -24,6 +24,7 @@ jest.mock('@/store/storage', () => ({
 
 let mockClientVersion = '1.2.0';
 jest.mock('@/store/api-config', () => ({
+  canonicalCloudOrigin: (o: string) => o.replace(/\/+$/, '').replace(/^https:\/\/api\.flowi\.casperdev\.site$/i, 'https://api.flowi.com.ua'),
   getApiBase: jest.fn(() => 'https://a.example.com/api'),
   get CLIENT_VERSION() { return mockClientVersion; },
 }));

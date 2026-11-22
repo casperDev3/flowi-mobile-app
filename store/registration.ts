@@ -9,6 +9,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 import { apiFetch } from './api';
+import { getRegistrationPushToken } from './push';
 import { loadData, saveData } from './storage';
 
 const PENDING_KEY = 'pending_registration';
@@ -58,9 +59,23 @@ export async function pollRegistrationStatus(requestId: string): Promise<Registr
   if (!token) {
     throw new Error('registration_token_missing');
   }
+  // rc1 (контракт реєстраційного пушу): дозвіл на нотифікації могли дати вже
+  // ПІСЛЯ подання заявки, або ОС змінила токен — сервер оновлює прив'язку
+  // лише коли пара (token, kind) змінилась, тож слати щоразу безпечно.
+  const body: Record<string, string> = { request_id: requestId, request_token: token };
+  try {
+    const push = await getRegistrationPushToken();
+    if (push) {
+      body.push_kind = push.kind;
+      body.push_token = push.token;
+      body.push_platform = push.platform;
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('[registration] push-токен не прочитався:', e);
+  }
   return apiFetch<RegistrationStatusResult>('/auth/register/status/', {
     method: 'POST',
-    body: { request_id: requestId, request_token: token },
+    body,
     auth: false,
     allowOffline: true,
   });

@@ -185,6 +185,16 @@
 
 **Нова сторінка кабінету = рядок у `lib/__fixtures__/deeplinks.json` + копія фікстури в мобільний + рядок у `WEB_TO_MOBILE_ROUTES`.** Інакше впаде тест у вебі або в мобільному.
 
+### Легасі-хост у мобільному (rc1-polish)
+
+`api.flowi.casperdev.site` — той самий прод-сервер, що й `api.flowi.com.ua`. `store/api-config.ts::canonicalCloudOrigin` і `LEGACY_CLOUD_ORIGINS` тепер підключені:
+
+- `store/workspace.ts::normalizeWorkspaceOrigin` канонізує origin, тому всі порівняння «той самий workspace?» (`app/invite.tsx`, меню- й тренувальні інвайти, екран адреси, `switchWorkspace`) бачать старе посилання з `ws=https://api.flowi.casperdev.site` як поточний простір. Перемикання й виходу немає.
+- `store/invite-link.ts` канонізує `ws`, а `PendingInviteAutoJoin` (`app/_layout.tsx`) канонізує `pending_invite`, збережений старою збіркою.
+- `loadWorkspaceConfig` на старті переписує збережений `workspace_config` зі старим origin (`origin`, `apiBase`, `wsBase`) на новий хост. `workspaceId`, токени в SecureStore, `data_owner` і локальні дані лишаються як були (`migrateLegacyWorkspaceConfig`).
+- `store/push.ts`: черга `push_pending_unregister`, записана на старому хості, порівнюється за канонічною адресою.
+- Тести: `__tests__/workspace.test.ts` («легасі-адреса Flowi Cloud»).
+
 ## 7. Відкриті питання
 
 - **Веб, legacy origin у pending-запрошеннях.** `lib/pending-invite.ts::getPendingInviteFor` і `lib/workspace.ts::isSameWorkspaceOrigin` не канонізують `api.flowi.casperdev.site` → `api.flowi.com.ua` (це не мої файли). Посилання N-1-клієнта на новому вебі запропонує «інший workspace».

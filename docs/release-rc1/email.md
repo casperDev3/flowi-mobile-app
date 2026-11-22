@@ -6,6 +6,8 @@
 (`EMAIL_NO_AUTH`), міграція `core/0031_invite_delivery_status`.
 Шаблони: `flowi-server-app/ops/postfix/`. Тести: `core/test_rc1_invite_email.py`.
 
+> **Стан на rc1 (2026-11-22): пошта opt-in і поки вимкнена.** Поки `EMAIL_HOST` не задано, сервер листів не шле: запрошення отримують `delivery_status=skipped`. Postfix і DNS нижче — план на потім, а не крок релізу. Мобільний застосунок у «Учасники → Очікують» для `skipped` показує «Лист не надсилався, поділіться посиланням». Для `failed` він показує «Лист не доставлено» і кнопку «Надіслати ще раз» (`POST …/invites/{id}/resend/`; `429 resend_too_soon` → «Спробуйте за хвилину», `429 resend_limit` → «Скасуйте й створіть нове»). Код: `store/project-team.ts::inviteDeliveryNotice`/`resendThrottleReason`, `app/project/[id]/members.tsx`, тест `__tests__/project-members-delivery.test.tsx`.
+
 ## 1. Схема
 
 ```
@@ -21,10 +23,10 @@ Django (flowi-api, venv на VPS) ──SMTP:25 plain, loopback──▶ Postfix
   `EMAIL_HOST=host.docker.internal` + явний `EMAIL_NO_AUTH=True`).
 - Старий прямий SMTP (EMAIL_HOST=smtp.gmail.com + EMAIL_USER) і далі працює,
   якщо env заданий: порт 587 → TLS за замовчуванням.
-- **Увага:** без `EMAIL_HOST` у env сервер тепер СПРОБУЄ слати на
-  localhost:25 (раніше пошта мовчки вимикалась). Postfix ставити ДО деплою
-  rc1, інакше запрошення матимуть `delivery_status=failed` (видно адмінам,
-  можна надіслати ще раз після налаштування).
+- Без `EMAIL_HOST` у env пошта вимкнена (opt-in): листи не шлються, запрошення
+  отримують `delivery_status=skipped`. Ділитися треба посиланням. Щоб увімкнути
+  пошту, задайте `EMAIL_HOST` (для Postfix `localhost` / `host.docker.internal`)
+  і пройдіть §2–§5.
 
 ## 2. Налаштування VPS (власник)
 

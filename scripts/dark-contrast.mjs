@@ -23,7 +23,7 @@ const BEFORE = {
 const AFTER = {
   surfaces: { canvas: '#0E0E10', card: '#1A1A1D', elevated: '#232327', hover: '#2C2C31' },
   text: { primary: '#F2F2F3', secondary: '#B9B9BF', muted: '#93939B' },
-  borders: { hairline: '#34343A', strong: '#45454C' },
+  borders: { hairline: '#34343A', strong: '#45454C', control: '#6D6D6D' },
   finance: { income: '#0ECB81', expense: '#F6465D', 'expense-ink': '#FF6B7D' },
 };
 

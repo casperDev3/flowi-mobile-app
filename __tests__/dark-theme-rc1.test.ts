@@ -2,7 +2,7 @@
  * RC1 (2026-11-22): темна тема — нейтрально-сіра, суцільні поверхні, AA-текст.
  * Протокол і таблиці контрасту — docs/release-rc1/dark-theme.md.
  */
-import { darkScale, finColors, financeDark, glass, overlay, theme } from '@/constants/theme';
+import { darkControlBorder, darkScale, finColors, financeDark, glass, overlay, theme } from '@/constants/theme';
 
 function lum(hex: string): number {
   const h = hex.replace('#', '');
@@ -72,5 +72,24 @@ describe('темна тема RC1', () => {
     expect(finColors(false)).toEqual({ income: theme.light.status.success, expense: theme.light.status.danger, expenseInk: theme.light.status.danger });
     expect(finColors(true).income).toBe('#0ECB81');
     expect(finColors(true).expense).toBe('#F6465D');
+  });
+});
+
+// WCAG 1.4.11 (rc1): межа полів вводу / контролів форм у темній темі.
+describe('темна межа контролів (WCAG 1.4.11)', () => {
+  test('controlBorder ≥ 3:1 на card і elevated', () => {
+    expect(contrast(darkScale.controlBorder, darkScale.card)).toBeGreaterThanOrEqual(3);
+    expect(contrast(darkScale.controlBorder, darkScale.elevated)).toBeGreaterThanOrEqual(3);
+  });
+
+  test('проходить і на hover; паритет із вебом (#76767E)', () => {
+    expect(contrast(darkScale.controlBorder, darkScale.canvas ?? '#0E0E10')).toBeGreaterThanOrEqual(3);
+    expect(contrast(darkScale.controlBorder, '#2C2C31')).toBeGreaterThanOrEqual(3);
+    expect(darkScale.controlBorder).toBe('#76767E');
+  });
+
+  test('darkControlBorder: темна — 1 px controlBorder, світла — без змін (null)', () => {
+    expect(darkControlBorder(true)).toEqual({ borderWidth: 1, borderColor: darkScale.controlBorder });
+    expect(darkControlBorder(false)).toBeNull();
   });
 });

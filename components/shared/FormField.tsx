@@ -1,6 +1,6 @@
 import React from "react";
 import { Text, TextInput, View, type TextInputProps } from "react-native";
-import { radius, type } from "@/constants/theme";
+import { darkScale, radius, type } from "@/constants/theme";
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { glassOf } from '@/components/shared/dsTheme';
 import { useAnnounce } from '@/hooks/use-announce';
@@ -11,7 +11,7 @@ export function FormField({
   error,
   ...props
 }: TextInputProps & { label: string; required?: boolean; error?: string }) {
-  const { t } = useDSTheme();
+  const { t, isDark } = useDSTheme();
   // WCAG 4.1.3: role="alert" у RN сам не озвучує — оголошуємо явно.
   useAnnounce(error ? `${label}: ${error}` : '');
   return (
@@ -28,8 +28,9 @@ export function FormField({
         style={[
           {
             minHeight: 44,
-            borderWidth: error ? 2 : 0,
-            borderColor: error ? t.status.danger : "transparent",
+            // Темна (rc1, WCAG 1.4.11): межа поля ≥ 3:1; світла — без рамки, як була.
+            borderWidth: error ? 2 : isDark ? 1 : 0,
+            borderColor: error ? t.status.danger : isDark ? darkScale.controlBorder : "transparent",
             borderRadius: radius.control,
             backgroundColor: glassOf(t).surfaceSubtle,
             paddingHorizontal: 16,

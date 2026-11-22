@@ -132,6 +132,8 @@ export const ds = {
     return {
       // Скло — ViewStyle; для поля вводу ті самі поля сумісні з TextStyle.
       ...(ds.glass(isDark, 'subtle') as TextStyle),
+      // WCAG 1.4.11 (rc1): у темній межа поля ≥ 3:1 до card/elevated.
+      ...(isDark ? { borderColor: darkScale.controlBorder } : null),
       borderRadius: radius.control,
       minHeight: touchTarget,
       paddingHorizontal: space[4],

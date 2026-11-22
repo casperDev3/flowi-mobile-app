@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <color name="flowi_widget_bg">#14121E</color>
-  <color name="flowi_widget_text">#F5F3FF</color>
-  <color name="flowi_widget_text_secondary">#A1A1AA</color>
+  <!-- RC1 темна шкала (constants/theme.ts darkScale): canvas / textPrimary / textSecondary.
+       Акцент і трек кільця — без змін. Світлі значення (values/) не чіпаємо. -->
+  <color name="flowi_widget_bg">#0E0E10</color>
+  <color name="flowi_widget_text">#F2F2F3</color>
+  <color name="flowi_widget_text_secondary">#B9B9BF</color>
   <color name="flowi_widget_accent">#A78BFA</color>
   <color name="flowi_widget_ring_track">#1FFFFFFF</color>
 </resources>

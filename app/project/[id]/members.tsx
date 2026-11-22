@@ -39,9 +39,11 @@ import {
   fetchProjectMembers,
   getCachedMembers,
   inviteByEmail,
+  inviteDeliveryNotice,
   loadProjectInvites,
   removeProjectMember,
   resendProjectInvite,
+  resendThrottleReason,
   revokeProjectInvite,
   setMembersCacheFor,
   transferProjectOwnership,
@@ -411,8 +413,11 @@ export default function ProjectMembersScreen() {
       Alert.alert(tr.projectMembersInviteResent, describeEmailResult(invite.email ?? '', result).join('\n'));
     } catch (e) {
       haptic.error();
-      if (e instanceof ApiError && e.status === 429) {
-        Alert.alert(tr.projectMembersInviteResend, tr.projectMembersInviteResendTooSoon);
+      const throttle = resendThrottleReason(e);
+      if (throttle) {
+        // Сервер: `resend_too_soon` (кулдаун 60 с, Retry-After) чи `resend_limit`
+        // (вичерпано листи одного запрошення — лише скасувати й створити нове).
+        Alert.alert(tr.projectMembersInviteResend, throttle === 'limit' ? tr.projectMembersInviteResendLimit : tr.projectMembersInviteResendTooSoon);
       } else if (e instanceof ApiError && e.status === 409) {
         // Людина вже відповіла чи стала учасником — оновити обидва списки.
         Alert.alert(tr.projectMembersInviteResend, e.code === 'already_member' ? tr.projectMembersEmailAlreadyMember : tr.projectMembersInviteNotPending);
@@ -788,6 +793,7 @@ export default function ProjectMembersScreen() {
                 </Text>
                 {pendingInvites.map(invite => {
                   const busy = busyInviteId === invite.id;
+                  const delivery = inviteDeliveryNotice(invite);
                   const sentAt = invite.last_sent_at ?? invite.created_at;
                   const status = invite.expired
                     ? tr.projectMembersInviteExpiredShort
@@ -804,6 +810,26 @@ export default function ProjectMembersScreen() {
                         </Text>
                         {!invite.account_exists ? (
                           <Text numberOfLines={2} style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.projectMembersInviteNoAccountShort}</Text>
+                        ) : null}
+                        {delivery === 'failed' ? (
+                          <>
+                            <Text numberOfLines={2} style={{ color: tk.status.danger, fontSize: 11, marginTop: 2 }}>
+                              {tr.projectMembersInviteDeliveryFailed}
+                            </Text>
+                            {!busy ? (
+                              <TouchableOpacity
+                                onPress={() => { void handleResend(invite); }}
+                                accessibilityRole="button"
+                                accessibilityLabel={`${tr.projectMembersInviteResend}: ${invite.email ?? ''}`}
+                                style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' }}>
+                                <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, textDecorationLine: 'underline' }}>
+                                  {tr.projectMembersInviteResend}
+                                </Text>
+                              </TouchableOpacity>
+                            ) : null}
+                          </>
+                        ) : delivery === 'skipped' ? (
+                          <Text numberOfLines={2} style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.projectMembersInviteDeliverySkipped}</Text>
                         ) : null}
                       </View>
                       {busy ? <ActivityIndicator size="small" color={c.sub} style={{ width: 44 }} /> : (

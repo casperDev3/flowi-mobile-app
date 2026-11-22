@@ -156,6 +156,11 @@ const GROUP_BY_OPTIONS: { key: ProjectListGroupBy }[] = [
   { key: 'none' }, { key: 'status' }, { key: 'priority' }, { key: 'sprint' },
 ];
 
+/** Дія доступності картки дошки: зміна статусу без жесту тягнення (WCAG 2.5.7). */
+function BOARD_A11Y_ACTIONS(label: string): { name: string; label: string }[] {
+  return [{ name: 'changeStatus', label }];
+}
+
 export default function ProjectTasksScreen() {
   const {
     id: routeProjectId, open: openParam, tab: tabParam, create: createParam, deadline: deadlineParam, sprintId: sprintParam,
@@ -1003,6 +1008,10 @@ export default function ProjectTasksScreen() {
                 onPress={openTask}
                 onToggle={toggleTask}
                 onLongPress={canEdit ? openColumnPicker : undefined}
+                // WCAG 2.5.7 / 2.1.1: дошка без drag-n-drop; зміна колонки —
+                // довгий тап (вибір статусу) і та сама дія для VoiceOver/TalkBack.
+                rowAccessibilityActions={canEdit ? BOARD_A11Y_ACTIONS(tr.projectBoardChangeStatusA11y) : undefined}
+                onRowAccessibilityAction={canEdit ? e => { if (e.nativeEvent.actionName === 'changeStatus') openColumnPicker(task); } : undefined}
                 c={c}
                 isDark={isDark}
                 projects={projectForBadge}
@@ -1180,6 +1189,7 @@ export default function ProjectTasksScreen() {
                         <TextInput
                           placeholder={tr.dateInputFormatHint}
                           placeholderTextColor={t.text.muted}
+                          accessibilityLabel={`${tr.cardStartDate}: ${task.title}`}
                           value={editingDates.start}
                           onChangeText={v => setEditingDates(prev => (prev ? { ...prev, start: v } : prev))}
                           style={[st.dateInput, { color: c.text, backgroundColor: t.surface.card }]}
@@ -1187,6 +1197,7 @@ export default function ProjectTasksScreen() {
                         <TextInput
                           placeholder={tr.dateInputFormatHint}
                           placeholderTextColor={t.text.muted}
+                          accessibilityLabel={`${tr.deadline}: ${task.title}`}
                           value={editingDates.deadline}
                           onChangeText={v => setEditingDates(prev => (prev ? { ...prev, deadline: v } : prev))}
                           style={[st.dateInput, { color: c.text, backgroundColor: t.surface.card }]}

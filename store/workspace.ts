@@ -12,6 +12,7 @@
  */
 
 import {
+  canonicalCloudOrigin,
   CLIENT_PLATFORM,
   CLIENT_VERSION,
   DEFAULT_WORKSPACE_ORIGIN,
@@ -134,9 +135,15 @@ export function normalizeWorkspaceOrigin(
     return { ok: false, code: 'insecure_url' };
   }
 
-  const origin = `${url.protocol}//${url.host}${url.pathname}`
+  const raw = `${url.protocol}//${url.host}${url.pathname}`
     .replace(/\/+$/, '')
     .replace(/\/api$/i, '');
+  // rc1: стара адреса Flowi Cloud (api.flowi.casperdev.site) — той самий
+  // прод-сервер. Канонізуємо ТУТ, бо саме цим порівнюють «той самий
+  // workspace?» інвайти (app/invite.tsx, menu-invite, тренування), екран
+  // адреси (`isRealChange`) і switchWorkspace — інакше старе посилання
+  // пропонувало б «інший сервер» з виходом.
+  const origin = canonicalCloudOrigin(raw);
   return schemeAssumed ? { ok: true, origin, schemeAssumed: true } : { ok: true, origin };
 }
 
@@ -259,9 +266,48 @@ export function cachedWorkspaceConfig(): WorkspaceConfig | null {
   return getCachedWorkspace();
 }
 
+/** Замінює origin на початку URL (http(s)/ws(s) — та сама схема-пара). */
+function rebaseUrl(value: string, from: string, to: string): string {
+  const toWs = (o: string) => o.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
+  for (const [a, b] of [[from, to], [toWs(from), toWs(to)]] as const) {
+    if (value.toLowerCase().startsWith(a.toLowerCase())) return b + value.slice(a.length);
+  }
+  return value;
+}
+
+/**
+ * rc1: `workspace_config`, збережений старою збіркою на легасі-хості Flowi
+ * Cloud, переводимо на нову адресу. Це той самий сервер і той самий
+ * workspace (`workspaceId` лишається), тож це НЕ зміна workspace: токени в
+ * SecureStore, `data_owner` і локальні дані не чіпаються. `null` — міграція
+ * не потрібна.
+ */
+export function migrateLegacyWorkspaceConfig(config: WorkspaceConfig | null): WorkspaceConfig | null {
+  if (!config?.origin) return null;
+  const from = config.origin.replace(/\/+$/, '');
+  const to = canonicalCloudOrigin(from);
+  if (to === from) return null;
+  return {
+    ...config,
+    origin: to,
+    apiBase: `${to}/api`,
+    wsBase: config.wsBase ? rebaseUrl(config.wsBase, from, to) : config.wsBase,
+  };
+}
+
 export async function loadWorkspaceConfig(): Promise<WorkspaceConfig | null> {
   if (_loaded) return getCachedWorkspace();
-  const stored = await loadData<WorkspaceConfig | null>(CONFIG_KEY, null);
+  let stored = await loadData<WorkspaceConfig | null>(CONFIG_KEY, null);
+  const migrated = migrateLegacyWorkspaceConfig(stored);
+  if (migrated) {
+    stored = migrated;
+    try {
+      await saveData(CONFIG_KEY, migrated);
+    } catch (e) {
+      // Не записалось — у пам'яті вже нова адреса; наступний старт повторить.
+      if (__DEV__) console.warn('[workspace] міграція легасі-адреси не збереглась:', e);
+    }
+  }
   setCachedWorkspace(stored);
   _loaded = true;
   return stored;

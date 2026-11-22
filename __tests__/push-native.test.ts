@@ -28,6 +28,7 @@ jest.mock('@/store/storage', () => ({
 }));
 
 jest.mock('@/store/api-config', () => ({
+  canonicalCloudOrigin: (o: string) => o.replace(/\/+$/, '').replace(/^https:\/\/api\.flowi\.casperdev\.site$/i, 'https://api.flowi.com.ua'),
   getApiBase: jest.fn(() => 'https://api.flowi.com.ua/api'),
   CLIENT_VERSION: '1.4.0',
 }));
@@ -75,6 +76,7 @@ jest.mock('expo-constants', () => ({
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 
 import {
+  getRegistrationPushToken,
   nativeTokenFrom,
   registerPushToken,
   setupPushInteractionHandlers,
@@ -203,5 +205,40 @@ describe('оновлення токена і вихід', () => {
     const deletes = mockApiFetch.mock.calls.filter(([, opts]) => opts?.method === 'DELETE');
     expect(deletes.map(([path, opts]) => [path, opts?.body?.token])).toEqual([['/notifications/devices/', APNS]]);
     expect(read(REGISTERED_KEY, null)).toBeNull();
+  });
+});
+
+describe('getRegistrationPushToken — нативний токен для заявки (rc1)', () => {
+  const Notifications = jest.requireMock('expo-notifications') as {
+    getExpoPushTokenAsync: jest.Mock; getPermissionsAsync: jest.Mock;
+  };
+  const Constants = (jest.requireMock('expo-constants') as { default: { expoConfig: { extra: unknown } } }).default;
+
+  it('iOS → {kind:apns, token, platform:ios}; Expo-токен не запитується', async () => {
+    Notifications.getExpoPushTokenAsync.mockClear();
+    mockDeviceToken = { type: 'ios', data: 'beef' };
+    await expect(getRegistrationPushToken()).resolves.toEqual({ kind: 'apns', token: 'beef', platform: 'ios' });
+    expect(Notifications.getExpoPushTokenAsync).not.toHaveBeenCalled();
+  });
+
+  it('Android → {kind:fcm}', async () => {
+    mockDeviceToken = { type: 'android', data: 'fcm-1' };
+    await expect(getRegistrationPushToken()).resolves.toEqual({ kind: 'fcm', token: 'fcm-1', platform: 'android' });
+  });
+
+  it('не потребує EAS projectId', async () => {
+    const extra = Constants.expoConfig.extra;
+    Constants.expoConfig.extra = {};
+    try {
+      mockDeviceToken = { type: 'ios', data: 'c0de' };
+      await expect(getRegistrationPushToken()).resolves.toMatchObject({ kind: 'apns', token: 'c0de' });
+    } finally {
+      Constants.expoConfig.extra = extra;
+    }
+  });
+
+  it('без дозволу — null', async () => {
+    Notifications.getPermissionsAsync.mockImplementationOnce(async () => ({ status: 'denied' }));
+    await expect(getRegistrationPushToken()).resolves.toBeNull();
   });
 });

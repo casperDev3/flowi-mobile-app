@@ -1,4 +1,4 @@
-import { fontFamily, radius } from '@/constants/theme';
+import { darkControlBorder, darkScale, fontFamily, radius } from '@/constants/theme';
 /**
  * components/shared/PickerField.tsx — поле вибору одного зі списку.
  *
@@ -218,7 +218,7 @@ export function PickerField({
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${selected?.label ?? emptyOption?.label ?? ''}`}
-        style={[st.trigger, { backgroundColor: glassOf(t).surfaceSubtle, borderColor: open ? t.focus.ring : 'transparent' }]}>
+        style={[st.trigger, { backgroundColor: glassOf(t).surfaceSubtle, borderColor: open ? t.focus.ring : isDark ? darkScale.controlBorder : 'transparent' }]}>
         {selected?.icon
           ? <IconSymbol name={selected.icon} size={16} color={selected.color ?? c.sub} />
           : selected?.color ? <View style={[st.dot, { backgroundColor: selected.color }]} /> : null}
@@ -270,7 +270,7 @@ export function PickerField({
               value={query}
               onChangeText={setQuery}
               autoCorrect={false}
-              style={[st.search, { color: c.text, backgroundColor: glassOf(t).surfaceSubtle }]}
+              style={[st.search, { color: c.text, backgroundColor: glassOf(t).surfaceSubtle }, darkControlBorder(isDark)]}
             />
           )}
 

@@ -34,6 +34,8 @@ export interface MemberOut {
 export type InviteKind = 'link' | 'email';
 export type EmailInviteStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
 
+export type InviteDeliveryStatus = 'unknown' | 'skipped' | 'sent' | 'failed';
+
 export interface InviteOut {
   id: string;
   /** Сервер до decision 7 поля не віддавав — відсутнє = 'link'. */
@@ -57,6 +59,14 @@ export interface InviteOut {
   last_sent_at?: string | null;
   email_sent?: boolean;
   responded_at?: string | null;
+  /**
+   * rc1 (docs/release-rc1/email.md): доставка листа останнього надсилання.
+   * `skipped` — пошту на сервері не налаштовано (лист не пробували), `failed`
+   * — SMTP відмовив (`delivery_error`), `sent` — прийнято. Сервер до rc1 не віддає.
+   */
+  delivery_status?: InviteDeliveryStatus;
+  delivery_error?: string;
+  delivery_attempted_at?: string | null;
   /** Лише в списку `pending` GET /invites/. */
   expired?: boolean;
 }
@@ -255,6 +265,26 @@ export interface ResendInviteResult {
   notified: boolean;
   email_sent: boolean;
   email_configured: boolean;
+  /** rc1 — статус доставки щойно надісланого листа. */
+  delivery_status?: InviteDeliveryStatus;
+}
+
+/**
+ * Рядок стану доставки для «Очікують» (rc1): `failed` → «Надіслати ще раз»
+ * як явна дія, `skipped` → поділитися посиланням. `null` — нічого показувати.
+ */
+export function inviteDeliveryNotice(invite: Pick<InviteOut, 'kind' | 'delivery_status' | 'expired'>): 'failed' | 'skipped' | null {
+  if (invite.kind && invite.kind !== 'email') return null;
+  if (invite.delivery_status === 'failed') return 'failed';
+  if (invite.delivery_status === 'skipped') return 'skipped';
+  return null;
+}
+
+/** Причина 429 від resend: кулдаун (60 с) чи вичерпаний ліміт листів одного запрошення. */
+export function resendThrottleReason(error: unknown): 'too_soon' | 'limit' | null {
+  const err = error as { status?: unknown; code?: unknown } | null;
+  if (err?.status !== 429) return null;
+  return err.code === 'resend_limit' ? 'limit' : 'too_soon';
 }
 
 /** POST /projects/{id}/invites/{inviteId}/resend/ — нове сповіщення щоразу (кулдаун 60 с → 429). */

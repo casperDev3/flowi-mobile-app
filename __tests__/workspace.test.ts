@@ -23,6 +23,8 @@ import {
   checkWorkspaceCompatibility,
   clearWorkspaceConfig,
   compareSemver,
+  loadWorkspaceConfig,
+  migrateLegacyWorkspaceConfig,
   normalizeWorkspaceOrigin,
   refreshWorkspaceCompatibility,
   getWorkspaceIncompatibility,
@@ -53,17 +55,17 @@ function makeInfo(overrides: Partial<WorkspaceInfo> = {}): WorkspaceInfo {
 
 describe('normalizeWorkspaceOrigin', () => {
   it('додає https:// без схеми і зізнається, що схему домислив', () => {
-    expect(normalizeWorkspaceOrigin('api.flowi.casperdev.site')).toEqual({
+    expect(normalizeWorkspaceOrigin('api.example.com')).toEqual({
       ok: true,
-      origin: 'https://api.flowi.casperdev.site',
+      origin: 'https://api.example.com',
       schemeAssumed: true,
     });
   });
 
   it('схему, написану руками, не позначає домисленою', () => {
-    expect(normalizeWorkspaceOrigin('https://api.flowi.casperdev.site')).toEqual({
+    expect(normalizeWorkspaceOrigin('https://api.example.com')).toEqual({
       ok: true,
-      origin: 'https://api.flowi.casperdev.site',
+      origin: 'https://api.example.com',
     });
   });
 
@@ -107,9 +109,9 @@ describe('normalizeWorkspaceOrigin', () => {
   });
 
   it('прибирає кінцевий слеш і /api', () => {
-    expect(normalizeWorkspaceOrigin('https://api.flowi.casperdev.site/api/')).toEqual({
+    expect(normalizeWorkspaceOrigin('https://api.example.com/api/')).toEqual({
       ok: true,
-      origin: 'https://api.flowi.casperdev.site',
+      origin: 'https://api.example.com',
     });
   });
 
@@ -343,5 +345,49 @@ describe('checkWorkspace — чому саме не вийшло', () => {
     const r = await checkWorkspace('127.0.0.1:8000');
     expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('http://127.0.0.1:8000/api/workspace/');
     expect(r.ok).toBe(true);
+  });
+});
+
+// rc1: api.flowi.casperdev.site — легасі-аліас ТОГО САМОГО прод-сервера.
+describe('легасі-адреса Flowi Cloud (rc1)', () => {
+  it('normalizeWorkspaceOrigin канонізує стару адресу в нову (зі схемою, без, з /api)', () => {
+    expect(normalizeWorkspaceOrigin('https://api.flowi.casperdev.site')).toEqual({ ok: true, origin: 'https://api.flowi.com.ua' });
+    expect(normalizeWorkspaceOrigin('api.flowi.casperdev.site/api/')).toEqual({ ok: true, origin: 'https://api.flowi.com.ua', schemeAssumed: true });
+    expect(normalizeWorkspaceOrigin('HTTPS://API.FLOWI.CASPERDEV.SITE')).toEqual({ ok: true, origin: 'https://api.flowi.com.ua' });
+    // Інші адреси не чіпаємо.
+    expect(normalizeWorkspaceOrigin('https://flowi.casperdev.site')).toEqual({ ok: true, origin: 'https://flowi.casperdev.site' });
+  });
+
+  it('migrateLegacyWorkspaceConfig: origin/apiBase/wsBase → новий хост, решта (workspaceId) без змін', () => {
+    const legacy = buildWorkspaceConfig('https://api.flowi.casperdev.site', makeInfo());
+    const migrated = migrateLegacyWorkspaceConfig(legacy);
+    expect(migrated).toEqual({
+      ...legacy,
+      origin: 'https://api.flowi.com.ua',
+      apiBase: 'https://api.flowi.com.ua/api',
+      wsBase: 'wss://api.flowi.com.ua/ws',
+    });
+    expect(migrateLegacyWorkspaceConfig(buildWorkspaceConfig('https://api.flowi.com.ua', makeInfo()))).toBeNull();
+    expect(migrateLegacyWorkspaceConfig(buildWorkspaceConfig('https://self.example.com', makeInfo({ ws_url: 'wss://self.example.com/ws' })))).toBeNull();
+    expect(migrateLegacyWorkspaceConfig(null)).toBeNull();
+  });
+
+  it('loadWorkspaceConfig на старті переписує збережений легасі-конфіг і зберігає його', async () => {
+    let load!: typeof loadWorkspaceConfig;
+    let apiConfig!: typeof import('@/store/api-config');
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      load = require('@/store/workspace').loadWorkspaceConfig;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      apiConfig = require('@/store/api-config');
+    });
+    mockStore.set('workspace_config', buildWorkspaceConfig('https://api.flowi.casperdev.site', makeInfo()));
+    const config = await load();
+    expect(config?.origin).toBe('https://api.flowi.com.ua');
+    expect(config?.workspaceId).toBe('ws-1');
+    expect((mockStore.get('workspace_config') as { apiBase: string }).apiBase).toBe('https://api.flowi.com.ua/api');
+    expect(apiConfig.getApiBase()).toBe('https://api.flowi.com.ua/api');
+    expect(apiConfig.getWsBase()).toBe('wss://api.flowi.com.ua/ws');
+    mockStore.delete('workspace_config');
   });
 });

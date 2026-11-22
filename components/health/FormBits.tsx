@@ -5,7 +5,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { fontFamily, radius } from '@/constants/theme';
+import { darkControlBorder, fontFamily, radius } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 import { useMotion } from '@/hooks/use-motion';
 
@@ -22,13 +22,13 @@ export function Field({ label, value, onChange, placeholder, autoFocus, c, keybo
   label: string; value: string; onChange: (t: string) => void; placeholder?: string;
   autoFocus?: boolean; c: any; keyboardType?: any; multiline?: boolean;
 }) {
-  const { t } = useDS();
+  const { t, isDark } = useDS();
   return (
     <>
       <Text style={[s.label, { color: c.sub }]}>{label}</Text>
       <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={t.text.muted}
         autoFocus={autoFocus} keyboardType={keyboardType} multiline={multiline}
-        style={[s.input, { color: c.text, backgroundColor: c.dim, minHeight: multiline ? 70 : undefined, textAlignVertical: multiline ? 'top' : 'center' }]} />
+        style={[s.input, { color: c.text, backgroundColor: c.dim, minHeight: multiline ? 70 : undefined, textAlignVertical: multiline ? 'top' : 'center' }, darkControlBorder(isDark)]} />
     </>
   );
 }

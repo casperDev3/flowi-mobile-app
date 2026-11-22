@@ -11,7 +11,8 @@
 | elevated / input | `#1E1E22` / `#202024` | **`#232327`** | `--ds-surface-elevated/subtle`, `--ds-glass-surface-strong/sheet/subtle`, `--ds-content-surface-raised`, `--ds-skeleton-base` | `surface.elevated/subtle`, `glass.dark.surfaceStrong/surfaceSubtle`, `overlay.dark.solid` |
 | hover / secondary | rgba white 7% | **`#2C2C31`** | `--ds-action-secondary`, `--ds-content-fill`, `--ds-card-dark` | `action.secondary`, `featured.bg` |
 | border | `#2A2A2F` | **`#34343A`** | `--ds-border-hairline`, `--ds-glass-rim`, `--ds-glass-specular`, `--ds-content-separator`, `--ds-content-shadow` | `border.hairline`, `glass.dark.rim/rimShade` |
-| border strong (поля, контроли) | — | **`#45454C`** | `--ds-glass-control-edge` | `darkScale.borderStrong` (у `ds.glass(…,'subtle')`) |
+| border strong (вкладені блоки, чипи) | — | **`#45454C`** | — | `darkScale.borderStrong` (у `ds.glass(…,'subtle')`) |
+| **control border (поля вводу, контроли форм)** | `#45454C` (1.83:1 на card) | **`#76767E`** | `--ds-glass-control-edge` → `--ds-control-border` (той самий hex) | `darkScale.controlBorder`, `darkControlBorder(isDark)` |
 | text primary | `#F4F4F5` | **`#F2F2F3`** | `--ds-text-primary` | `text.primary` |
 | text secondary | `#A1A1AA` | **`#B9B9BF`** | `--ds-text-secondary` | `text.secondary` |
 | text muted | `#6B6B73` (3.4:1, не AA) | **`#93939B`** | `--ds-text-muted` | `text.muted` |
@@ -65,6 +66,17 @@
 |---|---:|---:|---:|---:|
 | hairline `#34343A` | 1.56 | 1.40 | 1.27 | 1.12 |
 | strong `#45454C` | 2.03 | 1.83 | 1.65 | 1.46 |
+| **control `#76767E`** | 4.28 | **3.86** | **3.48** | 3.08 |
+
+### Межа контролів форм (WCAG 1.4.11, rc1)
+
+Межа поля вводу є візуальною ознакою компонента UI, тому для неї потрібно ≥ 3:1 до суміжного кольору. Поля лежать на card (`#1A1A1D`) або на піднятій поверхні (`#232327`, аркуші й поповери). `#45454C` давав лише 1.83 і 1.65.
+
+**Як обрано значення.** Один hex для вебу й мобільного — `#76767E`: ≥ 3:1 на всіх темних поверхнях, включно з hover `#2C2C31` (3.08). Мінімальний `#6D6D6D` відкинуто: на hover лише 2.68. Тест `__tests__/dark-theme-rc1.test.ts` перевіряє пороги й паритет із вебом.
+
+**Де застосовано (лише темна, світла без змін):** `ds.input()` (`hooks/use-ds.ts`), `components/shared/FormField.tsx` (1 px у темній, у світлій рамки, як і раніше, немає), `components/shared/PickerField.tsx` (тригер і поле пошуку), `components/health/FormBits.tsx` (`Field`), `components/ds/filters/Filters.tsx` (пілюлі фільтрів, поле пошуку, доріжка сегмента; роздільник футера лишився hairline). `ds.glass(…,'subtle')` для вкладених блоків і чипів лишився на `borderStrong`.
+
+**Лишилось (відкрите):** екрани, що малюють `TextInput` власними стилями (`ds.glass(isDark,'subtle')` чи `c.dim` напряму), ще мають `#45454C` або взагалі не мають межі. Переводити їх на `darkControlBorder(isDark)` варто окремим проходом. Перелік: `grep -rn "<TextInput" app components`.
 
 ### Accents on surfaces — after (non-text ≥ 3:1; ✗ = below)
 
@@ -122,7 +134,7 @@
 
 
 Примітки:
-- Межі карток (1.40:1) — це візуальний поділ, а не «компонент UI» за 1.4.11. Поля вводу розпізнаються сумою кроку заливки (`#232327` на `#1A1A1D`) і сильнішої межі `#45454C`. AA для меж ми НЕ заявляємо.
+- Межі карток (1.40:1) — це візуальний поділ, а не «компонент UI» за 1.4.11, і вимоги ≥ 3:1 на них немає. Для полів вводу й контролів форм у темній 1.4.11 виконано: `controlBorder #76767E` (див. вище). Світла тема не змінювалась (рішення власника), її межі полів ≈ 1.1–1.3:1 і досі FAIL — це відкрите питання в `a11y-wcag22.md`.
 - `expense` `#F6465D` як ТЕКСТ на elevated/hover не проходить AA (4.44/3.94), тому текст сум бере `expense-ink` `#FF6B7D` (≥ 5.06 скрізь).
 - Мобільний `text.muted` на hover — 4.56 (на межі). На hover-поверхні muted краще не ставити.
 
@@ -133,7 +145,7 @@
 | Світлі токени мобільного byte-identical | дамп `theme.light/glass.light/overlay.light/shadow.light` до і після, `cmp` | ідентичні |
 | Світлі CSS вебу не зачеплено | `diff` globals.css: змінено лише рядки в темних блоках (+ нове reduced-transparency-правило лише для dark) | ok |
 | Два темні веб-блоки ідентичні | витяг обох блоків без відступів → `diff` | ідентичні |
-| Тест темної теми | `npx jest __tests__/dark-theme-rc1.test.ts` (AA тексту, кроки L* ≥ 4, нейтральний RGB, без мешу, непрозорість ≥ 0.94, фінанси) | 6/6 |
+| Тест темної теми | `npx jest __tests__/dark-theme-rc1.test.ts` (AA тексту, кроки L* ≥ 4, нейтральний RGB, без мешу, непрозорість ≥ 0.94, фінанси, межа контролів ≥ 3:1 і мінімальність) | 9/9 |
 | Тести теми/таб-бару/здоров'я | `npx jest __tests__/healthTheme.test.ts __tests__/health-redesign-1007.test.ts __tests__/audit-tabbar-a11y.test.tsx __tests__/audit-project-space.test.tsx` | pass (`healthTheme` оновлено на `#0E0E10`) |
 | Mobile tsc | `npx tsc --noEmit` | 0 помилок |
 | Web unit | `npm test` | 1530/1530 |
@@ -147,7 +159,8 @@
 |---|---|---|---|
 | 1 | iOS 26 (Liquid Glass) | Сьогодні, Задачі, Фінанси, Налаштування | картки суцільні `#1A1A1D` з межею 1 px; немає кольорових плям на тлі; таб-бар суцільний |
 | 2 | iOS < 26 | те саме + аркуші (SheetModal) | аркуш суцільний `#232327`, текст під ним не просвічує |
-| 3 | Android | таб-бар, картки, поля вводу | межа полів `#45454C` помітна; без «привидів» |
+| 3 | Android | таб-бар, картки, поля вводу | межа полів `#76767E` помітна (FormField, PickerField, фільтри); без «привидів» |
+| 3a | iOS + Android | віджет Android у темній, сплеш у темній | віджет: тло `#0E0E10`, текст `#F2F2F3`/`#B9B9BF`; сплеш: `#0E0E10` |
 | 4 | iOS «Зменшити прозорість» + «Збільшити контраст» | будь-який екран | вигляд той самий (суцільний), межі є |
 | 5 | Веб Chrome/Safari, тема «Темна» і «Системна» при темній ОС | /app, /app/finance, модалки, ⌘K | canvas `#0E0E10`; картки з межею; поповери/діалоги щільні; на тлі немає мешу |
 | 6 | Веб, macOS «Зменшити прозорість» | /app | межа карток лишилась |
@@ -157,8 +170,11 @@
 
 ## Не зроблено в цій зоні (інші власники)
 
-Ці значення старого темного canvas/тексту лежать у файлах інших агентів. Їх треба синхронізувати, коли ті агенти закінчать:
-- `app.json` → `splash … dark.backgroundColor: "#0D0D0F"` → `#0E0E10`
-- `android/app/src/main/res/values-night/colors.xml` → `splashscreen_background #0D0D0F` → `#0E0E10`
-- `modules/flowi-android/android/src/main/res/values-night/flowi_colors.xml` → `flowi_widget_text_secondary #A1A1AA` → `#B9B9BF` (і інші кольори віджета за шкалою вище)
-- iOS-віджет/годинник (Swift): так само звірити темні кольори зі шкалою.
+Синхронізовано в rc1-polish (лише темні значення, світлі файли не чіпались):
+- `app.json` → `expo-splash-screen … dark.backgroundColor` = `#0E0E10` ✓
+- `android/app/src/main/res/values-night/colors.xml` → `splashscreen_background` = `#0E0E10` ✓ (файл у `.gitignore`, згенерований prebuild; наступний `expo prebuild` перегенерує його з `app.json`, де вже стоїть нове значення)
+- `modules/flowi-android/android/src/main/res/values-night/flowi_colors.xml` → `flowi_widget_bg #0E0E10`, `flowi_widget_text #F2F2F3`, `flowi_widget_text_secondary #B9B9BF` ✓ (акцент `#A78BFA` і трек кільця без змін)
+
+Лишилось:
+- iOS-віджет і годинник (Swift): звірити темні кольори зі шкалою.
+- Кольори дій віджета Android (`drawable/flowi_*`, `FlowiStrings.kt`) — це акценти, вони спільні для обох тем і не мінялися.

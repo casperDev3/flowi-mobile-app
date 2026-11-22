@@ -681,12 +681,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (deviceName) body.device_name = deviceName;
     const workspaceId = cachedWorkspaceConfig()?.workspaceId ?? '';
 
-    // Контракт §2.4: `push_token`/`push_platform` опційні — заявник у режимі
-    // «за погодженням» ще не автентифікований (немає `/push/tokens/`), тож
-    // без цього поля тут він дізнавався б про рішення адміна ЛИШЕ поллінгом
-    // (кожні 65с), ніколи пушем `registration_decision`.
+    // Контракт §2.4: `push_kind`/`push_token`/`push_platform` опційні —
+    // заявник у режимі «за погодженням» ще не автентифікований (немає
+    // `/notifications/devices/`), тож без цих полів він дізнавався б про
+    // рішення адміна ЛИШЕ поллінгом (кожні 65с), ніколи пушем
+    // `registration_decision`. rc1: нативний токен ОС + `push_kind`
+    // ('fcm'|'apns'); `push_token` без `push_kind` сервер вважає легасі Expo.
     const push = await getRegistrationPushToken();
     if (push) {
+      body.push_kind = push.kind;
       body.push_token = push.token;
       body.push_platform = push.platform;
     }

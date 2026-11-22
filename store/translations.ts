@@ -2651,6 +2651,9 @@ export interface Translations {
   projectMembersInviteResend: string;
   projectMembersInviteResent: string;
   projectMembersInviteResendTooSoon: string;
+  projectMembersInviteResendLimit: string;
+  projectMembersInviteDeliveryFailed: string;
+  projectMembersInviteDeliverySkipped: string;
   projectMembersInviteNotPending: string;
   projectMembersInviteCancel: string;
   projectMembersInviteCancelConfirm: string;
@@ -2918,6 +2921,7 @@ export interface Translations {
   projectTasksMenu: string;
   projectTasksSearch: string;
   projectBoardShowAll: string;
+  projectBoardChangeStatusA11y: string;
   projectHomePage: string;
   projectHomeMyWork: string;
   projectHomeOverview: string;
@@ -5654,6 +5658,9 @@ const uk: Translations = {
   projectMembersInviteResend: 'Надіслати ще раз',
   projectMembersInviteResent: 'Запрошення надіслано ще раз',
   projectMembersInviteResendTooSoon: 'Щойно надсилали. Спробуйте ще раз за хвилину.',
+  projectMembersInviteResendLimit: 'Ліміт повторних надсилань вичерпано. Скасуйте запрошення й створіть нове.',
+  projectMembersInviteDeliveryFailed: 'Лист не доставлено — надішліть ще раз',
+  projectMembersInviteDeliverySkipped: 'Лист не надсилався, поділіться посиланням',
   projectMembersInviteNotPending: 'Людина вже відповіла на це запрошення.',
   projectMembersInviteCancel: 'Скасувати запрошення',
   projectMembersInviteCancelConfirm: 'Скасувати запрошення для {email}? Воно зникне зі сповіщень запрошеної людини.',
@@ -5919,6 +5926,7 @@ const uk: Translations = {
   projectTasksMenu: 'Дії із завданнями',
   projectTasksSearch: 'Пошук завдань',
   projectBoardShowAll: 'Усі завдання колонки — у списку',
+  projectBoardChangeStatusA11y: 'Змінити статус',
   projectHomePage: 'Стартовий екран',
   projectHomeMyWork: 'Відкривати з «Моєї роботи»',
   projectHomeOverview: 'Відкривати з «Огляду»',
@@ -8653,6 +8661,9 @@ const en: Translations = {
   projectMembersInviteResend: 'Send again',
   projectMembersInviteResent: 'Invitation sent again',
   projectMembersInviteResendTooSoon: 'Just sent. Try again in a minute.',
+  projectMembersInviteResendLimit: 'Resend limit reached. Cancel the invitation and create a new one.',
+  projectMembersInviteDeliveryFailed: 'Email not delivered — send it again',
+  projectMembersInviteDeliverySkipped: 'No email was sent, share the link instead',
   projectMembersInviteNotPending: 'This invitation has already been answered.',
   projectMembersInviteCancel: 'Cancel invitation',
   projectMembersInviteCancelConfirm: 'Cancel the invitation for {email}? It will disappear from their notifications.',
@@ -8918,6 +8929,7 @@ const en: Translations = {
   projectTasksMenu: 'Task actions',
   projectTasksSearch: 'Search tasks',
   projectBoardShowAll: 'All column tasks — in the list',
+  projectBoardChangeStatusA11y: 'Change status',
   projectHomePage: 'Start page',
   projectHomeMyWork: 'Open on “My work”',
   projectHomeOverview: 'Open on “Overview”',

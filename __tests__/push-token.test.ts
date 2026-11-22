@@ -35,6 +35,7 @@ jest.mock('@/store/storage', () => ({
 // module factory (hoisting-виняток), звичайне ім'я кидало б ReferenceError.
 let mockOrigin = 'https://a.example.com/api';
 jest.mock('@/store/api-config', () => ({
+  canonicalCloudOrigin: (o: string) => o.replace(/\/+$/, '').replace(/^https:\/\/api\.flowi\.casperdev\.site$/i, 'https://api.flowi.com.ua'),
   getApiBase: jest.fn(() => mockOrigin),
 }));
 

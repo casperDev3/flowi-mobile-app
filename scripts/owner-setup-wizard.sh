@@ -436,9 +436,7 @@ stage "DNS flowi.com.ua"
 say "У панелі DNS реєстратора flowi.com.ua створіть записи:"
 step "A     api   → $VPS_IP   (TTL 300 на час переїзду)"
 step "A     app   → $VPS_IP"
-step "TXT   @     → v=spf1 a:$API_HOST include:<SPF-домен вашого smarthost> -all"
-step "TXT   <selector>._domainkey → v=DKIM1; k=rsa; p=<публічний ключ від smarthost/OpenDKIM>"
-step "TXT   _dmarc → v=DMARC1; p=quarantine; rua=mailto:dmarc@flowi.com.ua; adkim=s; aspf=s"
+note "Поштові записи (SPF/DKIM/DMARC) — лише коли налаштовуєте пошту (етап 12); існуючий SPF реєстратора не чіпайте."
 note "Деталі й значення-заготовки: docs/release-rc1/identity-signing-domains.md (розділ DNS)."
 pause "Записи створено? Enter — перевіримо"
 for h in "$API_HOST" "$APP_HOST"; do
@@ -451,10 +449,14 @@ note "DMARC: $(dig +short TXT _dmarc.flowi.com.ua 2>/dev/null || echo 'ще не
 pause
 
 # ── 12 ─────────────────────────────────────────────────────────────────────
-stage "Пошта: smarthost для Postfix"
+stage "Пошта: smarthost для Postfix (необовʼязково)"
 say "Django шле на локальний Postfix (localhost:25), Postfix — на smarthost:587."
 note "Шаблони: flowi-server-app/ops/postfix/{main.cf.template,sasl_passwd.template,flowi-email.env.template,dns-records.txt}"
 note "Runbook: docs/release-rc1/email.md"
+note "Можна пропустити: без EMAIL_HOST пошта на сервері вимкнена, інвайти працюють посиланням (delivery_status=skipped)."
+MAIL_ENABLED=0
+if confirm "Налаштувати пошту зараз?"; then
+MAIL_ENABLED=1
 ask SMTP_RELAY_HOST "Smarthost (host, напр. smtp.example.com):"
 ask SMTP_RELAY_PORT "Порт smarthost [587]:"
 SMTP_RELAY_PORT="${SMTP_RELAY_PORT:-587}"
@@ -464,6 +466,9 @@ write_env SMTP_RELAY_HOST "$SMTP_RELAY_HOST"
 write_env SMTP_RELAY_PORT "$SMTP_RELAY_PORT"
 write_env SMTP_RELAY_USER "$SMTP_RELAY_USER"
 write_env SMTP_RELAY_PASSWORD "$SMTP_RELAY_PASSWORD"
+else
+SKIPPED+=("Пошта (Postfix relay, SPF/DKIM/DMARC) — пропущено; запустіть wizard ще раз, коли будете готові")
+fi
 pause
 
 # ── 13 ─────────────────────────────────────────────────────────────────────
@@ -495,11 +500,7 @@ PUBLIC_WS_URL=wss://$API_HOST/ws
 CORS_EXTRA_ORIGINS=https://$APP_HOST
 DEFAULT_FROM_EMAIL='Flowi <noreply@flowi.com.ua>'
 SERVER_EMAIL='Flowi <noreply@flowi.com.ua>'
-EMAIL_HOST=localhost
-EMAIL_PORT=25
-EMAIL_USE_TLS=False
-EMAIL_NO_AUTH=True
-# Прибрати старі EMAIL_USER / EMAIL_PASSWORD, якщо були.
+$(if [[ "${MAIL_ENABLED:-0}" == 1 ]]; then printf '%s\n' 'EMAIL_HOST=localhost' 'EMAIL_PORT=25' 'EMAIL_USE_TLS=False' 'EMAIL_NO_AUTH=True' '# Прибрати старі EMAIL_USER / EMAIL_PASSWORD, якщо були.'; else printf '%s\n' '# Пошта пропущена: НЕ задавати EMAIL_HOST (і прибрати старі EMAIL_HOST/EMAIL_USER/EMAIL_PASSWORD) — канал вимкнено.'; fi)
 APNS_KEY_FILE=/etc/flowi/secrets/AuthKey_${APNS_KEY_ID:-KEYID}.p8
 APNS_KEY_ID=${APNS_KEY_ID:-}
 APNS_TEAM_ID=${FLOWI_APPLE_TEAM_ID:-}
@@ -518,17 +519,19 @@ FLOWI_IOS_BUNDLE_ID=$APP_ID
 FLOWI_ANDROID_PACKAGE=$APP_ID
 FLOWI_ANDROID_SHA256_CERTS=${FLOWI_ANDROID_SHA256_CERTS:-}
 EOF
+if [[ "${MAIL_ENABLED:-0}" == 1 ]]; then
 cat > "$VPS_DIR/postfix-sasl_passwd" <<EOF
 # → /etc/postfix/sasl_passwd (формат ops/postfix/sasl_passwd.template); main.cf: relayhost = [${SMTP_RELAY_HOST:-smtp.example.com}]:${SMTP_RELAY_PORT:-587}
 [${SMTP_RELAY_HOST:-smtp.example.com}]:${SMTP_RELAY_PORT:-587} ${SMTP_RELAY_USER:-user}:${SMTP_RELAY_PASSWORD:-password}
 EOF
+fi
 )
-printf '  %s✓ wrote%s %s/{api.env.snippet,web.env.snippet,postfix-sasl_passwd}\n' "$GREEN" "$RESET" "$VPS_DIR"
+printf '  %s✓ wrote%s %s/{api.env.snippet,web.env.snippet%s}\n' "$GREEN" "$RESET" "$VPS_DIR" "$([[ "${MAIL_ENABLED:-0}" == 1 ]] && echo ',postfix-sasl_passwd')"
 say "Скопіюйте на VPS (root):"
 step "ssh root@$VPS_IP 'install -d -m 700 /etc/flowi/secrets'"
 step "scp \"${APNS_P8_LOCAL:-$SIGN_DIR/AuthKey_KEYID.p8}\" \"$SIGN_DIR/fcm-service-account.json\" root@$VPS_IP:/etc/flowi/secrets/ && ssh root@$VPS_IP 'chmod 600 /etc/flowi/secrets/*'"
 step "Рядки з $VPS_DIR/api.env.snippet → /var/www/flowi-api/.env; з web.env.snippet → /etc/flowi/web.env."
-step "postfix-sasl_passwd → /etc/postfix/sasl_passwd; chmod 600; postmap /etc/postfix/sasl_passwd; main.cf з ops/postfix/main.cf.template; systemctl reload postfix."
+if [[ "${MAIL_ENABLED:-0}" == 1 ]]; then step "postfix-sasl_passwd → /etc/postfix/sasl_passwd; chmod 600; postmap /etc/postfix/sasl_passwd; main.cf з ops/postfix/main.cf.template; systemctl reload postfix."; fi
 step "Звірте upstream-и: systemctl cat flowi-api (порт Daphne) і nginx -T | grep proxy_pass; за потреби FLOWI_API_UPSTREAM/FLOWI_WEB_UPSTREAM у env Caddy."
 step "Caddy: flowi-server-app/ops/caddy/Caddyfile.production → /etc/caddy/Caddyfile; caddy validate --config /etc/caddy/Caddyfile."
 step "Перемикання 80/443: systemctl disable --now nginx && systemctl enable --now caddy (GlitchTip :8443 — див. runbook §7)."

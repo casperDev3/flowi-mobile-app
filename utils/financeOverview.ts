@@ -10,7 +10,10 @@
  *   • totalByCurrency — «На рахунках»: сума балансів АКТИВНИХ рахунків у
  *     кожній валюті. Та сама цифра і на «Сьогодні», і на «Фінансах».
  *   • month — «Сальдо місяця»: доходи − витрати поточного місяця в основній
- *     валюті, без переказів. Це НЕ баланс і так і підписано.
+ *     валюті, без переказів. Це НЕ баланс і так і підписано. `month.uncounted`
+ *     — оборот того ж місяця й ракурсу в ІНШИХ валютах, якого в income/expense
+ *     немає: екран мусить його показати («не враховано: 10 $»), а не
+ *     промовчати (скарга 2026-11; те саме поле є на вебі).
  *   • breakdowns — «Звідки ця сума» по кожному рахунку.
  *   • unassigned — операції без рахунку (чи з невідомим/архівним рахунком):
  *     вони є в обороті місяця, але в жоден видимий баланс не входять — про
@@ -28,6 +31,7 @@ import {
 } from './accounts';
 import { DEFAULT_MONEY_SCOPE, matchesMoneyScope, type MoneyScope } from './budgetScope';
 import { isSameMonth } from './dateUtils';
+import type { PnlUncounted } from './finance/pnl';
 import type { Transaction } from './financeUtils';
 
 export interface FinanceMonthFlow {
@@ -35,6 +39,8 @@ export interface FinanceMonthFlow {
   expense: number;
   /** income − expense. «Сальдо місяця», не баланс. */
   net: number;
+  /** Інші валюти місяця (той самий ракурс), за кодом (asc); лише з операціями. */
+  uncounted: PnlUncounted[];
 }
 
 export interface FinanceOverview {
@@ -98,6 +104,7 @@ export function financeOverview({
   }
 
   const month = { income: 0, expense: 0 };
+  const monthUncounted = new Map<string, PnlUncounted>();
   const unassigned = { count: 0, ids: [] as string[], netByCurrency: {} as Record<string, number> };
   const future = { count: 0, netByCurrency: {} as Record<string, number> };
   const endOfToday = new Date(now);
@@ -118,16 +125,32 @@ export function financeOverview({
       future.count += 1;
       future.netByCurrency[code] = round((future.netByCurrency[code] ?? 0) + signed);
     }
-    if (code !== primary || !isSameMonth(date, now)) continue;
-    if (!matchesMoneyScope(tx, scope)) continue;
+    if (!isSameMonth(date, now) || !matchesMoneyScope(tx, scope)) continue;
+    if (tx.type !== 'income' && tx.type !== 'expense') continue;
+    if (code !== primary) {
+      // Як на вебі (buildReport.others): інша валюта — окремим рядком, не в сумі.
+      const row = monthUncounted.get(code) ?? { currency: code, income: 0, expense: 0, count: 0 };
+      if (tx.type === 'income') row.income += txAmount(tx.amount);
+      else row.expense += txAmount(tx.amount);
+      row.count += 1;
+      monthUncounted.set(code, row);
+      continue;
+    }
     if (tx.type === 'income') month.income += txAmount(tx.amount);
-    else if (tx.type === 'expense') month.expense += txAmount(tx.amount);
+    else month.expense += txAmount(tx.amount);
   }
 
   return {
     primary,
     scope,
-    month: { income: round(month.income), expense: round(month.expense), net: round(month.income - month.expense) },
+    month: {
+      income: round(month.income),
+      expense: round(month.expense),
+      net: round(month.income - month.expense),
+      uncounted: [...monthUncounted.values()]
+        .sort((a, b) => (a.currency < b.currency ? -1 : a.currency > b.currency ? 1 : 0))
+        .map((row) => ({ ...row, income: round(row.income), expense: round(row.expense) })),
+    },
     balances,
     breakdowns,
     totalByCurrency,

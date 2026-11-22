@@ -41,7 +41,10 @@ describe('financeOverview — спільна фікстура web/mobile', () =>
   });
 
   test('«Сальдо місяця» — окрема величина, не баланс', () => {
-    expect(overview.month).toEqual(fixture.expected.month);
+    // Фікстура описує лише числа; `uncounted` — додане поле: дохід 20 USD
+    // того ж місяця не в income (гривня), але й не загублений.
+    expect(overview.month).toMatchObject(fixture.expected.month);
+    expect(overview.month.uncounted).toEqual([{ currency: 'USD', income: 20, expense: 0, count: 1 }]);
   });
 
   test('операції без рахунку і майбутні — пораховані й видимі', () => {

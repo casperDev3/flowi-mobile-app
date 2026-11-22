@@ -19,10 +19,13 @@ import {
   isTransfer,
   type Account,
 } from '../accounts';
+import { matchesMoneyScope } from '../budgetScope';
 import type { Transaction } from '../financeUtils';
 import { addDaysKey, dateKeyOf } from '../subscriptions';
-import { daysOf, localDayKey, type FinanceFilter } from './period';
-import { amountOf, includedInTurnover, isTransferType, round, sortedByDateId } from './pnl';
+import { daysOf, inRange, localDayKey, type FinanceFilter } from './period';
+import {
+  amountOf, includedInTurnover, isTransferType, resolveTxCurrency, round, sortedByDateId, type PnlUncounted,
+} from './pnl';
 
 export interface CashflowPoint {
   /** 'YYYY-MM-DD' */
@@ -39,6 +42,27 @@ export interface CashflowFact {
   opening: number;
   inflow: number;
   outflow: number;
+  /**
+   * Оборот того ж вікна (ракурс, період, обрізаний по сьогодні) в ІНШИХ
+   * валютах, якого НЕМАЄ в inflow/outflow (§7.1), за валютою (asc). Поле є
+   * завжди: екран зобов'язаний сказати «не враховано: 10 $», а не промовчати
+   * (скарга 2026-11). Залишки сюди не входять — лише потоки. Дзеркало
+   * вебового `CashflowFact.uncounted` (там із курсами НБУ лишається лише
+   * неконвертоване; курсів у мобільному немає, тож тут — усі чужі валюти).
+   */
+  uncounted: PnlUncounted[];
+}
+
+/**
+ * Чи операція — оборот вікна фільтра в БУДЬ-ЯКІЙ валюті: те саме, що
+ * `includedInTurnover`, лише без перевірки валюти. Різниця між ними і є
+ * «не враховано».
+ */
+function inTurnoverWindow(tx: Transaction, filter: FinanceFilter): boolean {
+  return !isTransferType(tx)
+    && (tx.type === 'income' || tx.type === 'expense')
+    && matchesMoneyScope(tx, filter.scope)
+    && inRange(tx.date, filter.period);
 }
 
 /** Локальна дата дня `dateKey` — для `asOf` балансу (береться кінець доби). */
@@ -110,12 +134,13 @@ export function cashflowFact(input: {
   const from = filter.period.from;
   const to = filter.period.to < today ? filter.period.to : today;
   const opening = balanceAtEndOf(accounts, transactions, filter.currency, addDaysKey(from, -1), primary);
-  if (from > to) return { points: [], opening, inflow: 0, outflow: 0 };
+  if (from > to) return { points: [], opening, inflow: 0, outflow: 0, uncounted: [] };
 
   const active = new Map(activeAccounts(accounts as Account[]).map((account) => [account.id, account]));
   const inflowByDay = new Map<string, number>();
   const outflowByDay = new Map<string, number>();
   const balanceByDay = new Map<string, number>();
+  const uncounted = new Map<string, PnlUncounted>();
 
   for (const tx of sortedByDateId(transactions)) {
     if (!tx) continue;
@@ -124,6 +149,14 @@ export function cashflowFact(input: {
     if (includedInTurnover(tx, filter, accounts, primary)) {
       const map = tx.type === 'income' ? inflowByDay : outflowByDay;
       map.set(day, (map.get(day) ?? 0) + amountOf(tx));
+    } else if (inTurnoverWindow(tx, filter)) {
+      // Оборот у чужій валюті: не в сумі, але й не загублений.
+      const code = resolveTxCurrency(tx, accounts, primary);
+      const row = uncounted.get(code) ?? { currency: code, income: 0, expense: 0, count: 0 };
+      if (tx.type === 'income') row.income += amountOf(tx);
+      else row.expense += amountOf(tx);
+      row.count += 1;
+      uncounted.set(code, row);
     }
     const delta = balanceContribution(tx, active, filter.currency, primary);
     if (delta) balanceByDay.set(day, (balanceByDay.get(day) ?? 0) + delta);
@@ -141,5 +174,13 @@ export function cashflowFact(input: {
     outflow += dayOut;
     points.push({ day, inflow: round(dayIn), outflow: round(dayOut), balance: round(running) });
   }
-  return { points, opening, inflow: round(inflow), outflow: round(outflow) };
+  return {
+    points,
+    opening,
+    inflow: round(inflow),
+    outflow: round(outflow),
+    uncounted: [...uncounted.values()]
+      .sort((a, b) => (a.currency < b.currency ? -1 : a.currency > b.currency ? 1 : 0))
+      .map((row) => ({ ...row, income: round(row.income), expense: round(row.expense) })),
+  };
 }

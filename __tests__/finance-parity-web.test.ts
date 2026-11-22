@@ -45,7 +45,9 @@ describe('паритет із вебом: financeOverview на вебовій ф
 
   test('сальдо місяця (основна валюта) — як на вебі', () => {
     const { income, expense, net } = fixture.expected.month;
-    expect(overview.month).toEqual({ income, expense, net });
+    expect(overview.month).toMatchObject({ income, expense, net });
+    // Вебова фікстура — лише гривня, тож «інших валют» місяця немає (поле є, порожнє).
+    expect(overview.month.uncounted).toEqual([]);
   });
 
   test('операції без рахунку враховано й показано', () => {

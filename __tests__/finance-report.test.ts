@@ -266,6 +266,21 @@ describe('Cash Flow — факт', () => {
     expect(personal.points.map(p => p.balance)).toEqual(fact.points.map(p => p.balance));
     expect(personal.outflow).toBe(4099);
   });
+
+  test('оборот у чужій валюті — в явному uncounted (як на вебі), а не загублений', () => {
+    // 13: дохід 20 USD у вересні — не в inflow (гривневий фільтр), але видимий.
+    expect(fact.uncounted).toEqual([{ currency: 'USD', income: 20, expense: 0, count: 1 }]);
+    // У доларовому погляді навпаки: гривневий оборот — у відрі, долар — у сумі.
+    const usd = cashflowFact({ transactions, accounts, filter: filter({ currency: 'USD' }), primary: 'UAH', now: NOW });
+    expect(usd.inflow).toBe(20);
+    expect(usd.uncounted).toEqual([{ currency: 'UAH', income: 10000, expense: 4499, count: 7 }]);
+    // financeOverview — те саме відро для місяця.
+    const overview = financeOverview({ txs: transactions, accounts, primary: 'UAH', now: NOW });
+    expect(overview.month.uncounted).toEqual([{ currency: 'USD', income: 20, expense: 0, count: 1 }]);
+    // Період у майбутньому — порожній факт із порожнім відром.
+    const future = cashflowFact({ transactions, accounts, filter: filter({ period: resolvePeriod('month', '2026-10', NOW) }), primary: 'UAH', now: NOW });
+    expect(future.uncounted).toEqual([]);
+  });
 });
 
 describe('Cash Flow — прогноз', () => {

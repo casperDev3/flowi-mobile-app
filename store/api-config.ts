@@ -14,10 +14,35 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-export const DEFAULT_WORKSPACE_ORIGIN = 'https://api.flowi.casperdev.site';
+/**
+ * Flowi Cloud (rc1, 2026-11-22): API живе на api.flowi.com.ua. Self-host /
+ * стенд перевизначає адресу на етапі збірки через EXPO_PUBLIC_FLOWI_API_ORIGIN
+ * (Metro вбудовує EXPO_PUBLIC_* у бандл) — без правки коду.
+ */
+export const FLOWI_CLOUD_ORIGIN = 'https://api.flowi.com.ua';
+
+/**
+ * Попередні адреси того самого Flowi Cloud. Сервер на них і далі відповідає
+ * (Caddy проксіює /api, /ws для N-1 клієнтів), тож це ТОЙ САМИЙ workspace —
+ * див. docs/release-rc1/identity-signing-domains.md, таблиця хостів.
+ */
+export const LEGACY_CLOUD_ORIGINS: readonly string[] = ['https://api.flowi.casperdev.site'];
+
+function envOrigin(): string | null {
+  const raw = (process.env.EXPO_PUBLIC_FLOWI_API_ORIGIN ?? '').trim().replace(/\/+$/, '').replace(/\/api$/i, '');
+  return /^https?:\/\/[^\s/]+$/i.test(raw) ? raw : null;
+}
+
+export const DEFAULT_WORKSPACE_ORIGIN: string = envOrigin() ?? FLOWI_CLOUD_ORIGIN;
+
+/** Стара адреса Flowi Cloud → нова; будь-яка інша лишається як є. */
+export function canonicalCloudOrigin(origin: string): string {
+  const o = origin.replace(/\/+$/, '');
+  return LEGACY_CLOUD_ORIGINS.some((l) => l.toLowerCase() === o.toLowerCase()) ? FLOWI_CLOUD_ORIGIN : o;
+}
 
 export const CLIENT_VERSION: string =
-  (Constants.expoConfig?.version as string | undefined) ?? '1.3.0';
+  (Constants.expoConfig?.version as string | undefined) ?? '1.4.0';
 
 /** Контракт §0.4 знає лише 'ios' | 'android' для мобільного заголовка. */
 export const CLIENT_PLATFORM: 'ios' | 'android' = Platform.OS === 'ios' ? 'ios' : 'android';
@@ -82,6 +107,13 @@ export interface WorkspaceIncompatibility {
    */
   code: 'update_app' | 'update_server' | 'update_app_to' | 'workspace_changed';
   minVersion?: string;
+  /**
+   * rc1 (docs/release-rc1/compat-n1.md): посилання на НОВИЙ застосунок у
+   * сторі — з тіла 426 (`store_url`) або з `store_urls` payload-у
+   * `/api/workspace/`. Порожньо — екран оновлення без кнопки (fallback з
+   * `expo.extra.storeUrls`, див. app/update-required.tsx).
+   */
+  storeUrl?: string;
 }
 
 let _incompatibility: WorkspaceIncompatibility | null = null;
@@ -108,8 +140,17 @@ export function setWorkspaceIncompatibility(v: WorkspaceIncompatibility | null):
  * Викликає `store/api.ts` на будь-якій відповіді `426 client_outdated`
  * (контракт §0.4) — блокує UI негайно, а не лише на холодному старті.
  */
-export function reportClientOutdated(minVersion?: string): void {
-  setWorkspaceIncompatibility({ code: 'update_app_to', minVersion });
+export function reportClientOutdated(minVersion?: string, storeUrl?: string): void {
+  setWorkspaceIncompatibility({
+    code: 'update_app_to',
+    minVersion,
+    ...(storeUrl ? { storeUrl } : {}),
+  });
+}
+
+/** Екран оновлення (app/update-required.tsx) — для кодів, що лікуються оновленням застосунку. */
+export function needsAppUpdate(v: WorkspaceIncompatibility | null): boolean {
+  return v !== null && (v.code === 'update_app' || v.code === 'update_app_to');
 }
 
 // ─── Гейт «перша перевірка сумісності цієї сесії ще не завершилась» ──────────

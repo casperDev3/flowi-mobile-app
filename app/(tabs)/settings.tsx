@@ -43,6 +43,7 @@ import { useResponsive } from '@/hooks/use-responsive';
 import { wideModalStyles } from '@/components/finance/wideModal';
 import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { ProfileCard } from '@/components/settings/ProfileCard';
+import { AnalyticsConsentCard } from '@/components/settings/AnalyticsConsentCard';
 import { ToolTiles } from '@/components/settings/ToolTiles';
 import { settingsColumnCount, settingsSectionLayout, type SettingsSectionId } from '@/components/settings/model';
 import { fontFamily, type GlassAccent } from '@/constants/theme';
@@ -512,6 +513,8 @@ export default function SettingsScreen() {
               />
             </SettingsCard>
             <AdvertisingSettings />
+            {/* rc1: згода на анонімну статистику — синхронізується з вебом. */}
+            <AnalyticsConsentCard style={st.sectionCard} />
             <BentoCard padded={false} style={st.sectionCard}>
               <SettingRow
                 icon="person.fill"
@@ -917,7 +920,7 @@ const NotifRow = React.memo(function NotifRow(
             локально запланованих нагадувань праворуч. */}
         <NotificationBadge />
         {scheduledCount > 0 && (
-          <View style={{ backgroundColor: accent, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
+          <View style={{ backgroundColor: accent, borderRadius: 10, minWidth: 20, minHeight: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
             <Text style={{ color: onAccent, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{scheduledCount}</Text>
           </View>
         )}

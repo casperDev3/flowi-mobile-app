@@ -100,11 +100,12 @@ export function TaskSubtasks({
                     value={editingText}
                     onChangeText={onChangeEditingText}
                     autoFocus
+                    accessibilityLabel={tr.subtasks}
                     onSubmitEditing={() => onSaveEdit(sub.id, editingText)}
                     returnKeyType="done"
                     style={[st.subTitle, { color: c.text, flex: 1, marginHorizontal: 10 }]}
                   />
-                  <TouchableOpacity onPress={() => onSaveEdit(sub.id, editingText)}>
+                  <TouchableOpacity onPress={() => onSaveEdit(sub.id, editingText)} accessibilityRole="button" accessibilityLabel={tr.a11ySaveSubtask} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                     <IconSymbol name="checkmark.circle.fill" size={20} color={c.text} />
                   </TouchableOpacity>
                 </View>
@@ -117,6 +118,19 @@ export function TaskSubtasks({
                 onPress={() => onToggle(sub.id)}
                 onLongPress={() => onShowActions(sub, originalIdx)}
                 delayLongPress={350}
+                // Рядок — чекбокс; вкладені «копіювати» й «…» VoiceOver не
+                // бачить (батько ковтає дітей), тому вони продубльовані діями.
+                accessibilityRole="checkbox"
+                accessibilityLabel={sub.title}
+                accessibilityState={{ checked: !!sub.done }}
+                accessibilityActions={[
+                  { name: 'copy', label: tr.copySubtask },
+                  { name: 'actions', label: tr.a11ySubtaskActions },
+                ]}
+                onAccessibilityAction={e => {
+                  if (e.nativeEvent.actionName === 'copy') onCopy(sub);
+                  else if (e.nativeEvent.actionName === 'actions') onShowActions(sub, originalIdx);
+                }}
                 style={[st.subRow, { backgroundColor: glassOf(t).surface, borderColor: 'transparent' }]}>
                 <View style={[st.subCheck, { borderColor: sub.done ? t.status.success : c.sub, backgroundColor: sub.done ? t.status.success : 'transparent' }]}>
                   {sub.done && <IconSymbol name="checkmark" size={10} color="#FFFFFF" />}
@@ -130,7 +144,7 @@ export function TaskSubtasks({
                   style={{ marginRight: 14 }}>
                   <IconSymbol name="doc.on.doc" size={14} color={c.sub} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => onShowActions(sub, originalIdx)} hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}>
+                <TouchableOpacity onPress={() => onShowActions(sub, originalIdx)} hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }} accessibilityRole="button" accessibilityLabel={`${tr.a11ySubtaskActions}: ${sub.title}`}>
                   <IconSymbol name="ellipsis" size={14} color={c.sub} />
                 </TouchableOpacity>
               </TouchableOpacity>
@@ -140,6 +154,7 @@ export function TaskSubtasks({
           {hasMore && (
             <TouchableOpacity
               onPress={onOpenAll}
+              accessibilityRole="button"
               style={[st.viewAllBtn, { backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
               <IconSymbol name="list.bullet" size={14} color={c.text} />
               <Text style={{ color: t.action.secondaryText, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 8 }}>
@@ -153,6 +168,7 @@ export function TaskSubtasks({
             <IconSymbol name="plus" size={16} color={c.sub} />
             <TextInput
               placeholder={tr.addSubtask}
+              accessibilityLabel={tr.addSubtask}
               placeholderTextColor={t.text.muted}
               value={newText}
               onChangeText={onChangeNewText}
@@ -162,7 +178,7 @@ export function TaskSubtasks({
               style={[st.subInput, { color: c.text, flex: 1, marginLeft: 8 }]}
             />
             {newText.trim() ? (
-              <TouchableOpacity onPress={() => onAdd()}>
+              <TouchableOpacity onPress={() => onAdd()} accessibilityRole="button" accessibilityLabel={tr.addSubtask} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <IconSymbol name="checkmark.circle.fill" size={20} color={c.text} />
               </TouchableOpacity>
             ) : null}

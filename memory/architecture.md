@@ -50,7 +50,7 @@ flowi-mobile-app/
 
 Окрема директорія: `/Users/a1d/Desktop/Pets/Flowi/flowi-server-app/`.
 Стек: **Django 6** + **DRF** + **Channels** + **Daphne** (ASGI).
-Деплой: HTTPS `api.flowi.casperdev.site`, WSS `wss://.../ws/`.
+Деплой (rc1): HTTPS `api.flowi.com.ua`, WSS `wss://.../ws/`; веб-кабінет `app.flowi.com.ua`. Старий `api.flowi.casperdev.site` лишається проксі для клієнтів N-1 (docs/release-rc1/identity-signing-domains.md).
 
 Запуск локально:
 ```bash

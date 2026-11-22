@@ -45,7 +45,7 @@ export function GlassTabBarBackground({ island = false }: {
       <View
         style={[
           StyleSheet.absoluteFill,
-          { backgroundColor: Platform.OS === 'android' ? (isDark ? 'rgba(23,23,26,0.92)' : 'rgba(255,255,255,0.9)') : g.surfaceStrong },
+          { backgroundColor: Platform.OS === 'android' ? (isDark ? g.surfaceStrong : 'rgba(255,255,255,0.9)') : g.surfaceStrong },
         ]}
       />
       <LinearGradient

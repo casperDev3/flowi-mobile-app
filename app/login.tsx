@@ -18,11 +18,13 @@ import { getScreenColors } from '@/constants/tokens';
 import { dsTokens } from '@/hooks/use-ds';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useAnnounce } from '@/hooks/use-announce';
 import { ApiError, OfflineError } from '@/store/api';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { throttleMessage } from '@/store/auth-throttle';
 import { getPendingRegistration } from '@/store/registration';
+import { getDeepLinkIntent } from '@/store/deep-link-intent';
 import { haptic } from '@/utils/haptics';
 import { fontFamily, shadow } from '@/constants/theme';
 import { MeshBackground } from '@/components/ds';
@@ -47,6 +49,7 @@ export default function LoginScreen() {
   const [generalError, setGeneralError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  useAnnounce(generalError || passwordError || emailError); // WCAG 4.1.3
 
   const k = dsTokens(isDark);
   const c = {
@@ -92,7 +95,10 @@ export default function LoginScreen() {
       // completeSession) — «увімкнути онлайн?» після входу більше нема сенсу
       // питати, застосунок уже онлайн.
       await login(trimEmail, password);
-      router.replace('/(tabs)');
+      // rc1 deeplinks.md: посилання, з яким людина прийшла до входу, — далі
+      // на `/open-link` (там перевірка доступу); інакше як завжди.
+      const intent = await getDeepLinkIntent().catch(() => null);
+      router.replace(intent ? ('/open-link' as never) : '/(tabs)');
     } catch (e: unknown) {
       haptic.error();
       if (e instanceof OfflineError) {
@@ -182,6 +188,8 @@ export default function LoginScreen() {
                   ]}
                   placeholderTextColor={k.text.muted}
                   placeholder="you@example.com"
+                  accessibilityLabel={tr.authEmail}
+                  accessibilityHint={emailError || undefined}
                   value={email}
                   onChangeText={v => { setEmail(v); if (emailError) setEmailError(''); }}
                   onBlur={() => validateEmailFormat(email)}
@@ -220,6 +228,8 @@ export default function LoginScreen() {
                     ]}
                     placeholderTextColor={k.text.muted}
                     placeholder="••••••••"
+                    accessibilityLabel={tr.authPassword}
+                    accessibilityHint={passwordError || undefined}
                     value={password}
                     onChangeText={v => { setPassword(v); if (passwordError) setPasswordError(''); }}
                     secureTextEntry={!showPassword}
@@ -256,6 +266,9 @@ export default function LoginScreen() {
               activeOpacity={0.82}
               onPress={handleLogin}
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel={tr.authLogin}
+              accessibilityState={{ disabled: loading, busy: loading }}
             >
               {loading ? (
                 <ActivityIndicator color={k.text.onAction} />
@@ -267,6 +280,7 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={st.linkBtn}
               onPress={() => router.push('/forgot-password')}
+              accessibilityRole="link"
             >
               <Text style={[st.linkText, { color: c.text, fontFamily: fontFamily.semibold }]}>
                 {tr.authForgotPassword}
@@ -276,6 +290,7 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={st.linkBtn}
               onPress={() => router.replace('/register')}
+              accessibilityRole="link"
             >
               <Text style={[st.linkText, { color: c.sub }]}>
                 {tr.authNoAccount}

@@ -1,6 +1,6 @@
 # A11Y-08 — стрілки місяця 36x36 + hitSlop 4 = 44x44 за HIG.
 # Тапаємо на 3pt ЗОВНІ видимої іконки: до правки тут був промах.
-appId: com.casper3.f-tracking-app
+appId: app.flowi.mobile
 ---
 - launchApp
 - waitForAnimationToEnd

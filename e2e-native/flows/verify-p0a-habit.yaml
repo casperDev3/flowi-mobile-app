@@ -1,6 +1,6 @@
 # P0 (а) NAT-01 — ЗВИЧКА створюється до кінця.
 # Заразом NAT-13 (плитка хабу ловить тап) і NAT-14 (аркуш зафарбований донизу).
-appId: com.casper3.f-tracking-app
+appId: app.flowi.mobile
 ---
 - launchApp
 - waitForAnimationToEnd

@@ -17,7 +17,7 @@ final class FlowiWatchSession: NSObject {
   static let shared = FlowiWatchSession()
   static let replyTimeout: TimeInterval = 2.5
 
-  private let queue = DispatchQueue(label: "com.casper3.f-tracking-app.watch-session")
+  private let queue = DispatchQueue(label: "app.flowi.mobile.watch-session")
   private var replies: [String: ([String: Any]) -> Void] = [:]
 
   #if canImport(WatchConnectivity)

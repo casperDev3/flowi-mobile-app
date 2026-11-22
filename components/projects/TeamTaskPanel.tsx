@@ -18,6 +18,7 @@ import { InlineTextArea, MultiOptionField, OptionField, type FieldOption } from 
 import { ActionBar, ActionButton } from '@/components/shared/ActionBar';
 import { PropertyGroup, ToggleRow, type CardColors } from '@/components/tasks/card/primitives';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { useAnnounce } from '@/hooks/use-announce';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { apiFetch } from '@/store/api';
@@ -92,6 +93,7 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
   const members = useProjectMembers(pid).filter(m => m.role !== 'viewer');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  useAnnounce(error); // помилка «Здати / Повернути» — озвучити (WCAG 4.1.3)
   const [tasks, setTasks] = useState<Task[]>([]);
   const [startColumn, setStartColumn] = useState<string | null>(null);
   // «Заблоковано» без причини не зберігається: перемикач спершу відкриває поле.

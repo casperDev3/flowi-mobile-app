@@ -13,6 +13,13 @@
  * запитує `requestNotificationPermissions()` (store/notifications.ts) там,
  * де користувач сам вмикає нагадування; тут ми лише РЕЄСТРУЄМО токен, якщо
  * дозвіл уже є.
+ *
+ * rc1 (docs/release-rc1/push.md): сервер шле пуш НАПРЯМУ через FCM HTTP v1
+ * та APNs, тож реєструємо НАТИВНИЙ токен пристрою (`getDevicePushTokenAsync`):
+ * `{kind:'apns'|'fcm', token, platform, app_version, bundle_id}`. Токен ОС
+ * може змінитись (перевстановлення, відновлення з бекапу, ротація FCM) —
+ * `addPushTokenListener` перереєструє його з `previous_token`. Сервер без
+ * нативного каналу (N-1, 400 на `kind`) — запасний шлях через Expo-токен.
  */
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
@@ -66,8 +73,37 @@ const AUTH_USER_CACHE_KEY = 'auth_user';
 /** Той самий ключ, у який пише `I18nProvider` (`store/i18n.tsx`). */
 const LANG_STORAGE_KEY = 'lang_option_v1';
 
+/** Перереєстровуємо незмінний токен раз на тиждень: оновлює `last_seen_at` і
+ * знову вмикає пристрій, який сервер вимкнув після помилки провайдера. */
+const REREGISTER_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type PushDeviceKind = 'expo' | 'fcm' | 'apns';
+
+/** Тіло `POST /notifications/devices/` для нативного токена (rc1). */
+export interface NativeDeviceRegistrationBody {
+  kind: 'fcm' | 'apns';
+  token: string;
+  platform: 'ios' | 'android';
+  app_version: string;
+  bundle_id?: string;
+  device_name?: string;
+  lang?: string;
+  timezone?: string;
+  previous_token?: string;
+}
+
+interface LocalPushToken {
+  kind: PushDeviceKind;
+  token: string;
+  platform: 'ios' | 'android';
+}
+
 interface RegisteredPush {
   token: string;
+  /** Відсутнє в записах до rc1 — це був Expo-токен. */
+  kind?: PushDeviceKind;
+  /** ISO-час останнього успішного POST. */
+  at?: string;
   userId: string;
   workspaceId: string;
   /**
@@ -107,6 +143,48 @@ function deviceName(): string {
 function resolveEasProjectId(): string | undefined {
   const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
   return extra?.eas?.projectId || Constants.easConfig?.projectId;
+}
+
+function bundleId(): string {
+  const config = Constants.expoConfig as { ios?: { bundleIdentifier?: string }; android?: { package?: string } } | null;
+  const value = Platform.OS === 'ios' ? config?.ios?.bundleIdentifier : config?.android?.package;
+  return String(value || '');
+}
+
+/**
+ * Нативний токен ОС (APNs hex на iOS, FCM registration token на Android) —
+ * саме його сервер rc1 використовує для прямої відправки. Дозволу тут не
+ * просимо (шапка файлу).
+ */
+export async function getNativePushToken(): Promise<LocalPushToken | null> {
+  try {
+    if (!Device.isDevice) return null;
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') return null;
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return null;
+    const result = await Notifications.getDevicePushTokenAsync();
+    return nativeTokenFrom(result);
+  } catch (e) {
+    if (__DEV__) console.warn('[push] нативний токен не отримано:', e);
+    return null;
+  }
+}
+
+/** `DevicePushToken` → форма для сервера; `null` — невідомий тип токена. */
+export function nativeTokenFrom(result: { type?: string; data?: unknown } | null | undefined): LocalPushToken | null {
+  const token = typeof result?.data === 'string' ? result.data.trim() : '';
+  if (!token) return null;
+  if (result?.type === 'ios') return { kind: 'apns', token, platform: 'ios' };
+  if (result?.type === 'android') return { kind: 'fcm', token, platform: 'android' };
+  return null;
+}
+
+/** Сервер до rc1 не знає `kind: 'fcm'|'apns'` і відповідає 400 саме на це поле. */
+function isNativeKindRejected(error: unknown): boolean {
+  const err = error as { status?: unknown; details?: { fields?: Record<string, unknown> } & Record<string, unknown> } | null;
+  if (err?.status !== 400) return false;
+  const fields = (err.details?.fields ?? err.details) as Record<string, unknown> | undefined;
+  return !!fields && Object.prototype.hasOwnProperty.call(fields, 'kind');
 }
 
 /**
@@ -229,72 +307,140 @@ async function syncServerReminders(userId: string, deviceRegistered: boolean): P
  * робиться. Можливості сервера (`server_reminders`) перечитуються щоразу —
  * сервер міг почати слати нове нагадування.
  */
-export async function registerPushToken(userId: string, workspaceId: string): Promise<void> {
+export async function registerPushToken(
+  userId: string,
+  workspaceId: string,
+  opts: { refreshedToken?: LocalPushToken } = {},
+): Promise<void> {
   try {
-    const projectId = resolveEasProjectId();
-    if (!projectId && __DEV__) {
-      // Без projectId запит гарантовано впаде — голосно попереджаємо в dev,
-      // замість мовчки ковтати помилку SDK на кожному вході.
-      console.warn('[push] app.json не має extra.eas.projectId — Expo push токен неможливо отримати (SDK 54).');
-    }
-
-    const local = await getLocalPushToken();
+    const native = opts.refreshedToken ?? await getNativePushToken();
 
     // `await`, а не `void` (мінор із ревʼю): DELETE і POST нижче — той самий
     // токен пристрою; без очікування DELETE може дістатись сервера ПІСЛЯ
     // POST і зняти щойно зареєстрований запис (див. коментар над
-    // `flushPendingUnregister`). `local?.token` виключає з дожимання САМЕ
+    // `flushPendingUnregister`). `native?.token` виключає з дожимання САМЕ
     // той токен, який ця функція от-от (пере)зареєструє.
-    await flushPendingUnregister(local?.token);
+    await flushPendingUnregister(native?.token);
 
-    if (!local) {
+    if (!native) {
       await syncServerReminders(userId, false);
       return;
     }
-    const { token, platform } = local;
     const lang = (await loadData<string>(LANG_STORAGE_KEY, 'uk')) === 'en' ? 'en' : 'uk';
     const timezone = deviceTimezone();
 
     const prev = await loadData<RegisteredPush | null>(REGISTERED_KEY, null);
-    const unchanged = !!prev && prev.token === token && prev.userId === userId && prev.workspaceId === workspaceId
+    const fresh = !!prev?.at && Date.now() - Date.parse(prev.at) < REREGISTER_AFTER_MS;
+    const unchanged = !!prev && prev.token === native.token && prev.kind === native.kind
+      && prev.userId === userId && prev.workspaceId === workspaceId
       && prev.endpoint === 'devices' && prev.appVersion === CLIENT_VERSION
-      && prev.lang === lang && prev.timezone === timezone;
+      && prev.lang === lang && prev.timezone === timezone && fresh;
     if (unchanged) {
       await syncServerReminders(userId, true);
       return;
     }
-    // Той самий токен, але зареєстрований на ЛЕГАСІ-ендпоінті сервера без
-    // модуля, — не повторюємо даремний POST на кожному старті.
-    if (prev && prev.endpoint === 'legacy' && prev.token === token && prev.userId === userId
-      && prev.workspaceId === workspaceId && prev.appVersion === CLIENT_VERSION) {
-      return;
-    }
 
-    const body: DeviceRegistrationBody = {
-      kind: 'expo',
-      token,
-      platform,
-      device_name: deviceName(),
+    // Той самий користувач і workspace, але інший нативний токен — сервер
+    // прибере старий рядок (інакше два токени одного телефона = подвійний пуш).
+    const previousToken = prev && prev.userId === userId && prev.workspaceId === workspaceId
+      && prev.kind === native.kind && prev.token !== native.token ? prev.token : undefined;
+
+    const body: NativeDeviceRegistrationBody = {
+      kind: native.kind as 'fcm' | 'apns',
+      token: native.token,
+      platform: native.platform,
       app_version: CLIENT_VERSION,
+      device_name: deviceName(),
       lang,
       timezone,
     };
-    let endpoint: 'devices' | 'legacy' = 'devices';
+    const bundle = bundleId();
+    if (bundle) body.bundle_id = bundle;
+    if (previousToken) body.previous_token = previousToken;
+
+    let registered: { token: string; kind: PushDeviceKind; endpoint: 'devices' | 'legacy' };
     try {
-      await postDevice(body);
+      await apiFetch('/notifications/devices/', { method: 'POST', body });
+      registered = { token: native.token, kind: native.kind, endpoint: 'devices' };
     } catch (e) {
-      if (!isModuleMissing(e)) throw e;
-      endpoint = 'legacy';
-      await apiFetch('/push/tokens/', { method: 'POST', body: { token, platform } });
+      if (!isNativeKindRejected(e) && !isModuleMissing(e)) throw e;
+      // Сервер N-1 без нативного каналу — Expo-токен, як до rc1.
+      const fallback = await registerExpoFallback(lang, timezone);
+      if (!fallback) {
+        await syncServerReminders(userId, false);
+        return;
+      }
+      registered = fallback;
     }
     await saveData(REGISTERED_KEY, {
-      token, userId, workspaceId, endpoint, appVersion: CLIENT_VERSION, lang, timezone,
+      token: registered.token,
+      kind: registered.kind,
+      userId,
+      workspaceId,
+      endpoint: registered.endpoint,
+      appVersion: CLIENT_VERSION,
+      lang,
+      timezone,
+      at: new Date().toISOString(),
     } satisfies RegisteredPush);
-    await syncServerReminders(userId, endpoint === 'devices');
+    await syncServerReminders(userId, registered.endpoint === 'devices');
   } catch (e) {
     // Помилку відправки глушимо: контракт покладає ретраї на наступний вхід,
     // а користувача блокувати заради пуша не варто.
     if (__DEV__) console.warn('[push] реєстрація токена не вдалася:', e);
+  }
+}
+
+/** Реєстрація Expo-токена на сервері без нативного каналу (до rc1). */
+async function registerExpoFallback(
+  lang: string,
+  timezone: string,
+): Promise<{ token: string; kind: PushDeviceKind; endpoint: 'devices' | 'legacy' } | null> {
+  const local = await getLocalPushToken();
+  if (!local) return null;
+  const body: DeviceRegistrationBody = {
+    kind: 'expo',
+    token: local.token,
+    platform: local.platform,
+    device_name: deviceName(),
+    app_version: CLIENT_VERSION,
+    lang,
+    timezone,
+  };
+  try {
+    await postDevice(body);
+    return { token: local.token, kind: 'expo', endpoint: 'devices' };
+  } catch (e) {
+    if (!isModuleMissing(e)) throw e;
+    await apiFetch('/push/tokens/', { method: 'POST', body: { token: local.token, platform: local.platform } });
+    return { token: local.token, kind: 'expo', endpoint: 'legacy' };
+  }
+}
+
+/**
+ * Токен ОС змінився, поки застосунок працює (`addPushTokenListener`) —
+ * перереєструємо одразу, з `previous_token`, не чекаючи холодного старту.
+ */
+async function handleNativeTokenChange(result: { type?: string; data?: unknown }): Promise<void> {
+  const refreshed = nativeTokenFrom(result);
+  if (!refreshed) return;
+  const cached = await loadData<{ id: string } | null>(AUTH_USER_CACHE_KEY, null);
+  if (!cached?.id) return;
+  await registerPushToken(cached.id, cachedWorkspaceConfig()?.workspaceId ?? '', { refreshedToken: refreshed });
+}
+
+/** Підписка на оновлення нативного токена. Повертає відписку. */
+export function setupPushTokenRefresh(): () => void {
+  try {
+    const sub = Notifications.addPushTokenListener(token => {
+      void handleNativeTokenChange(token as { type?: string; data?: unknown }).catch(e => {
+        if (__DEV__) console.warn('[push] оновлення токена не вдалося:', e);
+      });
+    });
+    return () => sub.remove();
+  } catch (e) {
+    if (__DEV__) console.warn('[push] addPushTokenListener недоступний:', e);
+    return () => {};
   }
 }
 
@@ -426,6 +572,9 @@ function handlePushTap(data: PushPayloadData): void {
  * Викликається один раз із кореневого layout; повертає функцію відписки.
  */
 export function setupPushInteractionHandlers(): () => void {
+  // Оновлення нативного токена слухаємо з того самого кореневого layout —
+  // окремого виклику в `app/_layout.tsx` не потрібно.
+  const stopTokenRefresh = setupPushTokenRefresh();
   const sub = Notifications.addNotificationResponseReceivedListener(response => {
     handlePushTap((response.notification.request.content.data ?? {}) as PushPayloadData);
   });
@@ -441,5 +590,8 @@ export function setupPushInteractionHandlers(): () => void {
     if (__DEV__) console.warn('[push] getLastNotificationResponseAsync не вдався:', e);
   });
 
-  return () => sub.remove();
+  return () => {
+    sub.remove();
+    stopTokenRefresh();
+  };
 }

@@ -49,12 +49,12 @@ export function PromoCard({ title, caption, actionLabel, onAction, actionTestID,
         <View style={[StyleSheet.absoluteFill, { backgroundColor: t.gradient.iridescentGlow }]} />
       ) : null}
       {reduceTransparency ? (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(13,13,15,0.45)' : 'rgba(255,255,255,0.45)' }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(14,14,16,0.45)' : 'rgba(255,255,255,0.45)' }]} />
       ) : (
         <BlurView
           intensity={isDark ? 30 : 40}
           tint={isDark ? 'dark' : 'light'}
-          style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(13,13,15,0.25)' : 'rgba(255,255,255,0.25)' }]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(14,14,16,0.25)' : 'rgba(255,255,255,0.25)' }]}
         />
       )}
       <View

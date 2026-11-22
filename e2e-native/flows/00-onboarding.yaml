@@ -4,9 +4,9 @@
 # Тут живе SecureStore, якого на вебі немає, тож цей шлях перевіряється лише так.
 #
 # clearState обов'язковий: без нього другий прогін стартує вже підключеним.
-# eraseText теж: поле приходить заповненим продакшн-адресою api.flowi.casperdev.site,
+# eraseText теж: поле приходить заповненим продакшн-адресою api.flowi.com.ua (rc1; до rc1 — api.flowi.casperdev.site),
 # а inputText у Maestro ДОПИСУЄ, не замінює — без стирання вийшла б каша з двох адрес.
-appId: com.casper3.f-tracking-app
+appId: app.flowi.mobile
 ---
 - clearState
 - launchApp

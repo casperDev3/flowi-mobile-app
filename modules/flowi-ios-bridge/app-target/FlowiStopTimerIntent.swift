@@ -7,14 +7,14 @@ import ActivityKit
 #endif
 
 enum FlowiPendingActions {
-  static let appGroup = "group.com.casper3.f-tracking-app"
+  static let appGroup = "group.app.flowi.mobile"
   /// Кожна дія — окремий ключ `<key>.<id>` зі значенням-JSON одного DeviceAction:
   /// запис одного ключа атомарний, тож інтент і прибирання в застосунку
   /// (FlowiPendingQueue) не можуть затерти одне одного (без read-modify-write).
   static let key = "flowi_pending_device_actions_v1"
   /// userId власника черги; nil — ніхто не увійшов (FlowiPendingQueue.setOwner).
   static let ownerKey = "flowi_device_action_owner_v1"
-  static let darwinName = "com.casper3.f-tracking-app.pendingActions"
+  static let darwinName = "app.flowi.mobile.pendingActions"
 
   /// false — дію не поставлено (немає власника: користувач вийшов).
   @discardableResult

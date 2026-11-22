@@ -15,8 +15,9 @@ import { parseInviteLink } from '../store/invite-link';
 describe('parseInviteLink', () => {
   it('розбирає deep link зі схемою застосунку', () => {
     const url = 'ftrackingapp://invite?ws=https%3A%2F%2Fapi.flowi.casperdev.site&p=p-123&t=abc.def-ghi';
+    // rc1: стара адреса Flowi Cloud канонізується в нову (той самий workspace).
     expect(parseInviteLink(url)).toEqual({
-      ws: 'https://api.flowi.casperdev.site',
+      ws: 'https://api.flowi.com.ua',
       projectId: 'p-123',
       token: 'abc.def-ghi',
     });

@@ -758,14 +758,14 @@ export const TAB_BAR_BG_MEASURED = { light: '#F7F2FF', dark: '#191720' } as cons
  *     колір», а той самий колір — сенс альфи зникає.
  *
  * Неактивні навмисно лишились МЕНШ контрастними за активні (DS v2 на
- * TAB_BAR_BG: 5.28 проти 18.9 у світлій, 6.98 проти 16.3 у темній).
+ * TAB_BAR_BG: 5.28 проти 18.9 у світлій, 8.89 проти 15.5 у темній).
  */
 export const TAB_BAR_TINT = {
   // DS v2: активна вкладка — text.primary (а сама іконка — у pill
   // action.primary), неактивна — text.secondary. Знебарвлення лишилось:
   // «ви тут» тепер читається заливкою pill, а не насиченістю.
   light: { active: '#111113', inactive: '#6B6B73' },
-  dark:  { active: '#F4F4F5', inactive: '#A1A1AA' },
+  dark:  { active: '#F2F2F3', inactive: '#B9B9BF' },
 } as const;
 
 /**
@@ -774,7 +774,7 @@ export const TAB_BAR_TINT = {
  * TAB_BAR_TINT рахується і проти нього (__tests__/audit-tabbar-a11y.test.tsx).
  * TAB_BAR_BG_MEASURED вище лишається для панелі простору проєкту.
  */
-export const TAB_BAR_BG = { light: '#FFFFFF', dark: '#17171A' } as const;
+export const TAB_BAR_BG = { light: '#FFFFFF', dark: '#1A1A1D' } as const;
 
 /**
  * Кегль підпису таба. Було 10pt — найдрібніший текст застосунку.
@@ -820,6 +820,8 @@ export const SIDEBAR_WIDTH = 232;
  */
 export const SIDEBAR_HIDDEN_ON: readonly string[] = [
   '/welcome', '/login', '/register', '/forgot-password', '/workspace', '/register-pending',
+  // rc1: блокувальний екран «Оновіть застосунок» — без сайдбара.
+  '/update-required',
   // Запрошення (§4, контракт §4.3) — досяжний і гостю без акаунта: сайдбар
   // особистого простору тут так само недоречний, як на /welcome чи /login.
   '/invite',

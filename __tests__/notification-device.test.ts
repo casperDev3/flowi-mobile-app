@@ -41,6 +41,9 @@ jest.mock('expo-device', () => ({ isDevice: true, deviceName: 'iPad Pro', modelN
 jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
   getExpoPushTokenAsync: jest.fn(async () => ({ data: 'ExponentPushToken[abc]' })),
+  // rc1: основний шлях — нативний токен ОС (store/push.ts, docs/release-rc1/push.md).
+  getDevicePushTokenAsync: jest.fn(async () => ({ type: 'ios', data: 'ab'.repeat(32) })),
+  addPushTokenListener: jest.fn(() => ({ remove: jest.fn() })),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   getLastNotificationResponseAsync: jest.fn(async () => null),
 }));
@@ -77,8 +80,9 @@ describe('registerPushToken → DeviceRegistration', () => {
     await registerPushToken('u-1', 'ws-1');
     const post = mockApiFetch.mock.calls.find(([path, opts]) => path === '/notifications/devices/' && opts?.method === 'POST');
     expect(post?.[1]?.body).toMatchObject({
-      kind: 'expo',
-      token: 'ExponentPushToken[abc]',
+      kind: 'apns',
+      token: 'ab'.repeat(32),
+      platform: 'ios',
       app_version: '1.2.0',
       lang: 'en',
       device_name: 'iPad Pro',

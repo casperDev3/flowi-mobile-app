@@ -399,4 +399,4 @@ const onRefresh = useCallback(() => { setRefreshing(true); loadXxx().finally(() 
 - `MAESTRO_DRIVER_STARTUP_TIMEOUT=300000` обов'язковий, інакше драйвер XCUITest не встигає піднятись
 - `react-native-web` доходить лише до авторизації: `expo-secure-store` на вебі це `export default {}`
 - контраст рахувати з пікселів скріна, не з токенів — у темній темі `BlurView` віддає не константу
-- **ніколи не ганяти аудит на продакшн-акаунті** (`api.flowi.casperdev.site`) — сценарії створюють і видаляють записи незворотно
+- **ніколи не ганяти аудит на продакшн-акаунті** (`api.flowi.com.ua` і старий `api.flowi.casperdev.site` — це той самий прод) — сценарії створюють і видаляють записи незворотно

@@ -14,6 +14,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { fontFamily, radius } from '@/constants/theme';
 import { dsTokensForText } from '@/components/tasks/dsTokensForText';
+import { useI18n } from '@/store/i18n';
 
 /**
  * Ціль дотику 44×44 навколо стрілки 36×36 — той самий прийом, що вже стоїть
@@ -35,16 +36,17 @@ export function CalendarGrid({ year, month, markedDays, selectedDate, todayDate,
   months: string[]; weekdays: string[];
 }) {
   const t = dsTokensForText(c.text);
+  const { tr } = useI18n();
   return (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-        <TouchableOpacity onPress={onPrevMonth} style={st.navBtn} hitSlop={CALENDAR_NAV_HIT_SLOP}>
+        <TouchableOpacity onPress={onPrevMonth} style={st.navBtn} hitSlop={CALENDAR_NAV_HIT_SLOP} accessibilityRole="button" accessibilityLabel={tr.a11yPrevMonth}>
           <IconSymbol name="chevron.left" size={20} color={c.sub} />
         </TouchableOpacity>
         <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
           {months[month]} {year}
         </Text>
-        <TouchableOpacity onPress={onNextMonth} style={st.navBtn} hitSlop={CALENDAR_NAV_HIT_SLOP}>
+        <TouchableOpacity onPress={onNextMonth} style={st.navBtn} hitSlop={CALENDAR_NAV_HIT_SLOP} accessibilityRole="button" accessibilityLabel={tr.a11yNextMonth}>
           <IconSymbol name="chevron.right" size={20} color={c.sub} />
         </TouchableOpacity>
       </View>
@@ -66,6 +68,9 @@ export function CalendarGrid({ year, month, markedDays, selectedDate, todayDate,
               <TouchableOpacity
                 key={di}
                 onPress={() => onSelectDay(dayDate)}
+                accessibilityRole="button"
+                accessibilityLabel={`${day} ${tr.monthsGenitive?.[month] ?? months[month]} ${year}`}
+                accessibilityState={{ selected: isSel }}
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}>
                 <View style={[st.dayCell, isSel && { backgroundColor: t.action.primary }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.accent }]}>
                   <Text style={{ color: isSel ? t.text.onAction : isToday ? c.accent : c.text, fontSize: 13, fontVariant: ['tabular-nums'], fontFamily: isToday || isSel ? fontFamily.semibold : fontFamily.regular }}>{day}</Text>

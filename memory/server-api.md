@@ -1,8 +1,8 @@
 # Server API
 
 Django + DRF + Channels (Daphne ASGI). Деплой:
-- API: `https://api.flowi.casperdev.site/api/`
-- WS:  `wss://api.flowi.casperdev.site/ws/`
+- API: `https://api.flowi.com.ua/api/` (rc1; старий `https://api.flowi.casperdev.site/api/` — проксі для N-1)
+- WS:  `wss://api.flowi.com.ua/ws/` (старий `wss://api.flowi.casperdev.site/ws/` теж проксіюється)
 
 Локальний запуск: `cd flowi-server-app && .venv/bin/daphne -p 8000 flowi_server.asgi:application`.
 Admin: `http://localhost:8000/admin` (admin/admin у dev).

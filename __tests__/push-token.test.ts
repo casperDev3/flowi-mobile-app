@@ -56,6 +56,9 @@ jest.mock('expo-device', () => ({ isDevice: true }));
 jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
   getExpoPushTokenAsync: jest.fn(async () => ({ data: 'token-new' })),
+  // rc1: реєструється нативний токен ОС (той самий рядок, що й раніше в тестах).
+  getDevicePushTokenAsync: jest.fn(async () => ({ type: 'ios', data: 'token-new' })),
+  addPushTokenListener: jest.fn(() => ({ remove: jest.fn() })),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   getLastNotificationResponseAsync: jest.fn(async () => null),
 }));

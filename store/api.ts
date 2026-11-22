@@ -309,7 +309,10 @@ export async function apiFetch<T>(
     // застаріла для активного workspace — блокуємо UI екраном оновлення,
     // а не просто показуємо помилку на конкретному екрані.
     if (res.status === 426) {
-      reportClientOutdated(typeof err.details?.min_version === 'string' ? err.details.min_version : undefined);
+      reportClientOutdated(
+        typeof err.details?.min_version === 'string' ? err.details.min_version : undefined,
+        typeof err.details?.store_url === 'string' ? err.details.store_url : undefined,
+      );
     }
     throw err;
   }

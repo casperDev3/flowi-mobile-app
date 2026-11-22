@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
-import { fontFamily, radius, shadow, type as dsType } from '@/constants/theme';
+import { finColors, fontFamily, radius, shadow, type as dsType } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 import type { Currency, TxGroup, Transaction } from '@/utils/financeUtils';
 import { accountById, creditedAmount, isTransfer, resolveTxCurrency, type Account } from '@/utils/accounts';
@@ -73,6 +73,7 @@ export function TransactionGroup({
     group.label;
 
   const t = dsTokens(isDark);
+  const fin = finColors(isDark);
   const sh = shadow[isDark ? 'dark' : 'light'].card;
   // Денні підсумки й мітки — суцільні subtle-pill (не скло).
   const pill = { backgroundColor: t.surface.subtle } as const;
@@ -144,7 +145,7 @@ export function TransactionGroup({
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {incomeCodes.map(code => (
             <View key={'in_' + code} style={{ ...pill, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
-              <IconSymbol name="arrow.up" size={10} color={t.status.success} />
+              <IconSymbol name="arrow.up" size={10} color={fin.income} />
               <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.semibold, ...dsType.numeric }}>
                 {fmt(group.dayIncomeByCur[code], curOf(code))}
               </Text>
@@ -152,7 +153,7 @@ export function TransactionGroup({
           ))}
           {expenseCodes.map(code => (
             <View key={'ex_' + code} style={{ ...pill, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
-              <IconSymbol name="arrow.down" size={10} color={t.status.danger} />
+              <IconSymbol name="arrow.down" size={10} color={fin.expense} />
               <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.semibold, ...dsType.numeric }}>
                 {fmt(group.dayExpenseByCur[code], curOf(code))}
               </Text>
@@ -173,7 +174,7 @@ export function TransactionGroup({
           const transfer = tx.type === 'transfer';
           const isIncome = tx.type === 'income';
           // Тип — лише в гліфі (статусний колір); суми — text.primary, щоб читались на 4.5:1.
-          const color = transfer ? t.status.info : isIncome ? t.status.success : t.status.danger;
+          const color = transfer ? t.status.info : isIncome ? fin.income : fin.expense;
           const iconName: IconSymbolName = transfer
             ? 'arrow.left.arrow.right'
             : getCatIcon(tx.category, isIncome ? 'income' : 'expense');

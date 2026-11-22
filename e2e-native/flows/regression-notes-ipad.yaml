@@ -1,6 +1,6 @@
 # Local audit fixture: existing project with one note; no saved mutations in this flow.
 # Orientation command: https://docs.maestro.dev/reference/commands-available/setorientation
-appId: com.casper3.f-tracking-app
+appId: app.flowi.mobile
 env:
   PROJECT_ID: p-notes-audit
   PROJECT_NOTE_ID: n-project-audit

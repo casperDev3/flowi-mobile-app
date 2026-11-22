@@ -1,6 +1,6 @@
 # I18N-05 — заголовок нотифікації мусить іти мовою інтерфейсу.
 # Мова вже перемкнена на English попереднім кроком.
-appId: com.casper3.f-tracking-app
+appId: app.flowi.mobile
 ---
 - launchApp
 - waitForAnimationToEnd

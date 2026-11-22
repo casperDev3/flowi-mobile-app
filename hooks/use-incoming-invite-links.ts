@@ -1,5 +1,5 @@
 /**
- * hooks/use-incoming-invite-links.ts — слухач deep link `ftrackingapp://invite`
+ * hooks/use-incoming-invite-links.ts — слухач deep link `flowi://invite` (аліас `ftrackingapp://invite`)
  * (WORKSPACE_PROJECTS_PLAN.md §4, контракт §4.3).
  *
  * Реєструється один раз на весь застосунок (`app/_layout.tsx`, поруч із
@@ -7,13 +7,12 @@
  * закритий (холодний старт, `getInitialURL`) або відкритий на будь-якому
  * екрані (`addEventListener('url', …)`).
  *
- * Сам обробник лише зберігає розібране посилання (`pending_invite`, §9.1) і
- * веде на `/invite` — уся логіка «той самий workspace чи інший / є акаунт чи
+ * Сам обробник лише зберігає розібране посилання (`pending_invite`, §9.1);
+ * навігація — у `app/+native-intent.tsx`. Уся логіка «той самий workspace чи інший / є акаунт чи
  * нема» лежить у самому екрані (`app/invite.tsx`), бо вона залежить від
  * поточного `authStatus`, а тут його нема.
  */
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 
@@ -23,27 +22,20 @@ import { parseInviteLink, setPendingInvite } from '@/store/invite-link';
 import { registerInvitePushCategory, setupInvitePushActions, syncMyInvites } from '@/store/invite-inbox';
 import { inviteFailureText } from '@/store/invite-messages';
 
+/**
+ * rc1 (deeplinks.md): НАВІГАЦІЮ за посиланням робить лише
+ * `app/+native-intent.tsx` (utils/deepLinks.ts) — і на холодному старті, і
+ * поки застосунок відкритий. Раніше тут був ще й `router.push`, і одне
+ * посилання відкривало екран запрошення двічі (expo-router сам + цей хук).
+ * Тут лишилась тільки памʼять: `pending_invite` (§9.1) мусить пережити
+ * вхід/реєстрацію, навіть якщо екран `/invite` закриють.
+ */
 function handleUrl(url: string | null | undefined): void {
   if (!url) return;
-  try {
-    const link = new URL(url);
-    if (
-      (link.protocol === "https:" && link.pathname === "/invite/menu") ||
-      (link.protocol === "ftrackingapp:" && link.hostname === "menu-invite")
-    ) {
-      const ws = link.searchParams.get("ws"),
-        t = link.searchParams.get("t");
-      if (ws && t)
-        router.push({ pathname: "/menu-invite", params: { ws, t } } as never);
-      return;
-    }
-  } catch {
-    return;
-  }
   const parsed = parseInviteLink(url);
   if (!parsed) return;
-  void setPendingInvite(parsed).then(() => {
-    router.push({ pathname: '/invite', params: parsed } as never);
+  void setPendingInvite(parsed).catch(e => {
+    if (__DEV__) console.warn('[invite-link] не вдалося зберегти pending_invite:', e);
   });
 }
 

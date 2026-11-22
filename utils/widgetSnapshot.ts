@@ -27,7 +27,7 @@ import { isMyTask, type Task } from './taskUtils';
 import { meetingOccurrences, myTodayTasks, orderTodayTasks, snapshotTaskHasTime, snapshotTaskOverdue } from './watchSnapshot';
 
 /** App Group, спільна для застосунку й віджета (app.json → ios.entitlements). */
-export const WIDGET_APP_GROUP = 'group.com.casper3.f-tracking-app';
+export const WIDGET_APP_GROUP = 'group.app.flowi.mobile';
 /** Ключ у UserDefaults(suiteName: WIDGET_APP_GROUP). Swift читає той самий. */
 export const WIDGET_SNAPSHOT_KEY = 'flowi_widget_snapshot_v1';
 export const WIDGET_SNAPSHOT_VERSION = 1;

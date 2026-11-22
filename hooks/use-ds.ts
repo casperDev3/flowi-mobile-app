@@ -16,6 +16,7 @@ import { useMemo } from 'react';
 import type { TextStyle, ViewStyle } from 'react-native';
 
 import {
+  darkScale,
   glass,
   radius,
   space,
@@ -90,6 +91,15 @@ export const ds = {
    */
   glass(isDark: boolean, variant: 'card' | 'strong' | 'subtle' = 'card', reduceTransparency = false): ViewStyle {
     const g = glass[isDark ? 'dark' : 'light'];
+    // RC1: темна тема — суцільні поверхні з однією межею 1 px (без світлого
+    // верху/темного низу); subtle (поля, чипи, вкладене) — сильніша межа.
+    if (isDark) {
+      return {
+        backgroundColor: variant === 'subtle' ? g.solid.subtle : variant === 'strong' ? g.solid.strong : g.solid.card,
+        borderWidth: 1,
+        borderColor: variant === 'subtle' ? darkScale.borderStrong : darkScale.border,
+      };
+    }
     if (reduceTransparency) {
       return {
         backgroundColor: variant === 'subtle' ? g.solid.subtle : variant === 'strong' ? g.solid.strong : g.solid.card,

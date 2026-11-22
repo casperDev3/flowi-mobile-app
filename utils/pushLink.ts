@@ -172,7 +172,12 @@ export function modulesForEvent(eventType: string): readonly string[] {
 
 // ─── Deep link сервера → маршрут застосунку ─────────────────────────────────
 
-const SCHEME = 'ftrackingapp://';
+/**
+ * Схеми застосунку (rc1, deeplinks.md): канонічна `flowi://` і аліас
+ * `ftrackingapp://` — реєстр сервера (`core/notifications/registry.py`) і
+ * N-1 посилання досі шлють старий префікс, тож розбираються обидва.
+ */
+const SCHEMES = ['flowi://', 'ftrackingapp://'] as const;
 
 /**
  * `payload.url` сервера (`EventType.deep_link` у реєстрі) → маршрут expo-router.
@@ -182,8 +187,9 @@ const SCHEME = 'ftrackingapp://';
  * відкрити екран, який про цей запис нічого не знає.
  */
 export function deepLinkRoute(url: string | null | undefined): string | null {
-  if (!url || !url.startsWith(SCHEME)) return null;
-  const [rest, afterPath = ''] = url.slice(SCHEME.length).split('?', 2) as [string, string?];
+  const scheme = url ? SCHEMES.find(s => url.toLowerCase().startsWith(s)) : undefined;
+  if (!url || !scheme) return null;
+  const [rest, afterPath = ''] = url.slice(scheme.length).split('?', 2) as [string, string?];
   const pathOnly = rest.split('#')[0];
   let parts: string[];
   let query: URLSearchParams;

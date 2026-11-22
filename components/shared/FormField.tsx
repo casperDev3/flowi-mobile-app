@@ -3,6 +3,7 @@ import { Text, TextInput, View, type TextInputProps } from "react-native";
 import { radius, type } from "@/constants/theme";
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { glassOf } from '@/components/shared/dsTheme';
+import { useAnnounce } from '@/hooks/use-announce';
 // DS v2: поле — subtle-тло без рамки; помилка — 2px status.danger.
 export function FormField({
   label,
@@ -11,6 +12,8 @@ export function FormField({
   ...props
 }: TextInputProps & { label: string; required?: boolean; error?: string }) {
   const { t } = useDSTheme();
+  // WCAG 4.1.3: role="alert" у RN сам не озвучує — оголошуємо явно.
+  useAnnounce(error ? `${label}: ${error}` : '');
   return (
     <View style={{ gap: 6, marginVertical: 6 }}>
       <Text style={[type.bodyMedium, { color: t.text.primary }]}>

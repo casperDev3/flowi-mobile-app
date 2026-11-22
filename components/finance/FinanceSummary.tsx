@@ -18,7 +18,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { fontFamily, radius, shadow, space, type as dsType } from '@/constants/theme';
+import { finColors, fontFamily, radius, shadow, space, type as dsType } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 import type { Account, AccountKind } from '@/utils/accounts';
 import type { Currency, CurrencyTotals } from '@/utils/financeUtils';
@@ -126,7 +126,7 @@ export function FinanceSummary({
                 key={code}
                 numberOfLines={1}
                 accessibilityLabel={`${totalLabel ?? ''} ${fmt(value, curOf(code))}`}
-                style={{ ...dsType.displaySm, fontSize: 32, lineHeight: 36, color: value < 0 ? t.status.danger : t.text.primary, flexShrink: 1 }}>
+                style={{ ...dsType.displaySm, fontSize: 32, lineHeight: 36, color: value < 0 ? finColors(isDark).expenseInk : t.text.primary, flexShrink: 1 }}>
                 {fmt(value, curOf(code))}
               </Text>
             );
@@ -208,7 +208,7 @@ export function FinanceSummary({
                   </View>
                   <Text
                     numberOfLines={1}
-                    style={{ marginTop: 12, fontSize: 22, lineHeight: 26, fontFamily: fontFamily.light, letterSpacing: -0.44, ...dsType.numeric, color: balance < 0 ? t.status.danger : t.text.primary }}>
+                    style={{ marginTop: 12, fontSize: 22, lineHeight: 26, fontFamily: fontFamily.light, letterSpacing: -0.44, ...dsType.numeric, color: balance < 0 ? finColors(isDark).expenseInk : t.text.primary }}>
                     {fmt(balance, curOf(account.currency))}
                   </Text>
                   {account.goal ? (
@@ -318,8 +318,8 @@ export function PeriodFlowCard({
 
         {flowCodes.length === 0 ? (
           <View style={{ flexDirection: 'row', gap: 18 }}>
-            <FlowCell label={incomeLabel} value={fmt(0, curOf(primaryCode))} color={ds.text.primary} sub={ds.text.secondary} dot={ds.status.success} />
-            <FlowCell label={expenseLabel} value={fmt(0, curOf(primaryCode))} color={ds.text.primary} sub={ds.text.secondary} dot={ds.status.danger} />
+            <FlowCell label={incomeLabel} value={fmt(0, curOf(primaryCode))} color={ds.text.primary} sub={ds.text.secondary} dot={finColors(isDark).income} />
+            <FlowCell label={expenseLabel} value={fmt(0, curOf(primaryCode))} color={ds.text.primary} sub={ds.text.secondary} dot={finColors(isDark).expense} />
           </View>
         ) : (
           flowCodes.map((code, idx) => {
@@ -350,8 +350,8 @@ export function PeriodFlowCard({
                   )}
                 </View>
                 <View style={{ flexDirection: 'row', gap: 18, marginTop: 6 }}>
-                  <FlowCell label={incomeLabel} value={fmt(t.income, cur)} color={ds.text.primary} sub={ds.text.secondary} dot={ds.status.success} />
-                  <FlowCell label={expenseLabel} value={fmt(t.expense, cur)} color={ds.text.primary} sub={ds.text.secondary} dot={ds.status.danger} />
+                  <FlowCell label={incomeLabel} value={fmt(t.income, cur)} color={ds.text.primary} sub={ds.text.secondary} dot={finColors(isDark).income} />
+                  <FlowCell label={expenseLabel} value={fmt(t.expense, cur)} color={ds.text.primary} sub={ds.text.secondary} dot={finColors(isDark).expense} />
                 </View>
                 {t.income > 0 && (
                   <SegmentedProgress

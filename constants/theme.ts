@@ -119,24 +119,60 @@ export type DSTheme = {
   };
 };
 
+/**
+ * Нейтрально-сіра шкала темної теми (RC1, 2026-11-22). Чіткі кроки
+ * яскравості canvas → card → elevated → hover, суцільна межа 1 px. Паритет із
+ * вебом (app/globals.css, `--ds-*` у темних блоках) — canvas ОДИН на обох.
+ * Контрасти — docs/release-rc1/dark-theme.md (scripts/dark-contrast.js).
+ */
+export const darkScale = {
+  canvas: '#0E0E10',
+  card: '#1A1A1D',
+  /** Піднята поверхня: поля вводу, вкладені блоки, поповери, аркуші. */
+  elevated: '#232327',
+  hover: '#2C2C31',
+  border: '#34343A',
+  /** Межа полів вводу й контролів. */
+  borderStrong: '#45454C',
+  textPrimary: '#F2F2F3',
+  textSecondary: '#B9B9BF',
+  textMuted: '#93939B',
+} as const;
+
+/** Кольори фінансів у ТЕМНІЙ темі (світла бере status.success / status.danger). */
+export const financeDark = {
+  income: '#0ECB81',
+  /** Заливки (стовпці, крапки). */
+  expense: '#F6465D',
+  /** Текст сум витрат: ≥ 5:1 на всіх темних поверхнях. */
+  expenseInk: '#FF6B7D',
+} as const;
+
+/** Дохід / витрата для схеми: світла — status.success / status.danger (без змін), темна — {@link financeDark}. */
+export function finColors(isDark: boolean): { income: string; expense: string; expenseInk: string } {
+  return isDark
+    ? { income: financeDark.income, expense: financeDark.expense, expenseInk: financeDark.expenseInk }
+    : { income: light.status.success, expense: light.status.danger, expenseInk: light.status.danger };
+}
+
 const dark: DSTheme = {
   bg: {
-    canvas: '#0D0D0F',
+    canvas: darkScale.canvas,
   },
   surface: {
-    card: '#17171A',
-    subtle: '#202024',
-    elevated: '#1E1E22',
+    card: darkScale.card,
+    subtle: darkScale.elevated,
+    elevated: darkScale.elevated,
     overlay: 'rgba(0,0,0,0.60)',
-    glass: 'rgba(23,23,26,0.72)',
+    glass: 'rgba(26,26,29,0.96)',
   },
   border: {
-    hairline: '#2A2A2F',
+    hairline: darkScale.border,
   },
   text: {
-    primary: '#F4F4F5',
-    secondary: '#A1A1AA',
-    muted: '#6B6B73',
+    primary: darkScale.textPrimary,
+    secondary: darkScale.textSecondary,
+    muted: darkScale.textMuted,
     onAction: '#111113',
     onAccent: '#111113',
   },
@@ -144,8 +180,8 @@ const dark: DSTheme = {
     primary: '#F4F4F5',
     primaryHover: '#FFFFFF',
     primaryPressed: '#D4D4D8',
-    secondary: '#202024',
-    secondaryText: '#F4F4F5',
+    secondary: darkScale.hover,
+    secondaryText: darkScale.textPrimary,
   },
   accent: {
     lime: '#CDEB3A',
@@ -164,12 +200,12 @@ const dark: DSTheme = {
     ring: '#B8A4F8',
   },
   state: {
-    disabledBg: '#1A1A1D',
-    disabledText: '#52525B',
+    disabledBg: '#202023',
+    disabledText: '#6A6A72',
   },
   skeleton: {
-    base: '#1E1E22',
-    highlight: '#26262B',
+    base: darkScale.elevated,
+    highlight: darkScale.hover,
   },
   gradient: {
     iridescent: ['#1E3A66', '#5A2752', '#6B4419'],
@@ -181,8 +217,8 @@ const dark: DSTheme = {
     aiCard: ['rgba(127,11,232,0.30)', 'rgba(244,170,45,0.12)'],
   },
   featured: {
-    bg: '#2C2C2E',
-    text: '#F4F4F5',
+    bg: darkScale.hover,
+    text: darkScale.textPrimary,
     textSecondary: '#C7C7CC',
     action: '#F4F4F5',
     actionText: '#111113',
@@ -305,36 +341,34 @@ const glassLight: GlassTokens = {
   },
 };
 
+// RC1: темна тема — СУЦІЛЬНІ поверхні (Binance-подібна ясність): скло
+// непрозоре, без мешу й блюру, межа 1 px border. GlassSurface/GlassBackdrop/
+// ds.glass у темній ідуть суцільною гілкою (див. components/ds/Glass.tsx).
 const glassDark: GlassTokens = {
-  surface: 'rgba(30,30,36,0.52)',
-  surfaceStrong: 'rgba(32,32,38,0.70)',
-  surfaceSubtle: 'rgba(255,255,255,0.06)',
-  rim: 'rgba(255,255,255,0.14)',
-  rimShade: 'rgba(0,0,0,0.4)',
-  highlight: 'rgba(255,255,255,0.16)',
-  blur: 28,
-  saturate: 1.6,
-  blurIntensity: 45,
+  surface: darkScale.card,
+  surfaceStrong: darkScale.elevated,
+  surfaceSubtle: darkScale.elevated,
+  rim: darkScale.border,
+  rimShade: darkScale.border,
+  highlight: 'rgba(255,255,255,0)',
+  blur: 0,
+  saturate: 1,
+  blurIntensity: 0,
   blurTint: 'systemUltraThinMaterialDark',
   shadow: Platform.select<ViewStyle>({
     android: {},
     default: {
       shadowColor: '#000000',
-      shadowOpacity: 0.45,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 1 },
     },
   }),
-  solid: { card: '#17171A', strong: '#1E1E22', subtle: '#202024' },
+  solid: { card: darkScale.card, strong: darkScale.elevated, subtle: darkScale.elevated },
   mesh: {
-    base: '#0D0D10',
-    blobs: [
-      { color: '#7B5CFF', opacity: 0.18, cx: 0.06, cy: 0.04, rx: 0.85, ry: 0.42 }, // фіолет, вгорі ліворуч
-      { color: '#4F7CF7', opacity: 0.12, cx: 0.98, cy: 0.12, rx: 0.7, ry: 0.34 },  // синій, вгорі праворуч
-      { color: '#E8543F', opacity: 0.08, cx: 0.95, cy: 0.95, rx: 0.8, ry: 0.4 },   // корал, внизу праворуч
-      { color: '#CDEB3A', opacity: 0.06, cx: 0.02, cy: 0.9, rx: 0.7, ry: 0.36 },    // лайм, внизу ліворуч
-      { color: '#F2B135', opacity: 0.06, cx: 0.5, cy: 0.55, rx: 0.55, ry: 0.28 },   // бурштин, по центру
-    ],
+    // Без кольорових плям: тло = canvas (той самий, що на вебі).
+    base: darkScale.canvas,
+    blobs: [],
   },
   accent: {
     lavender: { solid: '#B8A4F8', fill: '#B8A4F8', ink: '#B8A4F8', tint: 'rgba(184,164,248,0.24)', glow: '#9B82FF', onSolid: '#111113' },
@@ -362,7 +396,7 @@ export const glass: Readonly<Record<DSScheme, GlassTokens>> = { light: glassLigh
  * прозорість» → суцільна `solid`. Паритет із вебом `--ds-overlay-*`.
  *
  * Контраст: text.secondary на `solid` — 4.9:1 (світла #6B6B73 на #F6F6F8),
- * 7.0:1 (темна #A1A1AA на #1A1A1E); на композиті fill+blur — не гірше.
+ * 8.0:1 (темна #B9B9BF на #232327); на композиті fill+blur — не гірше.
  */
 export type OverlayTokens = {
   /** Заливка поверх блюру. */
@@ -398,13 +432,13 @@ export const overlay: Readonly<Record<DSScheme, OverlayTokens>> = {
     scrimBlurIntensity: 18,
   },
   dark: {
-    fill: 'rgba(26,26,30,0.92)',
-    fillNoBlur: 'rgba(26,26,30,1)',
-    solid: '#1A1A1E',
+    fill: 'rgba(35,35,39,0.97)',
+    fillNoBlur: darkScale.elevated,
+    solid: darkScale.elevated,
     blurIntensity: 90,
     blurTint: 'systemThickMaterialDark',
     noiseOpacity: 0.04,
-    rim: 'rgba(255,255,255,0.12)',
+    rim: darkScale.border,
     rimShade: 'rgba(0,0,0,0.45)',
     scrim: 'rgba(0,0,0,0.60)',
     scrimBlurIntensity: 18,
@@ -559,7 +593,7 @@ export const shadow: Readonly<Record<DSScheme, { card: ViewStyle; popover: ViewS
     card: {
       // elevation через яскравість: верхній світлий край замість тіні
       borderTopWidth: 1,
-      borderTopColor: 'rgba(255,255,255,0.04)',
+      borderTopColor: darkScale.border,
     },
     popover: Platform.select<ViewStyle>({
       android: { elevation: 8 },

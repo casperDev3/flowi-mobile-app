@@ -21,7 +21,7 @@ module.exports = (config) => ({
   entitlements: {
     'com.apple.security.application-groups':
       (config.ios && config.ios.entitlements && config.ios.entitlements['com.apple.security.application-groups'])
-      || ['group.com.casper3.f-tracking-app'],
+      || ['group.app.flowi.mobile'],
     'com.apple.developer.healthkit': true,
   },
 });

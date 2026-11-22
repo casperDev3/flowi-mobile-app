@@ -10,7 +10,8 @@ describe('healthTheme', () => {
   test('getHealthColors відрізняє dark/light і має всі ключі', () => {
     const dark = getHealthColors(true);
     const light = getHealthColors(false);
-    expect(dark.bg1).toBe('#0D0D0F');
+    // RC1: один темний canvas на вебі й мобільному (docs/release-rc1/dark-theme.md).
+    expect(dark.bg1).toBe('#0E0E10');
     expect(light.bg1).toBe('#F1F1F3');
     for (const k of ['bg1', 'bg2', 'border', 'text', 'sub', 'dim', 'sheet', 'track', 'card'] as const) {
       expect(typeof dark[k]).toBe('string');

@@ -6,7 +6,7 @@ Pod::Spec.new do |s|
   s.description    = 'Native bridge for the Flowi app (Apple Watch link, timer Live Activity, App Group action queue).'
   s.license        = 'UNLICENSED'
   s.author         = 'Flowi'
-  s.homepage       = 'https://api.flowi.casperdev.site'
+  s.homepage       = 'https://app.flowi.com.ua'
   s.platforms      = { :ios => '15.1' }
   s.swift_version  = '5.9'
   s.source         = { git: '' }

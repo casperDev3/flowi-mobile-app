@@ -16,7 +16,7 @@ import { ScrollHeaderSlot, useScrollHeaderScroll } from '@/components/shared/Scr
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BentoCard, BentoGrid, EmptyState, SegmentedProgress } from '@/components/ds';
-import { fontFamily, radius, type as dsType } from '@/constants/theme';
+import { finColors, fontFamily, radius, type as dsType } from '@/constants/theme';
 import { WIDE_CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
 import { useDS } from '@/hooks/use-ds';
 import type { Translations } from '@/store/translations';
@@ -47,7 +47,7 @@ export function AccountsTab({
    */
   header?: React.ReactNode;
 }) {
-  const { t } = useDS();
+  const { t, isDark } = useDS();
   const [showArchived, setShowArchived] = useState(false);
   const byCurrency = useMemo(() => {
     const map = new Map<string, Account[]>();
@@ -77,7 +77,7 @@ export function AccountsTab({
               <Text numberOfLines={1} style={{ ...dsType.bodyMedium, color: t.text.primary }}>{a.name}</Text>
               <Text style={{ ...dsType.caption, color: t.text.secondary, marginTop: 1 }}>{kindLabel(a.kind)}</Text>
             </View>
-            <Text style={{ color: balance < 0 ? t.status.danger : t.text.primary, fontSize: 16, fontFamily: fontFamily.medium, ...dsType.numeric }}>{signed(balance, code)}</Text>
+            <Text style={{ color: balance < 0 ? finColors(isDark).expenseInk : t.text.primary, fontSize: 16, fontFamily: fontFamily.medium, ...dsType.numeric }}>{signed(balance, code)}</Text>
           </View>
           {goal ? (
             <SegmentedProgress

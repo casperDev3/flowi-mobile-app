@@ -1,0 +1,9 @@
+# Шаблон для ~/.gradle/gradle.properties (НЕ комітити реальні значення).
+# Upload-ключ лежить поза репозиторієм у ~/.flowi-signing/ (майстер:
+# scripts/owner-setup-wizard.sh). Читає plugins/withAndroidReleaseSigning.js →
+# android/app/build.gradle signingConfigs.release. Без цих значень
+# assembleRelease/bundleRelease падає навмисно.
+FLOWI_UPLOAD_STORE_FILE=/Users/CHANGE_ME/.flowi-signing/flowi-upload.jks
+FLOWI_UPLOAD_STORE_PASSWORD=CHANGE_ME
+FLOWI_UPLOAD_KEY_ALIAS=flowi-upload
+FLOWI_UPLOAD_KEY_PASSWORD=CHANGE_ME

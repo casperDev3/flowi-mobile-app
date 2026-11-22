@@ -13,9 +13,9 @@ struct WatchCredentials: Codable, Equatable {
   var issuedAt: String?
 }
 
-/// Keychain годинника (service `com.casper3.f-tracking-app.watch`).
+/// Keychain годинника (service `app.flowi.mobile.watch`).
 enum Keychain {
-  static let service = "com.casper3.f-tracking-app.watch"
+  static let service = "app.flowi.mobile.watch"
 
   private static func query(_ account: String) -> [String: Any] {
     [

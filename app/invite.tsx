@@ -25,6 +25,7 @@ import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { dsTokens } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useAnnounce } from '@/hooks/use-announce';
 import { UnsyncedOutboxError, useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { addRecentProject, syncProject } from '@/store/project-sync';
@@ -83,6 +84,7 @@ export default function InviteScreen() {
   // Заголовок екрана помилки: причина «мертвого» запрошення (decision 7) —
   // людина має одразу бачити, ЩО сталось, а не загальне «помилка».
   const [errorTitle, setErrorTitle] = useState('');
+  useAnnounce(stage === 'error' ? [errorTitle, errorText].filter(Boolean).join('. ') : ''); // WCAG 4.1.3
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [link, setLink] = useState<ParsedInviteLink | null>(null);
   const [joinedProjectId, setJoinedProjectId] = useState<string | null>(null);
@@ -331,10 +333,10 @@ export default function InviteScreen() {
             <View style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}>
               <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.inviteSwitchWorkspaceTitle}</Text>
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 16 }}>{tr.inviteSwitchWorkspaceMsg}</Text>
-              <TouchableOpacity onPress={confirmSwitch} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
+              <TouchableOpacity accessibilityRole="button" onPress={confirmSwitch} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
                 <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteSwitchWorkspaceConfirm}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.replace('/(tabs)/today')} style={st.linkBtn}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => router.replace('/(tabs)/today')} style={st.linkBtn}>
                 <Text style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.medium }}>{tr.cancel}</Text>
               </TouchableOpacity>
             </View>
@@ -346,10 +348,10 @@ export default function InviteScreen() {
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 16 }}>
                 {tr.inviteConfirmWorkspaceMsg.replace('{name}', pendingWorkspace.info.name || pendingWorkspace.origin)}
               </Text>
-              <TouchableOpacity onPress={confirmSetWorkspace} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
+              <TouchableOpacity accessibilityRole="button" onPress={confirmSetWorkspace} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
                 <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteConfirmWorkspaceButton}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.replace(authStatus === 'authed' ? '/(tabs)/today' : '/welcome')} style={st.linkBtn}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => router.replace(authStatus === 'authed' ? '/(tabs)/today' : '/welcome')} style={st.linkBtn}>
                 <Text style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.medium }}>{tr.cancel}</Text>
               </TouchableOpacity>
             </View>
@@ -377,16 +379,16 @@ export default function InviteScreen() {
               </Text>
 
               {authStatus === 'authed' ? (
-                <TouchableOpacity onPress={handleJoin} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
+                <TouchableOpacity accessibilityRole="button" onPress={handleJoin} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
                   <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteJoinButton}</Text>
                 </TouchableOpacity>
               ) : (
                 <>
                   <Text style={{ color: c.sub, fontSize: 13, marginBottom: 12 }}>{tr.inviteGuestHint}</Text>
-                  <TouchableOpacity onPress={goRegister} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
+                  <TouchableOpacity accessibilityRole="button" onPress={goRegister} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
                     <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteRegisterButton}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={goLogin} style={st.linkBtn}>
+                  <TouchableOpacity accessibilityRole="button" onPress={goLogin} style={st.linkBtn}>
                     <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, textDecorationLine: 'underline' }}>{tr.inviteLoginButton}</Text>
                   </TouchableOpacity>
                 </>
@@ -398,7 +400,7 @@ export default function InviteScreen() {
             <View style={[st.card, { backgroundColor: k.surface.card, ...shadow[isDark ? 'dark' : 'light'].card, alignItems: 'center' }]}>
               <IconSymbol name="checkmark.circle.fill" size={40} color={c.accent} />
               <Text style={{ color: c.text, fontSize: 17, fontFamily: fontFamily.semibold, marginTop: 12, marginBottom: 16 }}>{tr.inviteJoinedTitle}</Text>
-              <TouchableOpacity onPress={openProject} style={[st.primaryBtn, { backgroundColor: k.action.primary, alignSelf: 'stretch' }]}>
+              <TouchableOpacity accessibilityRole="button" onPress={openProject} style={[st.primaryBtn, { backgroundColor: k.action.primary, alignSelf: 'stretch' }]}>
                 <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteJoinedOpenProject}</Text>
               </TouchableOpacity>
             </View>
@@ -447,7 +449,7 @@ export default function InviteScreen() {
           )}
 
           {(stage === 'error') && (
-            <TouchableOpacity onPress={() => router.replace(authStatus === 'authed' ? '/(tabs)/today' : '/welcome')} style={[st.primaryBtn, { backgroundColor: k.action.primary, marginTop: 16 }]}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => router.replace(authStatus === 'authed' ? '/(tabs)/today' : '/welcome')} style={[st.primaryBtn, { backgroundColor: k.action.primary, marginTop: 16 }]}>
               <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.back}</Text>
             </TouchableOpacity>
           )}

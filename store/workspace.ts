@@ -12,6 +12,7 @@
  */
 
 import {
+  CLIENT_PLATFORM,
   CLIENT_VERSION,
   DEFAULT_WORKSPACE_ORIGIN,
   getCachedWorkspace,
@@ -51,6 +52,8 @@ export interface WorkspaceInfo {
   min_client_version: { mobile: string; web: string };
   ws_url: string;
   web_url?: string | null;
+  /** rc1 (compat-n1.md): посилання на новий застосунок у сторах; '' — ще не опубліковано. */
+  store_urls?: { ios?: string; android?: string };
   server_version?: string;
   features?: string[];
 }
@@ -71,6 +74,8 @@ export interface WorkspaceCheckError {
   code: WorkspaceCheckErrorCode;
   /** Лише для 'update_app_to' — версія, до якої треба оновитись. */
   minVersion?: string;
+  /** Лише для 'update_app_to' — посилання на стор для цієї ОС (з `store_urls`). */
+  storeUrl?: string;
   /**
    * Схему ми домислили самі (користувач її не писав). Тоді 'network' може
    * означати не «сервера немає», а «ми постукали не туди» — екран додає
@@ -162,7 +167,8 @@ export function checkWorkspaceCompatibility(
   }
   const minVersion = info.min_client_version?.mobile;
   if (minVersion && compareSemver(CLIENT_VERSION, minVersion) < 0) {
-    return { ok: false, code: 'update_app_to', minVersion };
+    const storeUrl = info.store_urls?.[CLIENT_PLATFORM] || undefined;
+    return { ok: false, code: 'update_app_to', minVersion, ...(storeUrl ? { storeUrl } : {}) };
   }
   return { ok: true };
 }
@@ -319,7 +325,11 @@ export async function refreshWorkspaceCompatibility(): Promise<void> {
       return;
     }
     if (result.code === 'update_app' || result.code === 'update_server' || result.code === 'update_app_to') {
-      setWorkspaceIncompatibility({ code: result.code, minVersion: result.minVersion });
+      setWorkspaceIncompatibility({
+        code: result.code,
+        minVersion: result.minVersion,
+        ...(result.storeUrl ? { storeUrl: result.storeUrl } : {}),
+      });
     }
     // 'network' / 'server_unavailable' / 'not_workspace' / 'invalid_url' /
     // 'insecure_url' — тимчасове

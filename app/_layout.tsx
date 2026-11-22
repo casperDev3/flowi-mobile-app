@@ -8,7 +8,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/manrope';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
-import { Redirect, router, Stack, usePathname } from 'expo-router';
+import { type Href, Redirect, router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, AppState, View } from 'react-native';
@@ -47,7 +47,9 @@ import {
 import { setupPushInteractionHandlers } from '@/store/push';
 import { getPendingRegistration, type PendingRegistration } from '@/store/registration';
 import { clearPendingInvite, getPendingInvite } from '@/store/invite-link';
+import { getDeepLinkIntent } from '@/store/deep-link-intent';
 import { subscribeToStorage } from '@/store/storage';
+import { needsAppUpdate } from '@/store/api-config';
 import { ThemeProvider } from '@/store/theme-context';
 import { TimerProvider } from '@/store/timer-context';
 import {
@@ -106,7 +108,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // (вже покинутого) workspace.
   const [, forceRerender] = useState(0);
   const hasWorkspace = cachedWorkspaceConfig() !== null;
-  const [incompatible, setIncompatible] = useState(() => getWorkspaceIncompatibility() !== null);
+  const [incompat, setIncompat] = useState(() => getWorkspaceIncompatibility());
+  const incompatible = incompat !== null;
   // Заявка «за погодженням» (контракт §2.4/§2.5), що чекає рішення адміна —
   // читається окремо від authStatus, бо заявник ще НЕ автентифікований
   // (токенів для нього нема, він гість). Без цього перезапуск застосунку
@@ -128,7 +131,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       // сама коротко виходить і скидає прапорець, коли конфігу нема.
       void refreshWorkspaceCompatibility().then(() => { if (mounted) forceRerender(n => n + 1); });
     });
-    const unsub = subscribeWorkspaceIncompatibility(v => { if (mounted) setIncompatible(v !== null); });
+    const unsub = subscribeWorkspaceIncompatibility(v => { if (mounted) setIncompat(v); });
     void getPendingRegistration().then(p => { if (mounted) setPendingReg(p); });
     // Заявку могли створити чи скасувати ПІД ЧАС цієї сесії (register()
     // ставить pending_registration, register-pending.tsx/switchWorkspace
@@ -156,7 +159,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   // Несумісність версій — блокувальний екран незалежно від того, є вже
   // workspace_config чи ні (сумісний раніше сервер міг оновитися щойно).
-  if (incompatible && pathname !== '/workspace') {
+  // rc1 (compat-n1.md): застаріла збірка → окремий екран «Оновіть застосунок»
+  // з посиланням на стор; /workspace лишається доступним («Змінити адресу»).
+  if (needsAppUpdate(incompat) && pathname !== '/update-required' && pathname !== '/workspace') {
+    return <Redirect href={'/update-required' as Href} />;
+  }
+  if (incompatible && !needsAppUpdate(incompat) && pathname !== '/workspace') {
     return <Redirect href="/workspace" />;
   }
   // '/invite' — виняток поруч із '/workspace': запрошення (контракт §4.3)
@@ -296,6 +304,42 @@ function FeedbackQueueRunner() {
  * уже автентифікований» (пункт (c)) обробляє сам `/invite` інтерактивно,
  * поки він відкритий.
  */
+/**
+ * rc1 deep links (docs/release-rc1/deeplinks.md): посилання, що прийшло до
+ * входу, після входу/реєстрації в ЦІЙ сесії повертає людину на `/open-link`
+ * (єдиний споживач наміру, store/deep-link-intent.ts).
+ *
+ * `login.tsx` веде на `/open-link` сам, тож тут — лише шляхи, що закінчились
+ * деінде (реєстрація, екран очікування заявки → вхід). Екрани входу й
+ * запрошень пропускаємо: вони ще ведуть власну навігацію, і перебивати її
+ * посеред кроку не можна. `sawNonAuthed` — як у PendingInviteAutoJoin:
+ * холодний старт уже автентифікованим веде на `/open-link` сам
+ * `+native-intent`, повторювати не треба.
+ */
+const DEEP_LINK_RESUME_SKIP = new Set([
+  '/login', '/register', '/register-pending', '/welcome', '/workspace', '/forgot-password',
+  '/open-link', '/invite', '/menu-invite', '/training-invite', '/training/invite', '/update-required',
+]);
+
+function DeepLinkIntentResume() {
+  const { status } = useAuth();
+  const pathname = usePathname();
+  const sawNonAuthed = useRef(status !== 'authed');
+
+  useEffect(() => {
+    if (status !== 'authed') { sawNonAuthed.current = true; return; }
+    if (!sawNonAuthed.current || DEEP_LINK_RESUME_SKIP.has(pathname)) return;
+    let alive = true;
+    void getDeepLinkIntent().then(intent => {
+      if (!alive || !intent) return;
+      sawNonAuthed.current = false;
+      router.replace('/open-link' as Href);
+    });
+    return () => { alive = false; };
+  }, [status, pathname]);
+  return null;
+}
+
 function PendingInviteAutoJoin() {
   const { status } = useAuth();
   const { tr } = useI18n();
@@ -420,6 +464,9 @@ function RootLayoutContent() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="project/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="workspace" options={{ headerShown: false }} />
+          <Stack.Screen name="update-required" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="open-link" options={{ headerShown: false, animation: 'fade' }} />
+          <Stack.Screen name="no-access" options={{ headerShown: false }} />
           <Stack.Screen name="welcome" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
@@ -490,6 +537,7 @@ function RootLayoutContent() {
         <PushInteractions />
         <FeedbackQueueRunner />
         <PendingInviteAutoJoin />
+        <DeepLinkIntentResume />
         {/* Швидкий запис нотатки поверх будь-якого екрана: віджети
             (notes?capture=1 → app/+native-intent.tsx) і дія іконки «Нова нотатка». */}
         <GlobalNoteCapture />

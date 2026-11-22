@@ -142,6 +142,7 @@ export function SubscriptionForm({
             value={draft.name}
             onChangeText={(name) => patch({ name })}
             placeholder={tr.subNamePlaceholder}
+            accessibilityLabel={tr.subName}
             placeholderTextColor={ds.text.muted}
             autoFocus={!editing}
             maxLength={120}
@@ -421,6 +422,7 @@ export function SubscriptionForm({
             value={draft.note}
             onChangeText={note => patch({ note })}
             placeholder={tr.note}
+            accessibilityLabel={tr.note}
             placeholderTextColor={ds.text.muted}
             multiline
             maxLength={1000}
@@ -431,6 +433,7 @@ export function SubscriptionForm({
             value={draft.url}
             onChangeText={url => patch({ url })}
             placeholder="https://"
+            accessibilityLabel={tr.subUrl}
             placeholderTextColor={ds.text.muted}
             autoCapitalize="none"
             autoCorrect={false}

@@ -12,6 +12,7 @@
  * `ws` — нормалізований origin workspace (без `/api`), як його віддає
  * `normalizeWorkspaceOrigin()` (store/workspace.ts).
  */
+import { canonicalCloudOrigin } from './api-config';
 import { loadData, saveData } from './storage';
 
 export interface ParsedInviteLink {
@@ -30,7 +31,9 @@ export function parseInviteLink(url: string): ParsedInviteLink | null {
   }
   // Deep link: ftrackingapp://invite?... (host === 'invite', бо схема — не http/https).
   // Веб-URL: https://.../invite?... (pathname === '/invite').
-  const isDeepLink = parsed.protocol === 'ftrackingapp:' && (parsed.hostname === 'invite' || parsed.pathname.replace(/^\/+/, '') === 'invite');
+  // rc1: `flowi://` — канонічна схема, `ftrackingapp://` — аліас (N-1 посилання).
+  const isAppScheme = parsed.protocol === 'flowi:' || parsed.protocol === 'ftrackingapp:';
+  const isDeepLink = isAppScheme && (parsed.hostname === 'invite' || parsed.pathname.replace(/^\/+/, '') === 'invite');
   const isWebLink = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.pathname.replace(/\/+$/, '') === '/invite';
   if (!isDeepLink && !isWebLink) return null;
 
@@ -38,7 +41,10 @@ export function parseInviteLink(url: string): ParsedInviteLink | null {
   const projectId = parsed.searchParams.get('p');
   const token = parsed.searchParams.get('t');
   if (!ws || !projectId || !token) return null;
-  return { ws, projectId, token };
+  // Стара адреса Flowi Cloud (N-1 клієнти мінтять `ws` зі свого хоста) — ТОЙ
+  // САМИЙ workspace; без канонізації новий білд бачив би «інший workspace» і
+  // пропонував вихід зі стиранням локальних даних.
+  return { ws: canonicalCloudOrigin(ws), projectId, token };
 }
 
 // ─── `pending_invite` (контракт §9.1) ────────────────────────────────────────

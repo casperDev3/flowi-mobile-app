@@ -1,5 +1,5 @@
 # P0 (а) NAT-01 — КОНТЕЙНЕР створюється до кінця.
-appId: com.casper3.f-tracking-app
+appId: app.flowi.mobile
 ---
 - launchApp
 - waitForAnimationToEnd

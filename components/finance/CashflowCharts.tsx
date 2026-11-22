@@ -9,6 +9,7 @@ import { View } from 'react-native';
 
 import type { CashflowPoint } from '@/utils/finance/cashflow';
 import type { ForecastPoint } from '@/utils/finance/forecast';
+import { finColors } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 
 import type { FinColors } from './financeLabels';
@@ -24,7 +25,8 @@ export function CashflowFactChart({ points, c, height = 120, summary }: {
     () => points.reduce((m, p) => Math.max(m, p.inflow, p.outflow), 0),
     [points],
   );
-  const { t, g } = useDS();
+  const { t, g, isDark } = useDS();
+  const fin = finColors(isDark);
   const half = height / 2;
   return (
     <View
@@ -38,11 +40,11 @@ export function CashflowFactChart({ points, c, height = 120, summary }: {
         return (
           <View key={p.day} style={{ flex: 1, height, justifyContent: 'center' }}>
             <View style={{ height: half, justifyContent: 'flex-end' }}>
-              <View style={{ height: up, backgroundColor: t.status.success, borderTopLeftRadius: 3, borderTopRightRadius: 3 }} />
+              <View style={{ height: up, backgroundColor: fin.income, borderTopLeftRadius: 3, borderTopRightRadius: 3 }} />
             </View>
             <View style={{ height: 1, backgroundColor: t.border.hairline }} />
             <View style={{ height: half - 1, justifyContent: 'flex-start' }}>
-              <View style={{ height: down, backgroundColor: g.accent.coral.fill, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 }} />
+              <View style={{ height: down, backgroundColor: isDark ? fin.expense : g.accent.coral.fill, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 }} />
             </View>
           </View>
         );

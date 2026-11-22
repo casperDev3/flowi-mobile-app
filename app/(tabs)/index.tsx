@@ -2296,6 +2296,7 @@ export default function TasksScreen() {
               <IconSymbol name="magnifyingglass" size={16} color={c.sub} />
               <TextInput
                 placeholder={tr.searchPlaceholder}
+                accessibilityLabel={tr.searchPlaceholder}
                 placeholderTextColor={c.sub}
                 value={search}
                 onChangeText={setSearch}
@@ -2942,6 +2943,12 @@ export default function TasksScreen() {
                 <Text style={[s.label, { color: c.sub }]}>{tr.creationDate}</Text>
                 <TouchableOpacity
                   onPress={() => { setShowFilterSheet(false); setShowCal(true); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${tr.creationDate}: ${dateFilter ? new Date(dateFilter).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : tr.select}`}
+                  // Вкладений «×» VoiceOver не бачить (батько ковтає дітей) —
+                  // скидання дати доступне як дія ротора / TalkBack-меню.
+                  accessibilityActions={dateFilter ? [{ name: 'clearDate', label: tr.a11yClearDate }] : undefined}
+                  onAccessibilityAction={e => { if (e.nativeEvent.actionName === 'clearDate') setDateFilter(null); }}
                   style={[s.filterActionBtn, { backgroundColor: c.dim, borderColor: dateFilter ? c.text : 'transparent' }]}>
                   <IconSymbol name="calendar" size={16} color={dateFilter ? c.text : c.sub} />
                   <Text style={{ color: dateFilter ? c.text : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 10 }}>
@@ -2950,7 +2957,7 @@ export default function TasksScreen() {
                       : tr.select}
                   </Text>
                   {dateFilter && (
-                    <TouchableOpacity onPress={() => setDateFilter(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <TouchableOpacity onPress={() => setDateFilter(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={tr.a11yClearDate}>
                       <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
                     </TouchableOpacity>
                   )}

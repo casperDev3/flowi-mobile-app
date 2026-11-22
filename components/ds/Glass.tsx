@@ -69,8 +69,9 @@ export function isNativeLiquidGlass(): boolean {
  * Абсолютний шар; при reduceTransparency не малюється.
  */
 export function GlassBackdrop({ intensityBoost = 0, style }: { intensityBoost?: number; style?: StyleProp<ViewStyle> }) {
-  const { g, scheme, reduceTransparency } = useDS();
-  if (reduceTransparency || Platform.OS !== 'ios') return null;
+  const { g, scheme, isDark, reduceTransparency } = useDS();
+  // RC1: темна тема — суцільні поверхні, матеріалу скла немає (заливка власника непрозора).
+  if (reduceTransparency || isDark || Platform.OS !== 'ios') return null;
   if (NativeGlassView) {
     const Native = NativeGlassView;
     return <Native pointerEvents="none" glassEffectStyle="regular" colorScheme={scheme} style={[StyleSheet.absoluteFill, style]} />;
@@ -130,7 +131,9 @@ export function GlassSurface({
 
   const subtle = variant === 'subtle';
   const r = radius ?? (variant === 'pill' ? R.pill : subtle ? R.nested : R.card);
-  const wantBlur = !reduceTransparency && !subtle && (blur ?? Platform.OS === 'ios');
+  // RC1: темна тема завжди суцільна (як «Зменшити прозорість»), з чіткою межею 1 px.
+  const solid = reduceTransparency || isDark;
+  const wantBlur = !solid && !subtle && (blur ?? Platform.OS === 'ios');
   const wantShadow = shadow ?? !subtle;
   const { outer, inner } = splitStyle(style);
 
@@ -139,17 +142,19 @@ export function GlassSurface({
     // Unslop: кольорового світіння немає — `glow` дає ту саму нейтральну тінь скла.
     : g.shadow;
 
-  // 1. Зменшена прозорість — суцільна поверхня.
-  if (reduceTransparency) {
+  // 1. Зменшена прозорість або темна тема — суцільна поверхня.
+  if (solid) {
     return (
       <View
         style={[
           {
             borderRadius: r,
             backgroundColor: subtle ? g.solid.subtle : variant === 'strong' ? g.solid.strong : g.solid.card,
-            borderWidth: subtle ? 0 : 1,
+            // Темна: межа є й у вкладених (subtle) — сходинки читаються без тіні.
+            borderWidth: subtle && !isDark ? 0 : 1,
             borderColor: t.border.hairline,
           },
+          isDark && wantShadow ? shadowStyle : null,
           outer,
           inner,
         ]}

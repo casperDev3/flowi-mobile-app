@@ -1091,6 +1091,20 @@ export interface Translations {
   workspaceErrorUpdateApp: string;
   workspaceErrorUpdateServer: string;
   workspaceErrorUpdateAppTo: string;
+  // rc1: екран «Оновіть застосунок» (app/update-required.tsx) і згода на аналітику
+  updateRequiredTitle: string;
+  updateRequiredTitleNewApp: string;
+  updateRequiredBody: string;
+  updateRequiredBodyNewApp: string;
+  updateRequiredOpenAppStore: string;
+  updateRequiredOpenPlay: string;
+  updateRequiredNoStore: string;
+  updateRequiredRetry: string;
+  updateRequiredChecking: string;
+  updateRequiredStillOutdated: string;
+  updateRequiredChangeWorkspace: string;
+  settingsShareStats: string;
+  settingsShareStatsHint: string;
   workspaceErrorChanged: string;
   workspaceChangeLink: string;
   workspaceSwitchConfirmTitle: string;
@@ -1178,6 +1192,12 @@ export interface Translations {
   // Accessibility labels (icon-only buttons)
   a11yOptions: string;
   a11yViewMode: string;
+  // RC1 a11y (S3-09): назви іконок-кнопок для VoiceOver/TalkBack
+  a11yPrevMonth: string;
+  a11yNextMonth: string;
+  a11yClearDate: string;
+  a11ySubtaskActions: string;
+  a11ySaveSubtask: string;
 
   // Forgot / Reset password
   authForgotPassword: string;
@@ -1813,6 +1833,14 @@ export interface Translations {
   inviteSwitchWorkspaceTitle: string;
   inviteSwitchWorkspaceMsg: string;
   inviteSwitchWorkspaceConfirm: string;
+  // rc1 deep links (docs/release-rc1/deeplinks.md)
+  deepLinkOpening: string;
+  deepLinkSwitchTitle: string;
+  deepLinkSwitchBody: string;
+  deepLinkSwitchConfirm: string;
+  noAccessTitle: string;
+  noAccessBody: string;
+  noAccessHome: string;
   inviteWorkspaceUnreachable: string;
   inviteInvalid: string;
   inviteExpired: string;
@@ -4181,7 +4209,7 @@ const uk: Translations = {
   workspaceScreenTitle: 'Адреса workspace',
   workspaceSubtitle: 'Введіть адресу сервера Flowi, з яким працюватиме застосунок',
   workspaceAddressLabel: 'Адреса сервера',
-  workspaceAddressPlaceholder: 'api.flowi.casperdev.site',
+  workspaceAddressPlaceholder: 'api.flowi.com.ua',
   workspaceCheckButton: 'Перевірити',
   workspaceContinueButton: 'Продовжити',
   workspaceChecking: 'Перевіряємо…',
@@ -4195,6 +4223,19 @@ const uk: Translations = {
   workspaceErrorUpdateApp: 'Оновіть застосунок до останньої версії',
   workspaceErrorUpdateServer: 'Оновіть сервер workspace',
   workspaceErrorUpdateAppTo: 'Оновіть застосунок до версії {v}',
+  updateRequiredTitle: 'Оновіть застосунок',
+  updateRequiredTitleNewApp: 'Встановіть новий Flowi',
+  updateRequiredBody: 'Ця версія ({current}) більше не підтримується вашим workspace. Потрібна {v} або новіша — оновіть Flowi, щоб продовжити. Дані на сервері збережені.',
+  updateRequiredBodyNewApp: 'Flowi переїхав у новий застосунок. Встановіть його зі стору та увійдіть тим самим акаунтом — усі дані на сервері збережені.',
+  updateRequiredOpenAppStore: 'Відкрити App Store',
+  updateRequiredOpenPlay: 'Відкрити Google Play',
+  updateRequiredNoStore: 'Знайдіть «Flowi» у магазині застосунків.',
+  updateRequiredRetry: 'Перевірити ще раз',
+  updateRequiredChecking: 'Перевіряємо…',
+  updateRequiredStillOutdated: 'Версія все ще застаріла. Оновіть застосунок і спробуйте знову.',
+  updateRequiredChangeWorkspace: 'Змінити адресу workspace',
+  settingsShareStats: 'Ділитися анонімною статистикою',
+  settingsShareStatsHint: 'Лише факти на кшталт «запрошення прийнято» — без тексту задач, імен і email. Допомагає покращувати Flowi.',
   workspaceErrorChanged: 'Ця адреса тепер веде на інший workspace. Перевірте адресу ще раз і продовжіть — це вийде з поточного акаунта.',
   workspaceChangeLink: 'Змінити workspace',
   workspaceSwitchConfirmTitle: 'Змінити workspace?',
@@ -4269,6 +4310,11 @@ const uk: Translations = {
   offlineReadOnly: 'Офлайн: лише перегляд',
   a11yOptions: 'Опції',
   a11yViewMode: 'Режим перегляду',
+  a11yPrevMonth: 'Попередній місяць',
+  a11yNextMonth: 'Наступний місяць',
+  a11yClearDate: 'Скинути дату',
+  a11ySubtaskActions: 'Дії з підзавданням',
+  a11ySaveSubtask: 'Зберегти підзавдання',
 
   authForgotPassword: 'Забули пароль?',
   authForgotPasswordTitle: 'Відновлення пароля',
@@ -4801,6 +4847,13 @@ const uk: Translations = {
   inviteSwitchWorkspaceTitle: 'Перейти в інший workspace?',
   inviteSwitchWorkspaceMsg: 'Це запрошення — з іншого workspace. Перехід вийде з поточного акаунта; дані лишаться на сервері.',
   inviteSwitchWorkspaceConfirm: 'Перейти',
+  deepLinkOpening: 'Відкриваємо посилання…',
+  deepLinkSwitchTitle: 'Відкрити в просторі «{name}»?',
+  deepLinkSwitchBody: 'Посилання веде в інший проєкт. Ви вийдете з поточного простору — нічого не загубиться.',
+  deepLinkSwitchConfirm: 'Відкрити',
+  noAccessTitle: 'Немає доступу',
+  noAccessBody: 'Цей запис недоступний у вашому акаунті. Якщо він потрібен, попросіть власника проєкту надіслати вам запрошення.',
+  noAccessHome: 'На головну',
   inviteWorkspaceUnreachable: 'Не вдалося з\'єднатися з workspace цього запрошення',
   inviteInvalid: 'Це запрошення недійсне',
   inviteExpired: 'Термін дії запрошення сплив або його відкликано',
@@ -7156,7 +7209,7 @@ const en: Translations = {
   workspaceScreenTitle: 'Workspace address',
   workspaceSubtitle: 'Enter the address of the Flowi server this app will work with',
   workspaceAddressLabel: 'Server address',
-  workspaceAddressPlaceholder: 'api.flowi.casperdev.site',
+  workspaceAddressPlaceholder: 'api.flowi.com.ua',
   workspaceCheckButton: 'Check',
   workspaceContinueButton: 'Continue',
   workspaceChecking: 'Checking…',
@@ -7170,6 +7223,19 @@ const en: Translations = {
   workspaceErrorUpdateApp: 'Update the app to the latest version',
   workspaceErrorUpdateServer: 'Update the workspace server',
   workspaceErrorUpdateAppTo: 'Update the app to version {v}',
+  updateRequiredTitle: 'Update the app',
+  updateRequiredTitleNewApp: 'Install the new Flowi',
+  updateRequiredBody: 'This version ({current}) is no longer supported by your workspace. Version {v} or newer is required — update Flowi to continue. Your data on the server is safe.',
+  updateRequiredBodyNewApp: 'Flowi has moved to a new app. Install it from the store and sign in with the same account — all your data on the server is safe.',
+  updateRequiredOpenAppStore: 'Open App Store',
+  updateRequiredOpenPlay: 'Open Google Play',
+  updateRequiredNoStore: 'Search for “Flowi” in your app store.',
+  updateRequiredRetry: 'Check again',
+  updateRequiredChecking: 'Checking…',
+  updateRequiredStillOutdated: 'This version is still outdated. Update the app and try again.',
+  updateRequiredChangeWorkspace: 'Change workspace address',
+  settingsShareStats: 'Share anonymous statistics',
+  settingsShareStatsHint: 'Only facts like “invite accepted” — no task text, names or emails. Helps us improve Flowi.',
   workspaceErrorChanged: 'This address now points to a different workspace. Check the address again and continue — this will sign you out of the current account.',
   workspaceChangeLink: 'Change workspace',
   workspaceSwitchConfirmTitle: 'Change workspace?',
@@ -7244,6 +7310,11 @@ const en: Translations = {
   offlineReadOnly: 'Offline: read only',
   a11yOptions: 'Options',
   a11yViewMode: 'View mode',
+  a11yPrevMonth: 'Previous month',
+  a11yNextMonth: 'Next month',
+  a11yClearDate: 'Clear date',
+  a11ySubtaskActions: 'Subtask actions',
+  a11ySaveSubtask: 'Save subtask',
 
   authForgotPassword: 'Forgot password?',
   authForgotPasswordTitle: 'Password recovery',
@@ -7776,6 +7847,13 @@ const en: Translations = {
   inviteSwitchWorkspaceTitle: 'Switch workspace?',
   inviteSwitchWorkspaceMsg: 'This invite is from a different workspace. Switching signs you out of the current account; your data stays on the server.',
   inviteSwitchWorkspaceConfirm: 'Switch',
+  deepLinkOpening: 'Opening the link…',
+  deepLinkSwitchTitle: 'Open in the “{name}” space?',
+  deepLinkSwitchBody: 'This link leads to another project. You will leave the current space — nothing will be lost.',
+  deepLinkSwitchConfirm: 'Open',
+  noAccessTitle: 'No access',
+  noAccessBody: 'This item is not available to your account. If you need it, ask the project owner to send you an invite.',
+  noAccessHome: 'Go to home',
   inviteWorkspaceUnreachable: 'Could not reach this invitation\'s workspace',
   inviteInvalid: 'This invitation is invalid',
   inviteExpired: 'This invitation has expired or was revoked',

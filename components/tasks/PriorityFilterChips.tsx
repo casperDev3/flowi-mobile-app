@@ -110,7 +110,8 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   chip: {
     minWidth: 40,
-    height: 34,
+    // minHeight, не height: при великому шрифті (Dynamic Type) підпис не обрізається.
+    minHeight: 34,
     paddingHorizontal: 10,
     borderRadius: radius.pill,
     borderWidth: 1.5,

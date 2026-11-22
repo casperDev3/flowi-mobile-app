@@ -9,7 +9,7 @@
 # в ЛОКАЛЬНИЙ тестовий акаунт (127.0.0.1:8000). НІКОЛИ не на продакшн-акаунті.
 # Прибирання: створена задача «Maestro capture» і нотатка лишаються —
 # видаліть їх вручну або скидайте стенд.
-appId: com.casper3.f-tracking-app
+appId: app.flowi.mobile
 ---
 - launchApp
 - openLink: "ftrackingapp:///notes?capture=1"

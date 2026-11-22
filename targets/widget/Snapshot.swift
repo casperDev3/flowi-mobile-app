@@ -2,7 +2,7 @@ import Foundation
 import HealthKit
 
 /// Спільна App Group застосунку й віджета (app.json → ios.entitlements).
-let flowiAppGroup = "group.com.casper3.f-tracking-app"
+let flowiAppGroup = "group.app.flowi.mobile"
 /// Той самий ключ, що WIDGET_SNAPSHOT_KEY у utils/widgetSnapshot.ts.
 let flowiSnapshotKey = "flowi_widget_snapshot_v1"
 let flowiStepsGoal = 10000

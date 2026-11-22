@@ -13,10 +13,10 @@
 import Foundation
 
 enum FlowiPendingQueue {
-  static let appGroup = "group.com.casper3.f-tracking-app"
+  static let appGroup = "group.app.flowi.mobile"
   static let key = "flowi_pending_device_actions_v1"
   static let ownerKey = "flowi_device_action_owner_v1"
-  static let darwinName = "com.casper3.f-tracking-app.pendingActions"
+  static let darwinName = "app.flowi.mobile.pendingActions"
 
   private static var prefix: String { key + "." }
   private static let lock = NSLock()

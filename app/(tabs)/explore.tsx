@@ -100,7 +100,7 @@ import { inRange, monthsOf, resolvePeriod } from '@/utils/finance/period';
 import { calcPeriodTotalsByCurrency } from '@/utils/financePeriod';
 import { parseFinanceTab, reportsFabHidden, visibleFinanceTabs, type FinanceTab } from '@/utils/financeTabs';
 import { formatSubscriptionMoney, parseDateKey } from '@/utils/subscriptions';
-import { fontFamily } from '@/constants/theme';
+import { finColors as finSchemeColors, fontFamily } from '@/constants/theme';
 import { KpiCounter, MeshBackground } from '@/components/ds';
 import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
 import { AccentIcon } from '@/components/shared/GlassBits';
@@ -1263,8 +1263,8 @@ export default function FinanceScreen() {
     border: t.border.hairline,
     text:   t.text.primary,
     sub:    t.text.secondary,
-    green:  t.status.success,
-    red:    t.status.danger,
+    green:  finSchemeColors(isDark).income,
+    red:    finSchemeColors(isDark).expenseInk,
     // Переказ малюємо нейтральним: він не дохід і не витрата, і зелений чи
     // червоний тут брехали б про те, що сталося з грошима.
     neutral: t.text.secondary,
@@ -1746,7 +1746,7 @@ export default function FinanceScreen() {
               <KpiCounter
                 value={fmtCode(value, code)}
                 label={tr.totalOnAccounts}
-                valueColor={value < 0 ? t.status.danger : undefined}
+                valueColor={value < 0 ? finSchemeColors(isDark).expenseInk : undefined}
                 onPress={openAccountsTab}
                 accessibilityLabel={[`${tr.totalOnAccounts} ${fmtCode(value, code)}`, carryText, tr.finOpenAccounts].filter(Boolean).join('. ')}
               />
@@ -2498,12 +2498,15 @@ export default function FinanceScreen() {
 
                       <Text style={[s.label, { color: c.sub, marginTop: 0 }]}>{tr.icon}</Text>
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                        {ICON_SUGGESTIONS.map(icon => {
+                        {ICON_SUGGESTIONS.map((icon, iconIdx) => {
                           const isSel = newCatIcon === icon;
                           return (
                             <TouchableOpacity
                               key={icon}
                               onPress={() => setNewCatIcon(icon)}
+                              accessibilityRole="radio"
+                              accessibilityLabel={`${tr.icon} ${iconIdx + 1}`}
+                              accessibilityState={{ selected: isSel, checked: isSel }}
                               style={{
                                 width: 36, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
                                 backgroundColor: isSel ? c.accent : c.dim,

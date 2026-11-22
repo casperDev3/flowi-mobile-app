@@ -20,6 +20,7 @@
 import { useMemo } from 'react';
 import type { ViewStyle } from 'react-native';
 
+import { finColors } from '@/constants/theme';
 import { ds, dsTokens, glassTokens, useDS, type DSTheme, type GlassTokens } from '@/hooks/use-ds';
 
 import type { FinColors } from './financeLabels';
@@ -92,8 +93,9 @@ export function finPalette(isDark: boolean, reduceTransparency = false): FinPale
     sheet: g.surfaceStrong,
     accent: g.accent.lime.ink,
     accentText: t.text.primary,
-    green: t.status.success,
-    red: t.status.danger,
+    // Дохід/витрата: у темній — #0ECB81 / #F6465D (ink для тексту сум), світла без змін.
+    green: finColors(isDark).income,
+    red: finColors(isDark).expenseInk,
     amber: t.accent.amber,
     neutral: t.status.info,
     action: t.action.primary,

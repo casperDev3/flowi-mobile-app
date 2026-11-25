@@ -142,7 +142,8 @@
       "./plugins/withSentryUploadToggle",
       "./plugins/withAndroidReleaseSigning",
       "@sentry/react-native/expo",
-      "expo-quick-actions"
+      "expo-quick-actions",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

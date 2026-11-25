@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.flowi.mobile",
-      "buildNumber": "2611251",
+      "buildNumber": "2611252",
       "associatedDomains": [
         "applinks:app.flowi.com.ua",
         "webcredentials:app.flowi.com.ua"
@@ -37,7 +37,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "app.flowi.mobile",
-      "versionCode": 2611251,
+      "versionCode": 2611252,
       "permissions": [
         "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
         "android.permission.health.READ_DISTANCE",

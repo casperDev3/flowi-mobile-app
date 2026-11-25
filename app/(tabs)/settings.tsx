@@ -44,6 +44,7 @@ import { wideModalStyles } from '@/components/finance/wideModal';
 import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { ProfileCard } from '@/components/settings/ProfileCard';
 import { AnalyticsConsentCard } from '@/components/settings/AnalyticsConsentCard';
+import { feedbackMailUrl, legalLinks, legalUrl, rateAppUrl } from '@/utils/legalLinks';
 import { ToolTiles } from '@/components/settings/ToolTiles';
 import { settingsColumnCount, settingsSectionLayout, type SettingsSectionId } from '@/components/settings/model';
 import { fontFamily, type GlassAccent } from '@/constants/theme';
@@ -211,10 +212,6 @@ export default function SettingsScreen() {
       { text: tr.yes, onPress: () => void pullAllFromServer() },
     ]);
   }), [guardSync, tr]);
-
-  const handleInDevelopment = useCallback(() => {
-    Alert.alert(tr.inDevelopment, tr.inDevelopmentMsg);
-  }, [tr]);
 
   // Палітра — у useMemo: інакше кожен рендер створює новий об'єкт, і всі
   // рядки-нащадки під React.memo однаково перемальовуються.
@@ -483,7 +480,7 @@ export default function SettingsScreen() {
                 icon="paperplane.fill"
                 iconColor="#4F7CF7"
                 label={tr.sendFeedback}
-                onPress={handleInDevelopment}
+                onPress={() => void Linking.openURL(feedbackMailUrl(lang))}
                 text={c.text}
                 sub={c.sub}
                 border={c.border}
@@ -493,7 +490,7 @@ export default function SettingsScreen() {
                 icon="star.fill"
                 iconColor="#F6B93B"
                 label={tr.rateApp}
-                onPress={handleInDevelopment}
+                onPress={() => void Linking.openURL(rateAppUrl())}
                 text={c.text}
                 sub={c.sub}
                 border={c.border}
@@ -530,7 +527,7 @@ export default function SettingsScreen() {
               />
             </BentoCard>
             {/* Правові посилання — рядком-футером під карткою розділу. */}
-            <View style={st.links}>{[['privacy', lang === 'en' ? 'Privacy' : 'Приватність'], ['terms', lang === 'en' ? 'Terms' : 'Умови'], ['contact', lang === 'en' ? 'Contact' : 'Контакти']].map(([path, label]) => <TouchableOpacity key={path} accessibilityRole="link" onPress={() => void Linking.openURL(`https://flowi-web-app.vercel.app/${path}`)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: c.text }}>{label}</Text></TouchableOpacity>)}</View>
+            <View style={st.links}>{legalLinks(lang).map(({ page, label }) => <TouchableOpacity key={page} accessibilityRole="link" onPress={() => void Linking.openURL(legalUrl(page, lang))} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: c.text }}>{label}</Text></TouchableOpacity>)}</View>
           </View>
         );
       case 'account':

@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -27,6 +28,7 @@ import { previewInvite, type InvitePreview } from '@/store/project-team';
 import { haptic } from '@/utils/haptics';
 import { fontFamily, shadow } from '@/constants/theme';
 import { MeshBackground } from '@/components/ds';
+import { legalUrl } from '@/utils/legalLinks';
 
 // ─── Простий валідатор формату email ─────────────────────────────────────────
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -35,7 +37,7 @@ export default function RegisterScreen() {
   const cs = useColorScheme();
   const isDark = cs === 'dark';
   const router = useRouter();
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   const { register } = useAuth();
   const { inviteToken } = useLocalSearchParams<{ inviteToken?: string }>();
   // Та сама колонка сталої ширини, що й на вході: форма з чотирьох полів,
@@ -387,6 +389,19 @@ export default function RegisterScreen() {
             >
               <Text style={[st.linkText, { color: c.sub }]}>{tr.authHaveAccount}</Text>
             </TouchableOpacity>
+
+            {/* Згода з умовами — посилання на публічні сторінки flowi-web-app. */}
+            <Text style={[st.legalText, { color: c.sub }]}>
+              {lang === 'en' ? 'By creating an account, you agree to the ' : 'Створюючи акаунт, ви приймаєте '}
+              <Text accessibilityRole="link" style={st.legalLink} onPress={() => void Linking.openURL(legalUrl('terms', lang))}>
+                {lang === 'en' ? 'Terms of Use' : 'Умови використання'}
+              </Text>
+              {lang === 'en' ? ' and the ' : ' та '}
+              <Text accessibilityRole="link" style={st.legalLink} onPress={() => void Linking.openURL(legalUrl('privacy', lang))}>
+                {lang === 'en' ? 'Privacy Policy' : 'Політику конфіденційності'}
+              </Text>
+              .
+            </Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -395,6 +410,8 @@ export default function RegisterScreen() {
 }
 
 const st = StyleSheet.create({
+  legalText: { fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 8, paddingHorizontal: 12 },
+  legalLink: { textDecorationLine: 'underline' },
   header: {
     paddingHorizontal: 20,
     paddingTop: 16,

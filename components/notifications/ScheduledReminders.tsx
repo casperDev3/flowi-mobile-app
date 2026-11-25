@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import { accentRoles, fontFamily, moduleAccent, type, type ModuleKey } from '@/constants/theme';
 import { dsTheme } from '@/components/shared/dsTheme';
 /**
@@ -121,6 +122,7 @@ function toItem(n: Notifications.NotificationRequest): ScheduledItem {
 }
 
 export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: Props) {
+  const navInset = useAndroidNavInset();
   const t = dsTheme(isDark);
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -360,7 +362,7 @@ export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: 
       ListHeaderComponent={listHeader}
       ListEmptyComponent={listEmpty}
       style={{ flex: 1 }}
-      contentContainerStyle={[contentStyle, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }]}
+      contentContainerStyle={[contentStyle, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 + navInset }]}
       showsVerticalScrollIndicator={false}
     />
   );

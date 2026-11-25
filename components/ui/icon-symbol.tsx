@@ -282,6 +282,11 @@ const MAPPING: Record<string, MaterialIconName> = {
   // Клієнти: пункт меню й дії контактів (лист).
   'person.crop.rectangle.stack': 'contacts',
   'envelope': 'mail-outline',
+  // Android-аудит 11.2026: використовувались без мапінгу (на Android — порожньо).
+  'arrow.down.left': 'south-west',
+  'tray.full': 'inbox',
+  'lock.fill': 'lock',
+  'map.fill': 'map',
 };
 
 export type IconSymbolName = keyof typeof MAPPING;

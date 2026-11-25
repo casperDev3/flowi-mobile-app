@@ -14,6 +14,7 @@
  * широкому екрані. На `medium` (600–840) сайдбар уже займає 232pt, і
  * деталь вийшла б вужчою за 260pt — читалася б гірше, ніж на весь екран.
  */
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import React from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -73,6 +74,7 @@ export function DetailPane({
   // Колонка не має власного верхнього відступу (він лишився на хедері
   // списку зліва), тож верхній виріз доводиться враховувати самій.
   const insets = useSafeAreaInsets();
+  const androidSheetPad = useAndroidBottomPad();
   // DS v2: колонка — surface.card, лист — surface.elevated; без блюру й рамки.
   const t = dsTheme(isDark);
   void sheetColor; void borderColor;
@@ -107,7 +109,7 @@ export function DetailPane({
     <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <Pressable accessible={false} style={[st.overlay, { backgroundColor: t.surface.overlay }]} onPress={onClose}>
-          <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[st.sheetWrapper, sheetHeight ? st.shrink : null]}>
+          <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[st.sheetWrapper, sheetHeight ? st.shrink : null, androidSheetPad]}>
             {open && (
               <View
                 style={[st.sheet, sheetHeight ? { height: Math.min(sheetHeight, maxHeight), flexShrink: 1 } : null, { maxHeight, backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>

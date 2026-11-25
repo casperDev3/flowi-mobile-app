@@ -83,22 +83,51 @@ export async function requestNotificationPermissions(): Promise<boolean> {
     finalStatus = status;
   }
   if (finalStatus !== 'granted') return false;
-  if (Platform.OS === 'android') {
-    // Ім'я каналу видно в системних налаштуваннях телефону; Android дозволяє
-    // оновити його для вже створеного каналу, тож зміна мови доходить і сюди.
-    const trCh = await notificationTr();
-    await Notifications.setNotificationChannelAsync('flowi-reminders', {
-      name: trCh.notifChannelReminders,
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#7C3AED',
-    });
-  }
+  await ensureReminderChannel(true);
   // Контракт §2.8: дозвіл міг щойно з'явитись не при вході, а тут-таки —
   // наприклад, користувач вмикає нагадування в Налаштуваннях. Без цього
   // токен реєструвався б лише на наступному холодному старті/вході.
   void ensurePushTokenRegistered();
   return true;
+}
+
+/** Android-канал нагадувань (HIGH — банер). Без явного `channelId` Expo кладе
+ * сповіщення у фоновий канал «Miscellaneous» зі звичайною важливістю. */
+export const REMINDER_CHANNEL_ID = 'flowi-reminders';
+let reminderChannelReady: Promise<void> | null = null;
+
+/** Створює/оновлює канал. Ідемпотентно; `refresh` — оновити назву (зміна мови). */
+export function ensureReminderChannel(refresh = false): Promise<void> {
+  if (Platform.OS !== 'android') return Promise.resolve();
+  if (reminderChannelReady && !refresh) return reminderChannelReady;
+  reminderChannelReady = (async () => {
+    // Ім'я каналу видно в системних налаштуваннях телефону; Android дозволяє
+    // оновити його для вже створеного каналу, тож зміна мови доходить і сюди.
+    const trCh = await notificationTr();
+    await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
+      name: trCh.notifChannelReminders,
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#7C3AED',
+    });
+  })().catch((e) => {
+    reminderChannelReady = null;
+    if (__DEV__) console.warn('[notifications] channel setup failed:', e);
+  });
+  return reminderChannelReady;
+}
+
+/** scheduleNotificationAsync з каналом нагадувань на Android. */
+async function scheduleOnChannel(
+  req: Notifications.NotificationRequestInput,
+): Promise<string> {
+  if (Platform.OS === 'android') {
+    await ensureReminderChannel();
+    if (req.trigger && typeof req.trigger === 'object' && !('channelId' in req.trigger)) {
+      req = { ...req, trigger: { ...req.trigger, channelId: REMINDER_CHANNEL_ID } as Notifications.NotificationTriggerInput };
+    }
+  }
+  return Notifications.scheduleNotificationAsync(req);
 }
 
 export interface ReminderMeta {
@@ -251,7 +280,7 @@ export async function scheduleReminder(
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
 
   const tr = await notificationTr();
-  await Notifications.scheduleNotificationAsync({
+  await scheduleOnChannel({
     identifier: id,
     content: {
       title: meta.type === 'task' ? tr.notifTaskTitle : tr.notifSubtaskTitle,
@@ -310,7 +339,7 @@ export async function scheduleDailyReminder(
 
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
 
-  await Notifications.scheduleNotificationAsync({
+  await scheduleOnChannel({
     identifier: id,
     content: { title, body, sound: true, data: { dailyKey: key } },
     trigger: {
@@ -351,7 +380,7 @@ export async function scheduleWeeklyReminder(
   const granted = await requestNotificationPermissions();
   if (!granted) return false;
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
-  await Notifications.scheduleNotificationAsync({
+  await scheduleOnChannel({
     identifier: id,
     content: { title, body, sound: true, data: { weeklyKey: key } },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday, hour, minute },
@@ -390,7 +419,7 @@ export async function scheduleMedReminders(
     const hour = parseInt(m[1], 10), minute = parseInt(m[2], 10);
     const id = `med_${medId}_${i}`;
     await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
-    await Notifications.scheduleNotificationAsync({
+    await scheduleOnChannel({
       identifier: id,
       content: { title, body, sound: true, data: { medId } },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute },
@@ -426,7 +455,7 @@ export async function scheduleDateReminder(
   const granted = await requestNotificationPermissions();
   if (!granted) return null;
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
-  await Notifications.scheduleNotificationAsync({
+  await scheduleOnChannel({
     identifier: id,
     content: { title, body, sound: true },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
@@ -484,7 +513,7 @@ export async function scheduleMeetingNotification(
 
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
   const tr = await notificationTr();
-  await Notifications.scheduleNotificationAsync({
+  await scheduleOnChannel({
     identifier: id,
     content: {
       title: tr.notifMeetingTitle,
@@ -639,7 +668,7 @@ export function syncSubscriptionReminders(
       try {
         await Notifications.cancelScheduledNotificationAsync(spec.id).catch(() => {});
         if (spec.daily) {
-          await Notifications.scheduleNotificationAsync({
+          await scheduleOnChannel({
             identifier: spec.id,
             content,
             trigger: {
@@ -649,7 +678,7 @@ export function syncSubscriptionReminders(
             },
           });
         } else if (spec.fireAt && spec.fireAt.getTime() > Date.now()) {
-          await Notifications.scheduleNotificationAsync({
+          await scheduleOnChannel({
             identifier: spec.id,
             content,
             trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: spec.fireAt },
@@ -840,7 +869,7 @@ export function rescheduleHealthRemindersFromStorage(
 
     for (const spec of missing) {
       try {
-        await Notifications.scheduleNotificationAsync({
+        await scheduleOnChannel({
           identifier: spec.id,
           content: { title: spec.title, body: spec.body, sound: true, data: spec.data },
           trigger: {
@@ -966,7 +995,7 @@ export function rescheduleTrainingRemindersFromStorage(
 
     for (const spec of missing) {
       try {
-        await Notifications.scheduleNotificationAsync({
+        await scheduleOnChannel({
           identifier: spec.id,
           content: { title: spec.title, body: spec.body, sound: true, data: spec.data },
           trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: spec.date },

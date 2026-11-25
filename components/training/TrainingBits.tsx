@@ -173,7 +173,7 @@ export function Field({ c, label, style,
         placeholderTextColor={c.faint}
         accessibilityLabel={label}
         {...input}
-        style={[styles.input, { color: c.text, backgroundColor: c.input }, error ? { borderWidth: 1, borderColor: TG_ERR } : null]}
+        style={[styles.input, { color: c.text, backgroundColor: c.input }, input.multiline ? { textAlignVertical: 'top' } : null, error ? { borderWidth: 1, borderColor: TG_ERR } : null]}
       />
     </View>
   );

@@ -345,7 +345,7 @@ export default function ProjectSettingsScreen() {
           accessibilityLabel={tr.projectDescriptionPlaceholder}
           placeholderTextColor={tk.text.muted}
           multiline
-          style={[inputBase, { fontSize: 14, minHeight: 60, marginBottom: 10 }]}
+          style={[inputBase, { fontSize: 14, minHeight: 60, marginBottom: 10, textAlignVertical: 'top' }]}
         />
         <TextInput
           value={deadline}

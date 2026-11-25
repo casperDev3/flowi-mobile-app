@@ -18,6 +18,8 @@ import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 're
 
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { Motion } from '@/constants/motion';
+import { tabIslandOuterHeight } from '@/constants/nav';
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useI18n } from '@/store/i18n';
 
@@ -50,6 +52,7 @@ export function useUndoToast(isTab = true): UndoToastApi {
   const { tr } = useI18n();
   const { t, isDark } = useDSTheme();
   const reduced = useReduceMotion();
+  const navInset = useAndroidNavInset();
 
   const [toastData, setToastData] = useState<ToastData | null>(null);
 
@@ -104,9 +107,12 @@ export function useUndoToast(isTab = true): UndoToastApi {
   }, [hide]);
 
   // ── Позиція над таб-баром чи над дном Stack-скріну ──
+  // Android edge-to-edge: острівець табів займає `64 + 8 + insets.bottom`
+  // (constants/nav.ts → tabIslandOuterHeight), Stack-екран малює під панеллю
+  // навігації — тож на Android тост піднімаємо на інсет. iOS — без змін.
   const bottom = isTab
-    ? (Platform.OS === 'ios' ? 100 : 80)
-    : 40;
+    ? (Platform.OS === 'ios' ? 100 : tabIslandOuterHeight(navInset) + 8)
+    : 40 + navInset;
 
   // DS v2: тост — інвертована pill-плашка (action.primary + text.onAction);
   // «Скасувати» — лайм на чорному, глибока лаванда на світлому.

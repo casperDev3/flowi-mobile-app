@@ -114,7 +114,7 @@ export function MenuEditorModal({
       onRequestClose={() => void ed.close()}>
       <View style={{ flex: 1, backgroundColor: c.bg1, paddingBottom: insets.bottom }}>
         <MeshCanvas isDark={c.isDark} />
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View
             style={{
               paddingHorizontal: 16,

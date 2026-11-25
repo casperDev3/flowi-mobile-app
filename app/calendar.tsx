@@ -37,6 +37,7 @@
  *
  * Старий маршрут /meetings лишився редиректом сюди (app/meetings.tsx).
  */
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import { Audio as AVAudio } from 'expo-av';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -116,6 +117,7 @@ const DATA_KEYS = ['meetings', 'projects', 'workspace_projects', 'tasks', 'sprin
 export default function CalendarScreen() {
   const isDark = useColorScheme() === 'dark';
   const c = useCalendarColors(isDark);
+  const navInset = useAndroidNavInset();
   // Задача ПРОЄКТУ відкривається тут же, карткою проєкту — не в особистому редакторі.
   const { openProjectTask, projectTaskSheet } = useInPlaceProjectTask(isDark);
   const router = useRouter();
@@ -731,7 +733,7 @@ export default function CalendarScreen() {
 
   // Список дня поруч (статична зона) — тоді під сіткою його не дублюємо.
   const showSideColumn = staticShown;
-  const bottomPad = Platform.OS === 'ios' ? 48 : 28;
+  const bottomPad = (Platform.OS === 'ios' ? 48 : 28) + navInset;
 
   let content: React.ReactNode;
   if (!initialized) {
@@ -899,7 +901,7 @@ export default function CalendarScreen() {
       accessibilityRole="button"
       accessibilityLabel={tr.calCreateTitle}
       testID="calendar-fab"
-      style={[st.fab, isWide ? st.fabWide : null, { backgroundColor: c.action }, shadow[isDark ? 'dark' : 'light'].popover]}>
+      style={[st.fab, isWide ? st.fabWide : null, { backgroundColor: c.action }, shadow[isDark ? 'dark' : 'light'].popover, navInset ? { bottom: (isWide ? 68 : 28) + navInset } : null]}>
       <IconSymbol name="plus" size={24} color={c.onAction} />
     </TouchableOpacity>
   ) : null;

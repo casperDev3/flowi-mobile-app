@@ -1,3 +1,4 @@
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import { router } from 'expo-router';
 import { OverlayScrim } from '@/components/ds/OverlaySurface';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
@@ -23,6 +24,7 @@ import { fontFamily, radius, shadow, space, type as dsType } from '@/constants/t
 import { dsTokens, useDS } from '@/hooks/use-ds';
 import { CategoryRow, categoryRowsToMap } from '@/store/migrations';
 import { useI18n } from '@/store/i18n';
+import type { Translations } from '@/store/translations';
 import { loadData } from '@/store/storage';
 import { monthGrid } from '@/utils/dateUtils';
 import {
@@ -79,8 +81,8 @@ const CAT_COLORS = [
  * «Січень 2026». Ті самі списки вже є у словнику (`tr.monthsShort`,
  * `tr.months`, `tr.weekdays`), тож беруться звідти.
  */
-const fmtShort = (n: number) => {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}к`;
+const fmtShort = (n: number, thousandsSuffix: string) => {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}${thousandsSuffix}`;
   return String(Math.round(n));
 };
 
@@ -109,13 +111,15 @@ function makeColors(isDark: boolean, reduceTransparency = false) {
 type Period = 'week' | 'month' | '3months' | 'year' | 'all';
 
 /** Періоди для FilterSelect (планшет, DS v2.5) — ті самі, що й SectionTabs телефона. */
-const PERIOD_OPTIONS: readonly { value: Period; label: string }[] = [
-  { value: 'week',    label: 'Тиждень' },
-  { value: 'month',   label: 'Місяць'  },
-  { value: '3months', label: '3 Міс'   },
-  { value: 'year',    label: 'Рік'     },
-  { value: 'all',     label: 'Все'     },
-];
+function periodOptions(tr: Translations): readonly { value: Period; label: string }[] {
+  return [
+    { value: 'week',    label: tr.periodWeek },
+    { value: 'month',   label: tr.month },
+    { value: '3months', label: tr.statsPeriod3Months },
+    { value: 'year',    label: tr.year },
+    { value: 'all',     label: tr.statsPeriodAll },
+  ];
+}
 
 function getPeriodStart(period: Period): Date | null {
   const now = new Date();
@@ -242,6 +246,7 @@ const SparkLine = React.memo(function SparkLine({ data, color, height = 64, widt
 // ─── Main screen ─────────────────────────────────────────────────────────────
 export default function FinanceStatsScreen() {
   const readingWidth = useContentWidth();
+  const navInset = useAndroidNavInset();
   const { isWide, isExpanded } = useResponsive();
   // DS v2.5: на планшеті період + власний діапазон — один ряд FilterBar; телефон — як було.
   const filtersV25 = useFiltersV25();
@@ -264,6 +269,7 @@ export default function FinanceStatsScreen() {
   const monthLabelsShort = tr.monthsShort;
   const monthLabelsFull = tr.months;
   const weekdayLabels = tr.weekdays;
+  const periodOpts = useMemo(() => periodOptions(tr), [tr]);
   const [txs, setTxs] = useState<Transaction[]>([]);
   // Порожній стан показуємо лише після читання сховища: інакше він блимає
   // на першому кадрі, поки транзакції ще не приїхали.
@@ -607,13 +613,13 @@ export default function FinanceStatsScreen() {
               bleed={20}
               kpis={
                 <>
-                  <KpiCounter value={fmt(income)} label="Доходи" />
-                  <KpiCounter value={fmt(expense)} label="Витрати" />
+                  <KpiCounter value={fmt(income)} label={tr.incomes} />
+                  <KpiCounter value={fmt(expense)} label={tr.expenses} />
                   <KpiCounter
                     value={fmt(balance)}
-                    label="Баланс"
+                    label={tr.balance}
                     valueColor={balance < 0 ? c.t.status.danger : undefined}
-                    delta={`Заощадження ${savingsPct}%`}
+                    delta={`${tr.savings} ${savingsPct}%`}
                     deltaTone={balance >= 0 ? 'up' : 'down'}
                   />
                 </>
@@ -623,7 +629,7 @@ export default function FinanceStatsScreen() {
         </ScreenHeader>
 
         <ScrollView
-          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: (Platform.OS === 'ios' ? 48 : 28) + navInset }]}
           showsVerticalScrollIndicator={false}>
 
           {/* ── Планшет (DS v2.5): період / власний діапазон — один ряд FilterBar ── */}
@@ -657,11 +663,11 @@ export default function FinanceStatsScreen() {
                 active: period !== 'month',
                 node: (
                   <FilterSelect<Period>
-                    label="Період"
+                    label={tr.finFilterPeriod}
                     value={period}
                     neutralValue="month"
                     onChange={v => setPeriod(v ?? 'month')}
-                    options={PERIOD_OPTIONS}
+                    options={periodOpts}
                   />
                 ),
               }]}
@@ -706,13 +712,7 @@ export default function FinanceStatsScreen() {
           {/* ── Period selector (hidden when custom range active) ── */}
           {!filtersV25 && !hasCustomRange && (
             <SectionTabs<Period>
-              tabs={[
-                { key: 'week',    label: 'Тиждень' },
-                { key: 'month',   label: 'Місяць'  },
-                { key: '3months', label: '3 Міс'   },
-                { key: 'year',    label: 'Рік'     },
-                { key: 'all',     label: 'Все'     },
-              ]}
+              tabs={periodOpts.map(o => ({ key: o.value, label: o.label }))}
               value={period}
               onChange={setPeriod}
               bleed={20}
@@ -737,10 +737,10 @@ export default function FinanceStatsScreen() {
           {/* ── Balance trend ── */}
           {trendData.length >= 2 && (
             <>
-              <StatCard title="Тренд балансу" icon="chart.line.uptrend.xyaxis">
+              <StatCard title={tr.balanceTrend} icon="chart.line.uptrend.xyaxis">
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <View>
-                    <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 2 }}>Поточний баланс</Text>
+                    <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 2 }}>{tr.currentBalance}</Text>
                     {/* KPI — display-цифри DS. */}
                     <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ ...dsType.displaySm, fontFamily: fontFamily.light, color: c.text }}>{fmt(balance)}</Text>
                   </View>
@@ -754,8 +754,8 @@ export default function FinanceStatsScreen() {
                 </View>
                 <SparkLine data={trendData} color={trendColor} height={70} width={SPARK_W} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                  <Text style={{ color: c.sub, fontSize: 10 }}>Початок</Text>
-                  <Text style={{ color: c.sub, fontSize: 10 }}>Зараз</Text>
+                  <Text style={{ color: c.sub, fontSize: 10 }}>{tr.statsRangeStart}</Text>
+                  <Text style={{ color: c.sub, fontSize: 10 }}>{tr.statsNow}</Text>
                 </View>
               </StatCard>
             </>
@@ -763,10 +763,10 @@ export default function FinanceStatsScreen() {
 
           {/* ── Adaptive bar chart ── */}
           <StatCard
-            title={period === 'week' ? 'По днях (тиждень)' : period === '3months' ? 'По місяцях (3 міс)' : period === 'year' ? 'По місяцях (рік)' : period === 'all' ? 'По місяцях' : 'Поточний місяць'}
+            title={period === 'week' ? tr.statsByDaysWeek : period === '3months' ? tr.statsByMonths3 : period === 'year' ? tr.statsByMonthsYear : period === 'all' ? tr.byMonths : tr.statsCurrentMonth}
             icon="chart.bar.fill">
             {flowTxs.length === 0 ? (
-              <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 16 }}>Немає даних</Text>
+              <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 16 }}>{tr.noData}</Text>
             ) : (
               <>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 120, gap: 4, marginBottom: 6 }}>
@@ -775,7 +775,7 @@ export default function FinanceStatsScreen() {
                       {/* Amount label for tallest bar */}
                       {(m.income > 0 || m.expense > 0) && (
                         <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 2, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
-                          {fmtShort(Math.max(m.income, m.expense))}
+                          {fmtShort(Math.max(m.income, m.expense), tr.statsThousandsSuffix)}
                         </Text>
                       )}
                       <View style={{ width: '100%', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 2, flex: 1 }}>
@@ -793,8 +793,8 @@ export default function FinanceStatsScreen() {
                   ))}
                 </View>
                 <View style={s.legendRow}>
-                  <LegendDot color={c.green} label="Доходи"  sub={c.sub} />
-                  <LegendDot color={c.red}   label="Витрати" sub={c.sub} />
+                  <LegendDot color={c.green} label={tr.incomes}  sub={c.sub} />
+                  <LegendDot color={c.red}   label={tr.expenses} sub={c.sub} />
                 </View>
               </>
             )}
@@ -803,20 +803,20 @@ export default function FinanceStatsScreen() {
           {/* ── Income vs Expense donut ── */}
           {balanceDonutData.length > 0 && (
             <>
-              <StatCard title="Доходи / Витрати" icon="chart.pie.fill">
+              <StatCard title={tr.statsIncomeVsExpense} icon="chart.pie.fill">
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
                   {/* Unslop: друга кільцева діаграма поруч зі стовпцями лише
                       дублювала список праворуч — лишаємо одне велике тонке число. */}
                   <View style={{ minWidth: 96 }}>
-                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium }}>Заощаджено</Text>
+                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium }}>{tr.statsSaved}</Text>
                     <Text style={{ color: c.text, fontSize: 32, lineHeight: 36, fontFamily: fontFamily.light, letterSpacing: -0.32, fontVariant: ['tabular-nums'], marginTop: 4 }}>{savingsPct}%</Text>
                   </View>
                   {/* Stats */}
                   <View style={{ flex: 1, gap: 10 }}>
                     {[
-                      { label: 'Доходи',  value: income,  color: c.green },
-                      { label: 'Витрати', value: expense, color: c.red   },
-                      { label: 'Баланс',  value: balance, color: balance >= 0 ? c.green : c.red },
+                      { label: tr.incomes,  value: income,  color: c.green },
+                      { label: tr.expenses, value: expense, color: c.red   },
+                      { label: tr.balance,  value: balance, color: balance >= 0 ? c.green : c.red },
                     ].map(item => (
                       <View key={item.label}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -836,10 +836,10 @@ export default function FinanceStatsScreen() {
           )}
 
           {/* ── Quick stats ── */}
-          <StatCard title="Швидка статистика" icon="bolt.fill" accent="amber">
+          <StatCard title={tr.statsQuick} icon="bolt.fill" accent="amber">
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: largestTx ? 8 : 0 }}>
-            <QuickStat icon="list.bullet.circle.fill" label="Транзакцій" value={String(txCount)} color={c.accent} border={c.border} isDark={isDark} />
-            <QuickStat icon="calendar" label="Сер/день" value={avgDailyExp > 0 ? fmt(avgDailyExp) : '—'} color={c.red} border={c.border} isDark={isDark} />
+            <QuickStat icon="list.bullet.circle.fill" label={tr.statsTxCount} value={String(txCount)} color={c.accent} border={c.border} isDark={isDark} />
+            <QuickStat icon="calendar" label={tr.statsAvgPerDay} value={avgDailyExp > 0 ? fmt(avgDailyExp) : '—'} color={c.red} border={c.border} isDark={isDark} />
           </View>
           {largestTx && (
             <View style={[s.nested, { backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
@@ -847,7 +847,7 @@ export default function FinanceStatsScreen() {
                 <IconSymbol name={getCatIcon(largestTx.category, 'expense')} size={18} color={c.red} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold, marginBottom: 2 }}>Найбільша витрата</Text>
+                <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold, marginBottom: 2 }}>{tr.statsLargestExpense}</Text>
                 <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{largestTx.category}</Text>
                 {largestTx.note ? <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{largestTx.note}</Text> : null}
               </View>
@@ -895,24 +895,24 @@ export default function FinanceStatsScreen() {
             <>
               {/* Omni: штриховані стовпці, найвитратніший день (або вибраний
                   тапом) — фірмовим градієнтом із pill-підказкою суми. */}
-              <StatCard title="Витрати по днях тижня" icon="calendar" accent="coral">
+              <StatCard title={tr.statsByWeekday} icon="calendar" accent="coral">
                 <HatchedBars
                   data={weekdayStats.map(day => ({ label: day.label, value: day.total, display: day.total > 0 ? fmt(day.total) : '—' }))}
                   activeIndex={weekdaySel ?? weekdayPeak}
                   onSelect={setWeekdaySel}
                   height={110}
-                  accessibilityLabel="Витрати по днях тижня"
+                  accessibilityLabel={tr.statsByWeekday}
                 />
               </StatCard>
             </>
           )}
 
           {/* ── Category breakdown ── */}
-          <StatCard title="За категоріями" icon="chart.pie.fill" accent="lavender">
+          <StatCard title={tr.statsByCategory} icon="chart.pie.fill" accent="lavender">
           <SectionTabs<CatType>
             tabs={[
-              { key: 'expense', label: 'Витрати' },
-              { key: 'income',  label: 'Доходи' },
+              { key: 'expense', label: tr.expenses },
+              { key: 'income',  label: tr.incomes },
             ]}
             value={catTab}
             onChange={setCatTab}
@@ -921,7 +921,7 @@ export default function FinanceStatsScreen() {
 
           {categoryStats.length === 0 ? (
               <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 20 }}>
-                {catTab === 'expense' ? 'Витрат немає' : 'Доходів немає'}
+                {catTab === 'expense' ? tr.statsNoExpenses : tr.statsNoIncome}
               </Text>
           ) : (
             <>
@@ -942,7 +942,7 @@ export default function FinanceStatsScreen() {
                     </View>
                   ))}
                   {categoryStats.length > 5 && (
-                    <Text style={{ color: c.sub, fontSize: 10, marginTop: 2 }}>+{categoryStats.length - 5} інших</Text>
+                    <Text style={{ color: c.sub, fontSize: 10, marginTop: 2 }}>+{categoryStats.length - 5} {tr.statsOthers}</Text>
                   )}
                 </View>
               </View>
@@ -1002,7 +1002,7 @@ export default function FinanceStatsScreen() {
             accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"
-            style={[{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }, readingWidth, wm.column]}>
+            style={[{ paddingHorizontal: 12, paddingBottom: (Platform.OS === 'ios' ? 34 : 16) + navInset }, readingWidth, wm.column]}>
             <View style={[s.calSheet, { ...c.gl.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet }, shadow[isDark ? 'dark' : 'light'].popover]}>
               <OverlayMaterial isDark={isDark} radius={24} />
 
@@ -1026,7 +1026,7 @@ export default function FinanceStatsScreen() {
                 {(['start', 'end'] as const).map(step => {
                   const isActive = pickStep === step;
                   const isDone   = step === 'start' ? rangeStart !== null : rangeEnd !== null;
-                  const label    = step === 'start' ? 'Початок' : 'Кінець';
+                  const label    = step === 'start' ? tr.statsRangeStart : tr.statsRangeEnd;
                   const dateVal  = step === 'start' ? rangeStart : rangeEnd;
                   return (
                     <TouchableOpacity
@@ -1137,13 +1137,13 @@ export default function FinanceStatsScreen() {
                 {hasCustomRange && (
                   <TouchableOpacity onPress={clearRange} style={[s.calBtn, { ...c.gl.subtle, flex: 1 }]}>
                     <IconSymbol name="xmark" size={14} color={c.t.action.secondaryText} />
-                    <Text style={{ color: c.t.action.secondaryText, fontFamily: fontFamily.semibold, marginLeft: 4 }}>Скинути</Text>
+                    <Text style={{ color: c.t.action.secondaryText, fontFamily: fontFamily.semibold, marginLeft: 4 }}>{tr.reset}</Text>
                   </TouchableOpacity>
                 )}
                 {pickStep === 'end' && rangeStart && (
                   <View style={[s.calBtn, { backgroundColor: c.dim, flex: 2 }]}>
                     <IconSymbol name="calendar" size={14} color={c.sub} />
-                    <Text style={{ color: c.text, fontFamily: fontFamily.semibold, marginLeft: 6 }}>Оберіть кінець діапазону</Text>
+                    <Text style={{ color: c.text, fontFamily: fontFamily.semibold, marginLeft: 6 }}>{tr.statsPickRangeEnd}</Text>
                   </View>
                 )}
               </View>

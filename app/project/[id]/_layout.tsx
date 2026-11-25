@@ -17,7 +17,7 @@ import {ThemeProvider} from '@/store/theme-context';
  */
 import { Tabs, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useMemo } from 'react';
-import { AppState, type AppStateStatus, Text, View } from 'react-native';
+import { AppState, type AppStateStatus, Platform, Text, View } from 'react-native';
 
 import { fontFamily } from '@/constants/theme';
 
@@ -41,6 +41,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useProject } from '@/hooks/use-project';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useSoftSafeAreaInsets } from '@/hooks/use-soft-safe-area-insets';
 import { useI18n } from '@/store/i18n';
 import { enterProject, leaveProject, syncProject } from '@/store/project-sync';
 import { MODULES_BY_TEMPLATE, projectModules, readableTint } from '@/utils/projectUtils';
@@ -175,6 +176,11 @@ function ProjectLayout() {
 
   // DS v2: суцільна панель surface.card (TAB_BAR_BG), як в особистих табах.
   const tabBarBg = isDark ? TAB_BAR_BG.dark : TAB_BAR_BG.light;
+  // Android (edge-to-edge): висота-число не містить системної навігації —
+  // react-navigation віднімає нижній інсет ЗСЕРЕДИНИ панелі, і з 3-кнопковою
+  // навігацією (48dp) на іконки лишалось ~20dp. На iOS 88 уже враховує індикатор.
+  const navBottom = useSoftSafeAreaInsets().bottom || 0;
+  const tabBarHeight = TAB_BAR_HEIGHT + (Platform.OS === 'android' ? navBottom : 0);
   const inactiveTint = isDark ? TAB_BAR_TINT.dark.inactive : TAB_BAR_TINT.light.inactive;
   /**
    * NAT-08: активний підпис мусить тримати 4.5:1 проти тла панелі. У DS v2
@@ -204,7 +210,7 @@ function ProjectLayout() {
             borderTopWidth: 0,
             elevation: 0,
             backgroundColor: 'transparent',
-            height: TAB_BAR_HEIGHT,
+            height: tabBarHeight,
             // paddingTop: 10 звідси прибрано — висота панелі задана числом,
             // тож @react-navigation не додає нижній інсет, а віднімає його
             // зсередини: верхні 10pt було видно, але не натиснути. Те саме

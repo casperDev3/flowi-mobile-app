@@ -95,7 +95,7 @@ export function ClientFormSheet({ visible, client, isDark, onClose, onSave, onDe
         onChangeText={onChange}
         placeholderTextColor={t.text.muted}
         accessibilityLabel={label}
-        style={inputStyle}
+        style={extra?.multiline ? [inputStyle, { textAlignVertical: 'top' }] : inputStyle}
         {...extra}
       />
     </>

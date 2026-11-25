@@ -346,7 +346,9 @@ export async function readHealthConnectWeights(from: Date, to: Date): Promise<{ 
 export const healthConnectSource: HealthSourceApi = {
   source: 'healthconnect',
   label: 'Health Connect',
-  isAvailable: HC_AVAILABLE,
+  // Доступне лише коли нативний модуль реально є в збірці: без пакета
+  // react-native-health-connect картка «Health Connect» лише вводила б в оману.
+  get isAvailable() { return getSDK() !== null; },
   requestAccess: requestHealthConnectAccess,
   getAccess: getHealthConnectAccess,
   readDay: readHealthConnectDay,

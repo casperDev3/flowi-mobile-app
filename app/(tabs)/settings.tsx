@@ -1,3 +1,4 @@
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import { Atlas } from '@/constants/atlas';
 import { brandMark } from '@/constants/brand';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
@@ -86,6 +87,7 @@ const TOOL_ROWS: readonly {
 
 export default function SettingsScreen() {
   const contentWidth = useContentWidth();
+  const androidSheetPad = useAndroidBottomPad();
   // NAT-01: стеля аркуша — ЧИСЛО від висоти вікна; відсоток від батька з
   // height:auto у Yoga не резолвиться і обмеження просто зникає.
   const sheetSurface = useSheetSurface();
@@ -673,7 +675,7 @@ export default function SettingsScreen() {
               onPress={e => e.stopPropagation()}
               accessible={false}
               accessibilityViewIsModal
-              style={[st.sheetWrapper, wm.column]}>
+              style={[st.sheetWrapper, wm.column, androidSheetPad]}>
               <View style={[st.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
                 <OverlayMaterial isDark={isDark} />
                 <View style={st.handleRow}>
@@ -720,7 +722,7 @@ export default function SettingsScreen() {
               onPress={e => e.stopPropagation()}
               accessible={false}
               accessibilityViewIsModal
-              style={[st.sheetWrapper, wm.column]}>
+              style={[st.sheetWrapper, wm.column, androidSheetPad]}>
               <View style={[st.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
                 <OverlayMaterial isDark={isDark} />
                 <View style={st.handleRow}>

@@ -21,6 +21,7 @@ import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { popupFadeIn, popupFadeOut } from '@/constants/motion';
 import { fontFamily, radius, zone } from '@/constants/theme';
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import { useMotion } from '@/hooks/use-motion';
 import { useI18n } from '@/store/i18n';
 
@@ -36,7 +37,7 @@ export interface BulkAction {
   testID?: string;
 }
 
-export function BulkActionBar({ count, actions, onClear, bottom = 16, style, testID }: {
+export function BulkActionBar({ count, actions, onClear, bottom: bottomProp = 16, style, testID }: {
   count: number;
   actions: readonly BulkAction[];
   onClear: () => void;
@@ -50,6 +51,12 @@ export function BulkActionBar({ count, actions, onClear, bottom = 16, style, tes
   const s = useZoneStrings();
   const motion = useMotion();
   const [menu, setMenu] = useState(false);
+  // Android edge-to-edge: вікно малює під панеллю навігації. Табові екрани
+  // передають `tabBarInset + 16` (уже з safe-area) — max не рахує інсет двічі;
+  // Stack-екрани (архів, група, сповіщення) і широкий екран без табів
+  // отримують щонайменше `16 + insets.bottom`. iOS — без змін.
+  const navInset = useAndroidNavInset();
+  const bottom = navInset > 0 ? Math.max(bottomProp, 16 + navInset) : bottomProp;
 
   // Android «Назад» знімає вибір (як Esc на вебі).
   useEffect(() => {

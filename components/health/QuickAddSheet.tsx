@@ -1,3 +1,4 @@
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -39,6 +40,7 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
 }) {
   const c = getHealthDSColors(isDark);
   const gs = useGlassStyles();
+  const androidSheetPad = useAndroidBottomPad();
   const k = dsTokens(isDark);
   const sheetSurface = useSheetSurface();
   const wm = useWideModal();
@@ -67,7 +69,7 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
         <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={onClose}>
           <Pressable
             onPress={e => e.stopPropagation()}
-            style={[s.sheetWrap, wm.column]}
+            style={[s.sheetWrap, wm.column, androidSheetPad]}
             accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"

@@ -4,6 +4,7 @@
  * календарів, стан, синк, конфлікти, кошик, відключення); клієнтського
  * Client ID / PKCE більше немає.
  */
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import React from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
@@ -28,6 +29,7 @@ export function GoogleCalendarSheet({ visible, onClose, gcal, isDark, c, trash, 
   onRestoreLocal?: (meeting: Meeting) => void;
 }) {
   const sheetSurface = useSheetSurface();
+  const androidSheetPad = useAndroidBottomPad();
   const t = dsTokens(isDark);
   // Стеля — числом від висоти вікна, не відсотком (regression-e2 NAT-01).
   const { height } = useWindowDimensions();
@@ -35,7 +37,7 @@ export function GoogleCalendarSheet({ visible, onClose, gcal, isDark, c, trash, 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable accessible={false} style={[st.overlay, { backgroundColor: t.surface.overlay }]} onPress={onClose}>
-        <Pressable accessible={false} onPress={e => e.stopPropagation()} style={st.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
+        <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[st.sheetWrapper, androidSheetPad]} accessibilityViewIsModal importantForAccessibility="yes">
           <View style={[st.sheet, sheetSurface, { maxHeight: Math.round(height * 0.9), backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
             <OverlayMaterial isDark={isDark} />
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>

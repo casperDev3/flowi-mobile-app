@@ -219,7 +219,7 @@ export function CommentsSection({
                       maxLength={COMMENT_BODY_MAX_LENGTH}
                       style={{
                         color: c.text, fontSize: 13, fontFamily: fontFamily.regular, backgroundColor: glassOf(t).surfaceSubtle,
-                        borderRadius: Atlas.radius.medium, padding: 12, minHeight: 44,
+                        borderRadius: Atlas.radius.medium, padding: 12, minHeight: 44, textAlignVertical: 'top',
                       }}
                     />
                     <View style={{ flexDirection: 'row', gap: 12, marginTop: 6 }}>
@@ -287,7 +287,7 @@ export function CommentsSection({
           maxLength={COMMENT_BODY_MAX_LENGTH}
           style={{
             flex: 1, color: c.text, fontSize: 13, fontFamily: fontFamily.regular, backgroundColor: glassOf(t).surfaceSubtle,
-            borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, minHeight: 44, maxHeight: 120,
+            borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, minHeight: 44, maxHeight: 120, textAlignVertical: 'top',
           }}
         />
         <TouchableOpacity

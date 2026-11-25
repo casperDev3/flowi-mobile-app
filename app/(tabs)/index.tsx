@@ -1,3 +1,4 @@
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import { copyMeeting } from '@/utils/meetingSharing';
 import { Atlas } from '@/constants/atlas';
 import { AdSlot } from '@/components/advertising/Advertising';
@@ -167,6 +168,7 @@ import { fontFamily, radius } from '@/constants/theme';
 import { BentoArrowButton, BentoCard, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
 import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
 import { formatDurationShort } from '@/utils/uiLang';
+import { showActionMenu } from '@/utils/actionMenu';
 
 
 /**
@@ -202,6 +204,7 @@ const FIRST_LOAD_OTHER_KEYS: readonly string[] = ['projects', 'meetings', 'task_
 
 export default function TasksScreen() {
   const tabBarInset = useTabBarInset();
+  const androidSheetPad = useAndroidBottomPad();
   const headerScroll = useHeaderScroll();
   const resetHeaderScroll = headerScroll.reset;
   const { width, height, isMedium, isWide } = useResponsive();
@@ -982,7 +985,7 @@ export default function TasksScreen() {
     const projectId = task.projectId!;
     const projectColumns = mergeTaskStatusColumns(storedTaskStatuses, projectId);
     const projectName = projects.find(p => p.id === projectId)?.name ?? '';
-    Alert.alert(
+    showActionMenu(
       tr.statusLinkAskProjectTitle,
       tr.statusLinkAskProjectBody.replace('{project}', projectName).replace('{name}', chosen.name),
       [
@@ -1607,7 +1610,7 @@ export default function TasksScreen() {
       { text: tr.delete, style: 'destructive' as const, onPress: () => deleteSubtask(taskId, sub.id) },
       { text: tr.cancel, style: 'cancel' as const },
     ];
-    Alert.alert(sub.title, undefined, buttons);
+    showActionMenu(sub.title, undefined, buttons);
   }, [duplicateSubtask, moveSubtask, deleteSubtask, removeReminder, tr, lang]);
 
   const startTimer = useCallback(() => {
@@ -2904,7 +2907,7 @@ export default function TasksScreen() {
       {/* ─── Filter & Sort Bottom Sheet ─── */}
       <Modal visible={showFilterSheet} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowFilterSheet(false)}>
         <Pressable accessible={false} style={s.overlay} onPress={() => setShowFilterSheet(false)}>
-          <Pressable onPress={e => e.stopPropagation()} accessible={false} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+          <Pressable onPress={e => e.stopPropagation()} accessible={false} style={[s.sheetWrapper, sheetColumnStyle(isWide), androidSheetPad]}>
             <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRim(t, 'strong') }]}>
               <OverlayMaterial isDark={isDark} />
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -3064,7 +3067,7 @@ export default function TasksScreen() {
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={s.overlay} onPress={() => setShowCal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} accessible={false} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+            <Pressable onPress={e => e.stopPropagation()} accessible={false} style={[s.sheetWrapper, sheetColumnStyle(isWide), androidSheetPad]}>
               <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRim(t, 'strong') }]}>
                 <OverlayMaterial isDark={isDark} />
                 <View style={s.handleRow}>

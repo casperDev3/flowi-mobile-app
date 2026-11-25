@@ -1,3 +1,4 @@
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import { Atlas } from '@/constants/atlas';
 import React, { useEffect, useState } from 'react';
 import {
@@ -211,6 +212,7 @@ export function MeetingFormSheet({
   today.setHours(0, 0, 0, 0);
   const isUk = lang === "uk";
   const sheetSurface = useSheetSurface();
+  const androidSheetPad = useAndroidBottomPad();
 
   // DS v2: аркуш — surface.elevated, поля й чипи — surface.subtle без рамок,
   // вибраний чип — action.primary. Колір зустрічі (fColor) — лише як мітка.
@@ -365,7 +367,7 @@ export function MeetingFormSheet({
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <Pressable accessible={false} style={[s.overlay, { backgroundColor: t.surface.overlay }]} onPress={onClose}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.wrapper} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+          <Pressable onPress={e => e.stopPropagation()} style={[s.wrapper, androidSheetPad]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
             <View
               style={[s.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
               {/* Layout System v2.4: «брудне скло» — блюр + зерно під заливкою. */}

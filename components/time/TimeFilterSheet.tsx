@@ -15,6 +15,7 @@
  * проєкт і задача — FilterSelect). Телефон — шухляда, як і була.
  */
 
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import React from 'react';
 import {
   Modal,
@@ -90,10 +91,11 @@ export function TimeFilterSheet({
   onReset,
   onClose,
 }: TimeFilterSheetProps) {
+  const androidSheetPad = useAndroidBottomPad();
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable accessible={false} style={[s.overlay, { backgroundColor: c.t.surface.overlay }]} onPress={onClose}>
-        <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+        <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide), androidSheetPad]}>
           <View style={[s.sheet, { ...c.gl.strong, maxHeight: height * 0.85 }, shadow[isDark ? 'dark' : 'light'].popover]}>
             <OverlayMaterial isDark={isDark} />
             <ScrollView showsVerticalScrollIndicator={false}>

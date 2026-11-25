@@ -15,6 +15,7 @@
  * `accountBalance(account, transactions)` — інакше збережене число й історія
  * операцій розійшлися б і жодне з них не було б правдою.
  */
+import { useAndroidBottomPad, useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import { OverlayScrim } from '@/components/ds/OverlaySurface';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 import { dsTheme, glassOf } from '@/components/shared/dsTheme';
@@ -133,6 +134,8 @@ function warn(where: string, e: unknown) {
 
 export default function BanksScreen() {
   const readingWidth = useContentWidth();
+  const navInset = useAndroidNavInset();
+  const androidSheetPad = useAndroidBottomPad();
   const { height, isWide, isExpanded } = useResponsive();
   const screenWidth = useScreenWidth();
   // Сітка скарбничок у ландшафті — ширша колонка (3 картки в ряд), форми й
@@ -446,12 +449,13 @@ export default function BanksScreen() {
         depositLabel={tr.deposit}
         doneLabel={tr.donePiggy}
         editLabel={tr.edit}
+        remainingLabel={tr.piggyRemaining}
         width={cardWidth}
         onEdit={openEdit}
         onDeposit={openDeposit}
       />
     ),
-    [balances, c, isDark, fmt, multiCurrency, tr.deposit, tr.donePiggy, tr.edit, cardWidth, openEdit, openDeposit],
+    [balances, c, isDark, fmt, multiCurrency, tr.deposit, tr.donePiggy, tr.edit, tr.piggyRemaining, cardWidth, openEdit, openDeposit],
   );
 
   const formValid = !!name.trim() && isPositive(parseAmount(goal));
@@ -469,7 +473,7 @@ export default function BanksScreen() {
   const jarKpis = savings.length > 0 ? (
     <>
       <KpiCounter value={savings.length} label={tr.piggyBanks} />
-      {totalPct !== null ? <KpiCounter value={`${totalPct}%`} label="від загальної мети" /> : null}
+      {totalPct !== null ? <KpiCounter value={`${totalPct}%`} label={tr.piggyOfTotalGoal} /> : null}
     </>
   ) : undefined;
 
@@ -510,7 +514,7 @@ export default function BanksScreen() {
             paddingHorizontal: 20,
             paddingTop: 8,
             // Останню картку не має перекривати плавуча кнопка.
-            paddingBottom: FAB_BOTTOM + FAB_SIZE + 12,
+            paddingBottom: FAB_BOTTOM + navInset + FAB_SIZE + 12,
           }]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
@@ -525,21 +529,21 @@ export default function BanksScreen() {
                       )}
                       <View style={{ flexDirection: 'row', marginBottom: 14 }}>
                         <View style={{ flex: 1 }}>
-                          <Text style={[s.summaryLabel, { color: c.sub }]}>Накопичено</Text>
+                          <Text style={[s.summaryLabel, { color: c.sub }]}>{tr.piggySaved}</Text>
                           <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[s.summaryAmount, { color: c.text }]}>{fmt(row.saved, row.code)}</Text>
                         </View>
                         <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
                         <View style={{ flex: 1, paddingLeft: 16 }}>
-                          <Text style={[s.summaryLabel, { color: c.sub }]}>Мета</Text>
+                          <Text style={[s.summaryLabel, { color: c.sub }]}>{tr.piggyGoal}</Text>
                           <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[s.summaryAmount, { color: c.sub }]}>{fmt(row.goal, row.code)}</Text>
                         </View>
                       </View>
                       {row.goal > 0 && (
                         <>
                           {/* Omni: сегментний прогрес фірмовим градієнтом. */}
-                          <SegmentedProgress value={pct / 100} accessibilityLabel={`${pct}% від загальної мети`} />
+                          <SegmentedProgress value={pct / 100} accessibilityLabel={`${pct}% ${tr.piggyOfTotalGoal}`} />
                           <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginTop: 8 }}>
-                            {pct}% від загальної мети
+                            {pct}% {tr.piggyOfTotalGoal}
                           </Text>
                         </>
                       )}
@@ -556,7 +560,7 @@ export default function BanksScreen() {
             <View style={{ alignItems: 'center', paddingVertical: 56 }}>
               <IconSymbol name="banknote" size={32} color={c.sub} />
               <Text style={{ ...dsType.h2, color: c.text, marginTop: 14 }}>{tr.noPiggyBanks}</Text>
-              <Text style={{ ...dsType.body, color: c.sub, marginTop: 4 }}>Натисніть +, щоб створити ціль</Text>
+              <Text style={{ ...dsType.body, color: c.sub, marginTop: 4 }}>{tr.piggyEmptyHint}</Text>
             </View>
             )
           }
@@ -569,7 +573,7 @@ export default function BanksScreen() {
         accessibilityRole="button"
         accessibilityLabel={tr.add}
         scaleTo={0.92}
-        style={[s.fab, { backgroundColor: c.action }]}>
+        style={[s.fab, { backgroundColor: c.action }, navInset ? { bottom: FAB_BOTTOM + navInset } : null]}>
         <IconSymbol name="plus" size={26} color={c.onAction} />
       </PressableScale>
 
@@ -584,7 +588,7 @@ export default function BanksScreen() {
               accessible={false}
               accessibilityViewIsModal
               importantForAccessibility="yes"
-              style={[s.sheetWrapper, readingWidth, wm.column]}>
+              style={[s.sheetWrapper, readingWidth, wm.column, androidSheetPad]}>
               <View style={[s.sheet, { ...c.gl.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.92 }, shadow[isDark ? 'dark' : 'light'].popover]}>
                 <OverlayMaterial isDark={isDark} radius={24} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -698,7 +702,7 @@ export default function BanksScreen() {
                   </View>
 
                   {/* Color picker */}
-                  <Text style={[s.label, { color: c.sub }]}>Колір</Text>
+                  <Text style={[s.label, { color: c.sub }]}>{tr.ctrColor}</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                     {JAR_COLORS.map(color => (
                       <TouchableOpacity
@@ -753,7 +757,7 @@ export default function BanksScreen() {
               accessible={false}
               accessibilityViewIsModal
               importantForAccessibility="yes"
-              style={[s.sheetWrapper, readingWidth, wm.column]}>
+              style={[s.sheetWrapper, readingWidth, wm.column, androidSheetPad]}>
               {depositAccount && (
                 <View style={[s.sheet, { ...c.gl.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.92 }, shadow[isDark ? 'dark' : 'light'].popover]}>
                   <OverlayMaterial isDark={isDark} radius={24} />
@@ -916,7 +920,7 @@ function JarSeparator() {
  * усі BlurView разом із прогресами.
  */
 const JarCard = React.memo(function JarCard({
-  account, balance, c, isDark, fmt, showCurrency, depositLabel, doneLabel, editLabel, width, onEdit, onDeposit,
+  account, balance, c, isDark, fmt, showCurrency, depositLabel, doneLabel, editLabel, remainingLabel, width, onEdit, onDeposit,
 }: {
   account: Account;
   /** Накопичене = баланс рахунку, порахований із транзакцій. */
@@ -930,6 +934,8 @@ const JarCard = React.memo(function JarCard({
   doneLabel: string;
   /** Підпис кнопки-олівця: сама іконка скрінрідеру нічого не каже (A11Y-01). */
   editLabel: string;
+  /** «Залишилось» перед сумою, якої бракує до мети. */
+  remainingLabel: string;
   /** Ширина комірки сітки на планшеті; на телефоні — undefined (на всю ширину). */
   width?: number;
   onEdit: (account: Account) => void;
@@ -992,7 +998,7 @@ const JarCard = React.memo(function JarCard({
         <View style={{ flex: 1 }} />
         {goal > 0 && (
           <Text style={{ ...dsType.caption, ...dsType.numeric, color: c.sub }}>
-            Залишилось {fmt(Math.max(0, goal - balance), account.currency)}
+            {remainingLabel} {fmt(Math.max(0, goal - balance), account.currency)}
           </Text>
         )}
       </TouchableOpacity>

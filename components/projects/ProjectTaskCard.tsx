@@ -63,6 +63,7 @@ import { isLead, taskRights, teamPreferencesId, type Discussion, type TeamPrefer
 import { updateSynced } from '@/store/synced-storage';
 import { fontFamily, radius } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
+import { showActionMenu } from '@/utils/actionMenu';
 
 type CardTask = Task & { recurrence?: RecurrenceRule };
 
@@ -238,7 +239,7 @@ export function useProjectTaskCard({
     const when = sub.reminderAt
       ? new Date(sub.reminderAt).toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
       : null;
-    Alert.alert(sub.title, undefined, [
+    showActionMenu(sub.title, undefined, [
       { text: tr.editAction, onPress: () => { setEditingSubId(sub.id); setEditingSubText(sub.title); } },
       { text: tr.subtaskDuplicate, onPress: () => void write(task.id, t => {
         const i = t.subtasks.findIndex(s => s.id === sub.id);

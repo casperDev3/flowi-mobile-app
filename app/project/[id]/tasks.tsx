@@ -137,6 +137,7 @@ import { fontFamily, radius, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 import { glassOf } from '@/components/shared/dsTheme';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { showActionMenu } from '@/utils/actionMenu';
 import {
   FilterBar, FilterSearch, FilterSelect, KpiCounter, SectionTabs, Segmented, useFiltersV25,
 } from '@/components/ds';
@@ -470,7 +471,7 @@ export default function ProjectTasksScreen() {
     if (!projectId || !column.projectId || !user?.id || task.assigneeId !== user.id) return;
     if (personalEquivalentStrict(column, columns)) return;
     const personal = mergeTaskStatusColumns(columns);
-    Alert.alert(
+    showActionMenu(
       tr.statusLinkAskPersonalTitle,
       tr.statusLinkAskPersonalBody.replace('{name}', column.name).replace('{project}', project?.name ?? ''),
       [
@@ -512,7 +513,7 @@ export default function ProjectTasksScreen() {
   }, [teamRole, user?.id, selectTask, trackWrite, stopTimerForTask, askPersonalStatusLink]);
 
   const openColumnPicker = useCallback((task: Task) => {
-    Alert.alert(
+    showActionMenu(
       task.title,
       undefined,
       [
@@ -785,7 +786,7 @@ export default function ProjectTasksScreen() {
   const bulkMove = useCallback(() => {
     const targets = bulkTasks.filter(canExecuteTask);
     if (!targets.length) return;
-    Alert.alert(tr.statusLabel, `${targets.length} × ${tr.tasks}`, [
+    showActionMenu(tr.statusLabel, `${targets.length} × ${tr.tasks}`, [
       ...boardColumns.map(column => ({
         text: column.name,
         onPress: () => {

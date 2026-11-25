@@ -20,7 +20,7 @@
  * Кольори — лише з токенів DS v2 (notesTheme.ts).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, BackHandler, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AdSlot } from '@/components/advertising/Advertising';
@@ -203,6 +203,16 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
     setSelected(note); setIsNew(fresh);
   };
   const closeEditor = () => { setSelected(null); setIsNew(false); session.current = null; };
+  // Android: апаратна «Назад» у повноекранному редакторі (телефон) повертає до
+  // списку, а не закриває весь екран нотаток. Чернетка зберігається, як і за «←».
+  const editorFullScreen = !!selected && !split;
+  const closeEditorRef = useRef(closeEditor);
+  closeEditorRef.current = closeEditor;
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !editorFullScreen) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { closeEditorRef.current(); return true; });
+    return () => sub.remove();
+  }, [editorFullScreen]);
 
   const add = () => {
     if (!canCreate || !ready || readError) return;
@@ -409,7 +419,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   // чернетка живе в сесії й переживає поворот екрана.
   if (selected && !split) {
     return (
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={[s.root, { backgroundColor: c.bg }]}>
         {readErrorBlock}
         <View style={[s.panes, { paddingBottom: Math.max(insets.bottom, projectId ? tabBarInset : 0, 12) }]}>
@@ -543,7 +553,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   const addDisabled = !ready || readError || busy;
 
   const listZone = (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={[s.root, { backgroundColor: c.bg }]}>
       {readErrorBlock}
       <View style={[s.panes, { paddingBottom: Math.max(insets.bottom, projectId ? tabBarInset : 0, 12) }]}>

@@ -1,3 +1,4 @@
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import { Atlas } from '@/constants/atlas';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useRouter } from 'expo-router';
@@ -73,6 +74,7 @@ const SOCIALS: {
 
 export default function DeveloperScreen() {
   const { tr } = useI18n();
+  const navInset = useAndroidNavInset();
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -124,7 +126,7 @@ export default function DeveloperScreen() {
         />
 
         <ScrollView
-          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: (Platform.OS === 'ios' ? 48 : 28) + navInset }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Omni: профіль розробника — єдина темна (featured) картка сторінки

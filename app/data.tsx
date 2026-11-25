@@ -1,3 +1,4 @@
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
@@ -128,6 +129,7 @@ type Counts = Record<string, number>;
 
 export default function DataScreen() {
   const { tr } = useI18n();
+  const navInset = useAndroidNavInset();
   const contentWidth = useContentWidth();
   const { t, g, isDark, reduceTransparency } = useDS();
   const router = useRouter();
@@ -458,7 +460,7 @@ export default function DataScreen() {
           />
         </ScreenHeader>
 
-        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 + navInset }]} showsVerticalScrollIndicator={false}>
 
           {/* Omni: розділи — bento-картки (1 колонка на телефоні, 2 на планшеті). */}
           <BentoGrid columns={{ compact: 1, medium: 2, expanded: 2 }}>

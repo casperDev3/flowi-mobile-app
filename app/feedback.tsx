@@ -15,6 +15,7 @@
  * запис, на який веде push `feedback.status_changed`, `from=<шлях>` — екран,
  * з якого прийшли (для контексту бага; береться лише ШАБЛОН, §8.2).
  */
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import * as Clipboard from 'expo-clipboard';
 import * as Device from 'expo-device';
 import * as DocumentPicker from 'expo-document-picker';
@@ -112,6 +113,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 }
 
 export default function FeedbackScreen() {
+  const navInset = useAndroidNavInset();
   const params = useLocalSearchParams<{ kind?: string; open?: string; from?: string }>();
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
@@ -680,7 +682,7 @@ export default function FeedbackScreen() {
           <FlatList
             data={visible}
             keyExtractor={entry => `${entry.kind}:${entry.item.id}`}
-            contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }]}
+            contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 + navInset }]}
             showsVerticalScrollIndicator={false}
             ItemSeparatorComponent={Separator}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}

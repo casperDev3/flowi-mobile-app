@@ -1,3 +1,4 @@
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import { Atlas } from '@/constants/atlas';
 import { ClientChips } from '@/components/clients/ClientChips';
 import { useClients } from '@/hooks/use-clients';
@@ -163,6 +164,7 @@ function chunk<T>(arr: T[], n: number): T[][] {
 
 export default function FinanceScreen() {
   const tabBarInset = useTabBarInset();
+  const androidSheetPad = useAndroidBottomPad();
   const headerScroll = useHeaderScroll();
   const resetHeaderScroll = headerScroll.reset;
   const { width, height, isWide } = useResponsive();
@@ -2017,7 +2019,7 @@ export default function FinanceScreen() {
               accessible={false}
               accessibilityViewIsModal
               importantForAccessibility="yes"
-              style={[s.sheetWrapper, wm.column]}>
+              style={[s.sheetWrapper, wm.column, androidSheetPad]}>
               <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
                 <OverlayMaterial isDark={isDark} />
 
@@ -2319,7 +2321,7 @@ export default function FinanceScreen() {
             accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"
-            style={[s.sheetWrapper, wm.column]}>
+            style={[s.sheetWrapper, wm.column, androidSheetPad]}>
             <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
               <OverlayMaterial isDark={isDark} />
               <View style={s.handleRow}>
@@ -2387,7 +2389,7 @@ export default function FinanceScreen() {
               accessible={false}
               accessibilityViewIsModal
               importantForAccessibility="yes"
-              style={[s.sheetWrapper, wm.column]}>
+              style={[s.sheetWrapper, wm.column, androidSheetPad]}>
               <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
                 <OverlayMaterial isDark={isDark} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">

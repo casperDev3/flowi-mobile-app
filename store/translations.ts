@@ -886,6 +886,33 @@ export interface Translations {
   balanceTrend: string;
   currentBalance: string;
   noData: string;
+  statsPeriod3Months: string;
+  statsPeriodAll: string;
+  statsRangeStart: string;
+  statsRangeEnd: string;
+  statsNow: string;
+  statsByDaysWeek: string;
+  statsByMonths3: string;
+  statsByMonthsYear: string;
+  statsCurrentMonth: string;
+  statsIncomeVsExpense: string;
+  statsSaved: string;
+  statsQuick: string;
+  statsTxCount: string;
+  statsAvgPerDay: string;
+  statsLargestExpense: string;
+  statsByWeekday: string;
+  statsByCategory: string;
+  statsNoExpenses: string;
+  statsNoIncome: string;
+  statsOthers: string;
+  statsPickRangeEnd: string;
+  statsThousandsSuffix: string;
+  piggyOfTotalGoal: string;
+  piggySaved: string;
+  piggyGoal: string;
+  piggyEmptyHint: string;
+  piggyRemaining: string;
 
   // Apple Health
   grantAccess: string;
@@ -4028,6 +4055,33 @@ const uk: Translations = {
   balanceTrend: 'Тренд балансу',
   currentBalance: 'Поточний баланс',
   noData: 'Немає даних',
+  statsPeriod3Months: '3 Міс',
+  statsPeriodAll: 'Все',
+  statsRangeStart: 'Початок',
+  statsRangeEnd: 'Кінець',
+  statsNow: 'Зараз',
+  statsByDaysWeek: 'По днях (тиждень)',
+  statsByMonths3: 'По місяцях (3 міс)',
+  statsByMonthsYear: 'По місяцях (рік)',
+  statsCurrentMonth: 'Поточний місяць',
+  statsIncomeVsExpense: 'Доходи / Витрати',
+  statsSaved: 'Заощаджено',
+  statsQuick: 'Швидка статистика',
+  statsTxCount: 'Транзакцій',
+  statsAvgPerDay: 'Сер/день',
+  statsLargestExpense: 'Найбільша витрата',
+  statsByWeekday: 'Витрати по днях тижня',
+  statsByCategory: 'За категоріями',
+  statsNoExpenses: 'Витрат немає',
+  statsNoIncome: 'Доходів немає',
+  statsOthers: 'інших',
+  statsPickRangeEnd: 'Оберіть кінець діапазону',
+  statsThousandsSuffix: 'к',
+  piggyOfTotalGoal: 'від загальної мети',
+  piggySaved: 'Накопичено',
+  piggyGoal: 'Мета',
+  piggyEmptyHint: 'Натисніть +, щоб створити ціль',
+  piggyRemaining: 'Залишилось',
 
   grantAccess: 'Надати доступ',
 
@@ -7032,6 +7086,33 @@ const en: Translations = {
   balanceTrend: 'Balance Trend',
   currentBalance: 'Current balance',
   noData: 'No data',
+  statsPeriod3Months: '3 mo',
+  statsPeriodAll: 'All',
+  statsRangeStart: 'Start',
+  statsRangeEnd: 'End',
+  statsNow: 'Now',
+  statsByDaysWeek: 'By day (week)',
+  statsByMonths3: 'By month (3 mo)',
+  statsByMonthsYear: 'By month (year)',
+  statsCurrentMonth: 'This month',
+  statsIncomeVsExpense: 'Income / Expenses',
+  statsSaved: 'Saved',
+  statsQuick: 'Quick stats',
+  statsTxCount: 'Transactions',
+  statsAvgPerDay: 'Avg/day',
+  statsLargestExpense: 'Largest expense',
+  statsByWeekday: 'Expenses by weekday',
+  statsByCategory: 'By category',
+  statsNoExpenses: 'No expenses',
+  statsNoIncome: 'No income',
+  statsOthers: 'more',
+  statsPickRangeEnd: 'Select end date',
+  statsThousandsSuffix: 'k',
+  piggyOfTotalGoal: 'of total goal',
+  piggySaved: 'Saved',
+  piggyGoal: 'Goal',
+  piggyEmptyHint: 'Tap + to create a goal',
+  piggyRemaining: 'Remaining',
 
   grantAccess: 'Grant Access',
 

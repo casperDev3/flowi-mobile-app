@@ -63,7 +63,7 @@ export function NutritionTab({ h }: HealthTabProps) {
               зʼїдених, а не «500 / 2200». Вплив тренувань видно в залишку. */}
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
             <Text style={{ color: c.text, fontSize: 44, lineHeight: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.88 }}>{cal.consumed}</Text>
-            <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>/ {goals.calories} кк</Text>
+            <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>/ {formatKcal(goals.calories)}</Text>
             <View style={{ flex: 1 }} />
             <View style={[s.badge, { backgroundColor: (cal.over ? ACCENT_PULSE : ACCENT_CAL) + '29' }]}>
               <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
@@ -90,7 +90,7 @@ export function NutritionTab({ h }: HealthTabProps) {
               <TouchableOpacity key={kk} onPress={() => h.addQuick('calories', kk)}
                 accessibilityRole="button" accessibilityLabel={`+${formatKcal(kk)}`}
                 style={[s.chip, { backgroundColor: c.dim }]}>
-                <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>+{kk} кк</Text>
+                <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>+{formatKcal(kk)}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -202,7 +202,7 @@ export function NutritionTab({ h }: HealthTabProps) {
               </View>
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>
-                  {e.value} кк{e.protein ? ` · ${e.protein}${tr.proteinShort}` : ''}
+                  {formatKcal(e.value)}{e.protein ? ` · ${e.protein}${tr.proteinShort}` : ''}
                 </Text>
                 {e.note ? <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{e.note}</Text> : null}
               </View>

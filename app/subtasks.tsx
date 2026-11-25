@@ -8,6 +8,7 @@
  * чек-лист, ERR-01). Масового вибору немає: пункт чек-листа відмічається
  * одним тапом, а видаляють їх поодинці.
  */
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -132,6 +133,7 @@ const SubRow = React.memo(function SubRow({
 
 export default function SubtasksScreen() {
   const contentWidth = useContentWidth();
+  const navInset = useAndroidNavInset();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { taskId } = useLocalSearchParams<{ taskId: string }>();
@@ -285,7 +287,7 @@ export default function SubtasksScreen() {
             keyExtractor={subKey}
             renderItem={renderSub}
             ItemSeparatorComponent={SubSeparator}
-            contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 }]}
+            contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 + navInset }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={total > 0 ? (

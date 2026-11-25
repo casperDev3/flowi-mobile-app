@@ -13,6 +13,7 @@ import { fontFamily, radius, type } from '@/constants/theme';
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 
 interface MonthPickerProps {
   month: Date;
@@ -42,6 +43,7 @@ export function MonthPicker({
 }: MonthPickerProps) {
   // DS v2: аркуш — surface.elevated, клітинки — subtle-плашки, вибраний — action.primary.
   const { t, isDark } = useDSTheme();
+  const navInset = useAndroidNavInset();
   void dimColor; void borderColor;
   const now = new Date();
   const isCurrent =
@@ -101,7 +103,7 @@ export function MonthPicker({
                 overflow: 'hidden',
                 paddingTop: 12,
                 paddingHorizontal: 20,
-                paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+                paddingBottom: (Platform.OS === 'ios' ? 36 : 24) + navInset,
               }}>
               {/* Layout System v2.4: «брудне скло» — блюр + зерно під заливкою. */}
               <OverlayMaterial isDark={isDark} />

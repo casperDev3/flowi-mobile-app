@@ -1,3 +1,4 @@
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo } from 'react';
@@ -28,6 +29,7 @@ const DONATELLO_URL = 'https://donatello.to/igorichua';
 
 export default function DonateScreen() {
   const { tr } = useI18n();
+  const navInset = useAndroidNavInset();
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -88,7 +90,7 @@ export default function DonateScreen() {
         />
 
         <ScrollView
-          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: (Platform.OS === 'ios' ? 48 : 28) + navInset }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Omni: hero — AI/promo-картка (лавандово-рожева змивка + сфера), далі

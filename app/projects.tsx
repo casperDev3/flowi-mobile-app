@@ -1,3 +1,4 @@
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -536,6 +537,7 @@ export default function ProjectsScreen() {
   // Планшет: стелю читабельної колонки (720pt) тут знято — картки лягають у
   // колонки на всю ширину екрана (вікно мінус сайдбар), як дашборд «Сьогодні».
   const { isWide, width: windowWidth } = useResponsive();
+  const androidSheetPad = useAndroidBottomPad();
   const filtersV25 = useFiltersV25();
   const screenWidth = useScreenWidth();
   // Планшет, три зони: колонки masonry рахуються від РЕАЛЬНОЇ ширини головної
@@ -1435,7 +1437,7 @@ export default function ProjectsScreen() {
       <Modal visible={showModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[st.overlay, { backgroundColor: tk.surface.overlay }, wm.overlay]} onPress={closeModal}>
-            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, wm.column, androidSheetPad]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <View style={[st.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
                 <OverlayMaterial isDark={isDark} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">

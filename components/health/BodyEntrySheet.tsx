@@ -1,3 +1,4 @@
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -38,6 +39,7 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
 }) {
   const c = getHealthDSColors(isDark);
   const gs = useGlassStyles();
+  const androidSheetPad = useAndroidBottomPad();
   const k = dsTokens(isDark);
   const sheetSurface = useSheetSurface();
   const wm = useWideModal();
@@ -76,7 +78,7 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
         <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={onClose}>
           <Pressable
             onPress={e => e.stopPropagation()}
-            style={[s.sheetWrap, wm.column]}
+            style={[s.sheetWrap, wm.column, androidSheetPad]}
             accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"

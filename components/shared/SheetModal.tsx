@@ -55,6 +55,7 @@ import { type SheetPresentation, resolveSheetPresentation } from '@/constants/to
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { dialogColumnStyle, sheetColumnStyle, sidePanelColumnStyle } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import { useI18n } from '@/store/i18n';
 import { glassOf } from '@/components/shared/dsTheme';
 import { OverlayScrim } from '@/components/ds/OverlaySurface';
@@ -65,6 +66,9 @@ const SWIPE_THRESHOLD = 120;   // px
 const VEL_THRESHOLD   = 800;   // px/s
 
 // ─── Props ────────────────────────────────────────────────────────────────────
+
+/** Нижнє поле аркуша; на Android до нього додається inset панелі навігації. */
+const SHEET_BASE_BOTTOM = Platform.OS === 'ios' ? 34 : 16;
 
 export interface SheetModalProps {
   visible: boolean;
@@ -137,6 +141,8 @@ export function SheetModal({
 }: SheetModalProps) {
   const reduced = useReducedMotion() ?? false;
   const { width, isWide, sizeClass } = useResponsive();
+  // Android edge-to-edge: аркуш інакше ховає низ під панеллю навігації.
+  const navInset = useAndroidNavInset();
   const mode = resolveSheetPresentation(presentation, sizeClass);
   // I18N-06: ця модалка обгортає КОЖНУ шторку застосунку, тож
   // захардкоджене «Закрити» озвучувало українською й англійський інтерфейс.
@@ -310,10 +316,11 @@ export function SheetModal({
     mode === 'side' ? styles.outerSide
     : mode === 'dialog' ? styles.outerDialog
     : styles.outer;
+  const navPad = navInset > 0 ? { paddingBottom: SHEET_BASE_BOTTOM + navInset } : null;
   const wrapperStyle =
-    mode === 'side' ? [styles.wrapper, styles.wrapperSide]
+    mode === 'side' ? [styles.wrapper, styles.wrapperSide, navPad]
     : mode === 'dialog' ? [styles.wrapper, styles.wrapperDialog]
-    : styles.wrapper;
+    : [styles.wrapper, navPad];
 
   // ── Рендер ────────────────────────────────────────────────────────────────
   if (!mounted) return null;
@@ -447,7 +454,7 @@ const styles = StyleSheet.create({
   // Див. sheetSurfaceStyle у hooks/use-content-width.ts.
   wrapper: {
     paddingHorizontal: 12,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    paddingBottom: SHEET_BASE_BOTTOM,
     flexShrink: 1,
   },
   wrapperDialog: {

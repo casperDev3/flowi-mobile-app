@@ -1,3 +1,4 @@
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import * as Clipboard from 'expo-clipboard';
 import {loadRecoveryDrafts,dismissRecoveryDraft,type RecoveryDraft} from '@/store/recovery-drafts';
 import { useRouter } from 'expo-router';
@@ -61,6 +62,7 @@ interface Palette {
 
 export default function SyncScreen() {
   const contentWidth = useContentWidth();
+  const navInset = useAndroidNavInset();
   const router = useRouter();
   const { t, g, isDark, reduceTransparency } = useDS();
   const { tr } = useI18n();
@@ -235,7 +237,7 @@ export default function SyncScreen() {
         </ScreenHeader>
 
         <ScrollView
-          contentContainerStyle={[contentWidth, { padding: 20, paddingBottom: 48 }]}
+          contentContainerStyle={[contentWidth, { padding: 20, paddingBottom: 48 + navInset }]}
           showsVerticalScrollIndicator={false}>
 
             {recovery.map(row=><View key={row.id} style={{padding:16,marginBottom:12,backgroundColor:c.card,borderRadius:radius.nested}}>

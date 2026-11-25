@@ -1,3 +1,4 @@
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -29,6 +30,7 @@ const ACC = HEALTH_ACCENTS.prevention;
 
 export default function MedsScreen() {
   const contentWidth = useContentWidth();
+  const androidSheetPad = useAndroidBottomPad();
   const sheetSurface = useSheetSurface();
   const wm = useWideModal();
   const sheetScreenMinHeight = useSheetScreenMinHeight();
@@ -197,7 +199,7 @@ export default function MedsScreen() {
       <Modal visible={add} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrap, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrap, wm.column, androidSheetPad]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <View style={[s.sheet, sheetSurface, { ...gs.strong }]}>
                 {/* Брудне скло (Layout System v2.4): аркуш поверх вмісту не просвічує. */}
                 <OverlayMaterial isDark={isDark} radius={24} />

@@ -1,3 +1,4 @@
+import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -148,6 +149,7 @@ function HRSparkline({ samples, color }: { samples: HKHeartRateSample[]; color: 
 
 export default function AppleHealthScreen() {
   const { tr, lang } = useI18n();
+  const navInset = useAndroidNavInset();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   // Планшет (рішення 6): широка колонка, плитки «сьогодні» рядом по 3–4,
   // пульс і тиждень — двома колонками поруч.
@@ -361,7 +363,7 @@ export default function AppleHealthScreen() {
             keyExtractor={workoutKey}
             renderItem={renderWorkout}
             ItemSeparatorComponent={WorkoutSeparator}
-            contentContainerStyle={[lay.contentStyle, { paddingBottom: 40 }]}
+            contentContainerStyle={[lay.contentStyle, { paddingBottom: 40 + navInset }]}
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={
             <>

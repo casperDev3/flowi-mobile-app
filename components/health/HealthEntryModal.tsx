@@ -1,3 +1,4 @@
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -57,6 +58,7 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
   const gs = healthGlassStyles(isDark);
   const k = dsTokensFor(c);
   const sheetSurface = useSheetSurface();
+  const androidSheetPad = useAndroidBottomPad();
   const wm = useWideModal();
   const [val, setVal] = useState('');
   const [val2, setVal2] = useState('');
@@ -92,7 +94,7 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
         <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={onClose}>
           <Pressable
             onPress={e => e.stopPropagation()}
-            style={[s.sheetWrapper, wm.column]}
+            style={[s.sheetWrapper, wm.column, androidSheetPad]}
             accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"

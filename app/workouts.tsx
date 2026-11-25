@@ -21,7 +21,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { requestNotificationPermissions } from '@/store/notifications';
+import { ensureReminderChannel, REMINDER_CHANNEL_ID, requestNotificationPermissions } from '@/store/notifications';
 import { loadDataResult, retryStorageRead } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
@@ -880,6 +880,7 @@ export default function WorkoutsScreen() {
 
     const [hour, minute] = prog.reminderTime.split(':').map(Number);
     const ids: string[] = [];
+    await ensureReminderChannel();
     for (const day of prog.reminderDays) {
       try {
         const id = await Notifications.scheduleNotificationAsync({
@@ -887,13 +888,13 @@ export default function WorkoutsScreen() {
             title: 'Час тренуватись',
             body: prog.name,
             sound: true,
-            ...(Platform.OS === 'android' ? { channelId: 'flowi-reminders' } : {}),
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
             weekday: day === 0 ? 1 : day + 1,
             hour,
             minute,
+            ...(Platform.OS === 'android' ? { channelId: REMINDER_CHANNEL_ID } : {}),
           } as any,
         });
         ids.push(id);

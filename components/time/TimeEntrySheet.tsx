@@ -21,6 +21,7 @@
  * пишемо.
  */
 
+import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
 import React from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -71,11 +72,12 @@ export function TimeEntrySheet({
   onClose,
   onSubmit,
 }: TimeEntrySheetProps) {
+  const androidSheetPad = useAndroidBottomPad();
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <Pressable accessible={false} style={[s.overlay, { backgroundColor: c.t.surface.overlay }]} onPress={onClose}>
-          <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+          <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide), androidSheetPad]}>
             <View style={[s.sheet, { ...c.gl.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
               <OverlayMaterial isDark={isDark} />
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">

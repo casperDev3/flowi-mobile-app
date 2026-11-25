@@ -56,3 +56,6 @@ app-example
 modules/*/android/build/
 modules/*/android/.gradle/
 modules/*/android/.cxx/
+
+# Локальні доступи (секрети)
+*.local.md

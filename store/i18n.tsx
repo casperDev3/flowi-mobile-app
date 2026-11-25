@@ -4,6 +4,8 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { loadDataResult, saveData } from '@/store/storage';
 import { Lang, Translations, allTranslations } from '@/store/translations';
 import { langFromDeviceLanguages, resolveInitialLang } from '@/utils/deviceLanguage';
+import { setSystemStatusLanguage } from '@/utils/taskStatuses';
+import { setUiLang } from '@/utils/uiLang';
 
 const STORAGE_KEY = 'lang_option_v1';
 /** Є, щойно людина підключала workspace — ознака наявного встановлення. */
@@ -70,6 +72,11 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     setLangState(next);
     saveData(STORAGE_KEY, next);
   };
+
+  // Синхронно, до рендеру дітей: екрани зводять статуси через
+  // mergeTaskStatusColumns, і назви системних мають бути вже потрібною мовою.
+  setSystemStatusLanguage(lang);
+  setUiLang(lang);
 
   const value = useMemo(
     () => ({ lang, setLang, tr: allTranslations[lang] }),

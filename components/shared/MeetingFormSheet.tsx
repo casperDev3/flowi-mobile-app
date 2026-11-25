@@ -26,6 +26,7 @@ import { TimeSlotPicker } from '@/components/shared/TimeSlotPicker';
 import { MEETING_DURATION_PRESETS } from '@/utils/meetingReschedule';
 import { ClientChips } from '@/components/clients/ClientChips';
 import { projectClientId, type Client } from '@/utils/clients';
+import { formatDurationShort } from '@/utils/uiLang';
 
 // ─── Exported types ────────────────────────────────────────────────────────────
 
@@ -402,7 +403,7 @@ export function MeetingFormSheet({
                       {[
                         fDate ? new Date(fDate + 'T00:00').toLocaleDateString(isUk ? 'uk-UA' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' }) : null,
                         fTime || null,
-                        fDuration >= 60 ? `${Math.floor(fDuration / 60)}г${fDuration % 60 ? `${fDuration % 60}хв` : ''}` : `${fDuration}хв`,
+                        formatDurationShort(fDuration, isUk ? 'uk' : 'en'),
                         fLocation || null,
                         fRepeat ? '↻' : null,
                       ].filter(Boolean).join(' · ')}

@@ -1,3 +1,4 @@
+import { formatDurationShort } from '@/utils/uiLang';
 // Спільні кольори/акценти екранів «Здоров'я» (хаб + модулі)
 import { theme } from '@/constants/theme';
 
@@ -55,9 +56,4 @@ export function getHealthColors(isDark: boolean): HealthColors {
 export type RadialKey = 'water' | 'calories' | 'weight' | 'steps' | 'pulse';
 export type ModalKey = RadialKey | 'sleep';
 
-export const fmtSleep = (mins: number) => {
-  const h = Math.floor(mins / 60), m = mins % 60;
-  if (h > 0 && m > 0) return `${h}г ${m}хв`;
-  if (h > 0) return `${h} год`;
-  return `${m} хв`;
-};
+export const fmtSleep = (mins: number) => formatDurationShort(mins);

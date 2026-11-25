@@ -67,6 +67,7 @@ import {
   BentoArrowButton, BentoCard, KpiCounter, MeshBackground, SegmentedProgress, useBentoColors,
 } from '@/components/ds';
 import { useDS } from '@/hooks/use-ds';
+import { formatKcal, formatSteps, formatWater } from '@/utils/uiLang';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -499,9 +500,9 @@ export default function TodayScreen() {
             onPress={() => router.push('/health')}
             accessibilityLabel={tr.tabHealth}>
             <View style={{ flexDirection: 'row', gap: 4 }}>
-              <RingCell pct={calDay.pct} color={ACCENT_CAL} label={tr.calories} value={`${calDay.consumed}кк`} />
-              <RingCell pct={steps / goals.steps} color={ACCENT_STEPS} label={tr.steps} value={steps >= 1000 ? `${(steps / 1000).toFixed(1)}т` : `${steps}`} />
-              <RingCell pct={water / goals.water} color={ACCENT} label={tr.water} value={water >= 1000 ? `${(water / 1000).toFixed(1)}л` : `${water}мл`} />
+              <RingCell pct={calDay.pct} color={ACCENT_CAL} label={tr.calories} value={formatKcal(calDay.consumed)} />
+              <RingCell pct={steps / goals.steps} color={ACCENT_STEPS} label={tr.steps} value={formatSteps(steps)} />
+              <RingCell pct={water / goals.water} color={ACCENT} label={tr.water} value={formatWater(water)} />
               <RingCell pct={sleep ? sleep / goals.sleep : 0} color={ACCENT_SLEEP} label={tr.sleep} value={sleep ? fmtSleep(sleep) : '—'} />
             </View>
           </BentoCard>

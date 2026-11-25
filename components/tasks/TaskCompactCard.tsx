@@ -108,7 +108,7 @@ function TaskCompactCardInner<T extends Task>({
   priorityPlacement = 'footer', hideProject = false,
   selected = false, selectionMode = false, rowAccessibilityActions, onRowAccessibilityAction,
 }: TaskCompactCardProps<T>) {
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   const priorityLevel = normalizePriority(task);
   const priorityInFooter = priorityPlacement === 'footer';
   const overdue = isOverdue(task);
@@ -124,7 +124,11 @@ function TaskCompactCardInner<T extends Task>({
   const allSubtasksDone = task.subtasks.length > 0 && doneSubtasks === task.subtasks.length;
   const hasSubtasks = task.subtasks.length > 0;
   const deadlineParts = deadlineDayMonth(task.deadline);
-  const deadlineShort = deadlineParts ? `${deadlineParts.day} ${(tr.monthsShort[deadlineParts.month] ?? '').toLowerCase()}` : '';
+  const deadlineMonth = tr.monthsShort[deadlineParts?.month ?? 0] ?? '';
+  // «26 лис» українською, «Nov 26» англійською.
+  const deadlineShort = deadlineParts
+    ? (lang === 'en' ? `${deadlineMonth} ${deadlineParts.day}` : `${deadlineParts.day} ${deadlineMonth.toLowerCase()}`)
+    : '';
   const deadlineSpoken = deadlineParts ? `${tr.deadline}: ${deadlineParts.day} ${tr.monthsGenitive[deadlineParts.month] ?? ''}` : null;
 
   /* Animate text opacity when done state changes */

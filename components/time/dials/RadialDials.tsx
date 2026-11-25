@@ -12,6 +12,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import Svg, { Circle, G, Line } from 'react-native-svg';
+import { unitLabel } from '@/utils/uiLang';
 
 import { useClockTick } from '@/hooks/use-clock-tick';
 import { formatClock } from '@/utils/durationFormat';
@@ -113,7 +114,7 @@ export function ArcDial({ startedAt, size, colors, material: m, smooth }: DialRe
         />
         {h > 0 && (
           <SunkenLabel
-            text={`${h} год`}
+            text={`${h} ${unitLabel('год')}`}
             fontSize={size * 0.075}
             color={colors.sub}
             m={m}
@@ -189,7 +190,7 @@ export function ChronoDial({ startedAt, size, colors, material: m, smooth }: Dia
           а просто починає новий оберт. */}
       {h > 0 && (
         <CenterOverlay style={{ paddingTop: size * 0.42 }}>
-          <SunkenLabel text={`${h} год`} fontSize={size * 0.08} color={colors.sub} m={m} />
+          <SunkenLabel text={`${h} ${unitLabel('год')}`} fontSize={size * 0.08} color={colors.sub} m={m} />
         </CenterOverlay>
       )}
     </View>

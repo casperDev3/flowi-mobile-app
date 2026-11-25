@@ -40,6 +40,7 @@ import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
 import { EntryType, HealthEntry, getWeeklyInsights } from '@/utils/healthUtils';
 import { fontFamily } from '@/constants/theme';
 import { useGlassStyles } from '@/components/finance/finPalette';
+import { formatKcal, formatSteps, formatWater, unitLabel } from '@/utils/uiLang';
 
 /** Omni: icon-chip шапки картки тренду — за метрикою. */
 const METRIC_ICON: Partial<Record<EntryType, IconSymbolName>> = {
@@ -51,10 +52,10 @@ interface Metric { type: EntryType; label: string; color: string; agg: Agg; unit
 
 function fmtMetric(m: Metric, v: number): string {
   if (m.unit === 'sleep') return fmtSleep(Math.round(v));
-  if (m.type === 'steps') return v >= 1000 ? `${(v / 1000).toFixed(1)}т` : `${Math.round(v)}`;
-  if (m.type === 'water') return v >= 1000 ? `${(v / 1000).toFixed(1)} л` : `${Math.round(v)} мл`;
-  if (m.type === 'weight') return `${v.toFixed(1)} кг`;
-  return `${Math.round(v)}${m.unit ? ' ' + m.unit : ''}`;
+  if (m.type === 'steps') return formatSteps(v);
+  if (m.type === 'water') return formatWater(v);
+  if (m.type === 'weight') return `${v.toFixed(1)} ${unitLabel('кг')}`;
+  return `${Math.round(v)}${m.unit ? ' ' + unitLabel(m.unit) : ''}`;
 }
 
 export function OverviewTab({ h }: HealthTabProps) {
@@ -105,19 +106,19 @@ export function OverviewTab({ h }: HealthTabProps) {
       <View style={{ flexDirection: 'row', gap: 4 }}>
         {/* Кільце міряє ЗʼЇДЕНЕ проти ліміту їжі й нічого більше:
             спалене — окреме число, а не поправка до цього. */}
-        <RingCell pct={cal.pct} color={ACCENT_CAL} label={tr.calories} value={`${cal.consumed}кк`} />
+        <RingCell pct={cal.pct} color={ACCENT_CAL} label={tr.calories} value={formatKcal(cal.consumed)} />
         <RingCell pct={today.steps / goals.steps} color={ACCENT_STEPS} label={tr.steps}
-          value={today.steps >= 1000 ? `${(today.steps / 1000).toFixed(1)}т` : `${today.steps}`} />
+          value={formatSteps(today.steps)} />
         <RingCell pct={today.water / goals.water} color={ACCENT} label={tr.water}
-          value={today.water >= 1000 ? `${(today.water / 1000).toFixed(1)}л` : `${today.water}мл`} />
+          value={formatWater(today.water)} />
         <RingCell pct={today.sleep ? today.sleep / goals.sleep : 0} color={ACCENT_SLEEP} label={tr.sleep}
           value={today.sleep ? fmtSleep(today.sleep) : '—'} />
       </View>
       <View style={{ flexDirection: 'row', marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }}>
-        <VitalMini label={tr.weight} value={latestWeight ? `${latestWeight} кг` : '—'} color={ACCENT_WEIGHT} sub={c.sub} />
+        <VitalMini label={tr.weight} value={latestWeight ? `${latestWeight} ${unitLabel('кг')}` : '—'} color={ACCENT_WEIGHT} sub={c.sub} />
         <VitalMini label={tr.bmi} value={bmi ? bmi.toFixed(1) : '—'} color={bmi ? bmiColor(bmi) : c.sub} sub={c.sub} />
         <VitalMini label={tr.pulse} value={today.pulse ? `${today.pulse}` : '—'} color={ACCENT_PULSE} sub={c.sub} />
-        <VitalMini label={tr.protein} value={`${Math.round(today.protein)}г`} color={ACCENT} sub={c.sub} />
+        <VitalMini label={tr.protein} value={`${Math.round(today.protein)}${unitLabel('г')}`} color={ACCENT} sub={c.sub} />
       </View>
     </HealthCard>
   );

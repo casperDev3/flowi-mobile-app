@@ -24,6 +24,7 @@ import { fontFamily } from '@/constants/theme';
 
 import { EntryType } from '@/utils/healthUtils';
 import { useSheetSurface } from '@/hooks/use-content-width';
+import { formatSteps } from '@/utils/uiLang';
 
 export interface NewEntryPayload {
   type: EntryType; value: number; note?: string;
@@ -201,7 +202,7 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
                   accessibilityLabel={tr.steps}
                   keyboardType="number-pad" autoFocus
                   style={[s.bigInput, { color: c.text, backgroundColor: c.dim }]} />
-                <Presets values={[1000, 3000, 5000, 10000]} val={val} setVal={setVal} color={ACCENT_STEPS} c={c} fmt={st => (st >= 1000 ? `${st / 1000}т` : String(st))} />
+                <Presets values={[1000, 3000, 5000, 10000]} val={val} setVal={setVal} color={ACCENT_STEPS} c={c} fmt={st => formatSteps(st)} />
               </>}
 
               {modalKey === 'pulse' && <>

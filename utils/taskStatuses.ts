@@ -100,13 +100,42 @@ export function resolvedStatusType(column: Pick<TaskStatusColumn, 'id' | 'isDone
  * колонку з тим самим (насправді унікальним, `st-<uuid4>`) id — розділення на
  * рівні виклику прибирає цей ризик так само надійно, як унікальність id.
  */
+/**
+ * Назви системних статусів обома мовами. У сховищі (і в копіях для проєктів)
+ * лежить та назва, що була на момент створення, — здебільшого українська. Поки
+ * людина не перейменувала статус, показуємо його мовою інтерфейсу; власну назву
+ * не чіпаємо.
+ */
+const SYSTEM_STATUS_NAMES: Record<string, { uk: string; en: string }> = {
+  [ACTIVE_COLUMN_ID]: { uk: 'До роботи', en: 'To do' },
+  [IN_PROGRESS_COLUMN_ID]: { uk: 'У процесі', en: 'In progress' },
+  [REVIEW_COLUMN_ID]: { uk: 'На перевірці', en: 'In review' },
+  [DONE_COLUMN_ID]: { uk: 'Готово', en: 'Done' },
+  'team-review': { uk: 'На перевірці', en: 'In review' },
+};
+
+let systemStatusLang: 'uk' | 'en' = 'uk';
+
+/** Мова назв системних статусів — виставляє I18nProvider (store/i18n.tsx). */
+export function setSystemStatusLanguage(lang: 'uk' | 'en'): void {
+  systemStatusLang = lang;
+}
+
+/** Назва статусу мовою інтерфейсу, якщо це неперейменований системний статус. */
+export function localizedStatusName(column: Pick<TaskStatusColumn, 'id' | 'name'> & { sourceStatusId?: string }): string {
+  const names = SYSTEM_STATUS_NAMES[column.id] ?? (column.sourceStatusId ? SYSTEM_STATUS_NAMES[column.sourceStatusId] : undefined);
+  const name = column.name?.trim() ?? '';
+  if (!names || (name !== names.uk && name !== names.en)) return name;
+  return names[systemStatusLang];
+}
+
 export function mergeTaskStatusColumns(saved: TaskStatusColumn[], scopeProjectId?: string): TaskStatusColumn[] {
   if (scopeProjectId !== undefined) {
     return saved
       .filter(column => column?.id && column.name?.trim() && column.projectId === scopeProjectId)
       .map(column => ({
         ...column,
-        name: column.name.trim(),
+        name: localizedStatusName(column),
         color: column.color || '#7C3AED',
         isDone: Boolean(column.isDone),
         type: resolvedStatusType(column),
@@ -135,7 +164,10 @@ export function mergeTaskStatusColumns(saved: TaskStatusColumn[], scopeProjectId
   // системні «До роботи»/«У процесі»/… лишались би без поля, хоча решта вже
   // має його.
   for (const [id, column] of merged) {
-    if (column.type === undefined) merged.set(id, { ...column, type: deriveStatusType(column) });
+    const name = localizedStatusName(column);
+    if (column.type === undefined || name !== column.name) {
+      merged.set(id, { ...column, name, type: column.type ?? deriveStatusType(column) });
+    }
   }
   return [...merged.values()].sort(
     (left, right) =>

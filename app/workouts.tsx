@@ -29,6 +29,7 @@ import { formatDuration } from '@/utils/durationFormat';
 import { Layout } from '@/constants/tokens';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
+import { getUiLang, unitLabel } from '@/utils/uiLang';
 import { LoadErrorNotice } from '@/components/health/HealthNotices';
 import { getHealthDSColors } from '@/components/health/palette';
 import { fontFamily, shadow } from '@/constants/theme';
@@ -658,8 +659,8 @@ const ExerciseRow = React.memo(function ExerciseRow({ ex, c, isDark, onEdit, onD
           {[
             ex.muscleGroup,
             ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : null,
-            ex.weightKg ? `${ex.weightKg} кг` : null,
-            ex.restSec ? `відпочинок ${ex.restSec}с` : null,
+            ex.weightKg ? `${ex.weightKg} ${unitLabel('кг')}` : null,
+            ex.restSec ? `${getUiLang() === 'en' ? 'rest' : 'відпочинок'} ${ex.restSec}${unitLabel('с')}` : null,
           ].filter(Boolean).join(' · ')}
         </Text>
       </View>
@@ -752,7 +753,7 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
                 <Text style={{ color: c.sub, fontSize: 12 }}>
                   {[
                     ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : null,
-                    ex.weightKg ? `${ex.weightKg}кг` : null,
+                    ex.weightKg ? `${ex.weightKg} ${unitLabel('кг')}` : null,
                   ].filter(Boolean).join(' · ')}
                 </Text>
               </View>

@@ -29,6 +29,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import type { Translations } from '@/store/translations';
+import { unitLabel } from '@/utils/uiLang';
 import {
   ACCENT, ACCENT_MOOD, ACCENT_PROT, ACCENT_PULSE, ACCENT_STEPS, ACCENT_WEIGHT, ModalKey,
 } from '@/utils/healthTheme';
@@ -153,7 +154,7 @@ export function BodyTab({ h }: HealthTabProps) {
       node: (
         <MetricTrend entries={h.entries} type="weight" agg="avg" color={ACCENT_WEIGHT}
           title={`${tr.weight} · ${tr.dynamics}`}
-          format={v => `${v.toFixed(1)} кг`} c={c} tr={tr} />
+          format={v => `${v.toFixed(1)} ${unitLabel('кг')}`} c={c} tr={tr} />
       ),
     },
     {
@@ -206,7 +207,7 @@ export function BodyTab({ h }: HealthTabProps) {
         <HealthCard c={c} title={tr.summary} icon="chart.bar.fill">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             <Stat label={bodyfatManual ? tr.mBodyfat : tr.bodyfatEst} value={bodyfat != null ? `${bodyfat.toFixed(1)}%` : '—'} color={ACCENT_MOOD} sub={c.sub} />
-            <Stat label={tr.leanMass} value={lean ? `${lean.toFixed(1)} кг` : '—'} color={ACCENT} sub={c.sub} />
+            <Stat label={tr.leanMass} value={lean ? `${lean.toFixed(1)} ${unitLabel('кг')}` : '—'} color={ACCENT} sub={c.sub} />
             <Stat label={tr.bmi} value={bmi ? bmi.toFixed(1) : '—'} color={ACCENT_PROT} sub={c.sub} />
             <Stat label={tr.whtr} value={whtr ? whtr.toFixed(2) : '—'} color={whtr ? whtrColor : c.sub} sub={c.sub}
               badge={whtr ? whtrLbl : undefined} />

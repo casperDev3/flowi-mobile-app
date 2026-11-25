@@ -55,6 +55,7 @@ import { dsTokens } from '@/hooks/use-ds';
 import { HEALTH_ACCENTS } from '@/utils/healthTheme';
 import { fontFamily } from '@/constants/theme';
 import { BentoCard, MeshBackground, useBentoColors } from '@/components/ds';
+import { formatKcal, formatWater, unitLabel } from '@/utils/uiLang';
 
 const ACCENT = HEALTH_ACCENTS.water;
 
@@ -214,15 +215,15 @@ export default function HealthProfileScreen() {
             </>} right={<>
             {/* Превʼю розрахованих цілей — ЄДИНА темна картка сторінки (Omni):
                 це результат, заради якого профіль і заповнюють. */}
-            <BentoCard compact variant="dark" title={`TDEE ${tdee} кк`} icon="flame.fill" subtitle={tr.todayLabel}
+            <BentoCard compact variant="dark" title={`TDEE ${formatKcal(tdee)}`} icon="flame.fill" subtitle={tr.todayLabel}
               style={{ marginTop: lay.twoCol ? 8 : 24 }}>
               <PreviewRows
                 rows={[
-                  { label: tr.dailyLimit, value: `${goals.calories} кк`, color: HEALTH_ACCENTS.cal },
-                  { label: tr.protein, value: `${goals.protein} г`, color: HEALTH_ACCENTS.weight },
-                  { label: tr.water, value: `${goals.water} мл`, color: ACCENT },
+                  { label: tr.dailyLimit, value: formatKcal(goals.calories), color: HEALTH_ACCENTS.cal },
+                  { label: tr.protein, value: `${goals.protein} ${unitLabel('г')}`, color: HEALTH_ACCENTS.weight },
+                  { label: tr.water, value: formatWater(goals.water), color: ACCENT },
                 ]}
-                note={latestWeight == null ? `ℹ️ ${tr.recordWeight} — ${FALLBACK_WEIGHT} кг (за замовч.)` : null}
+                note={latestWeight == null ? `ℹ️ ${tr.recordWeight} — ${FALLBACK_WEIGHT} ${unitLabel('кг')} (${lang === 'en' ? 'default' : 'за замовч.'})` : null}
               />
             </BentoCard>
 

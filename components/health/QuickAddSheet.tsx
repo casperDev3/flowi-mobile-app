@@ -15,6 +15,7 @@ import { EntryType } from '@/utils/healthUtils';
 import { useSheetSurface } from '@/hooks/use-content-width';
 import { useGlassStyles } from '@/components/finance/finPalette';
 import { OverlayMaterial } from '@/components/ds';
+import { unitLabel } from '@/utils/uiLang';
 
 export interface QuickRecord { type: EntryType; value: number; }
 
@@ -93,14 +94,14 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
                     </View>
                     <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium, flex: 1, marginLeft: 10 }}>{tr[f.labelKey]}</Text>
                     <TextInput
-                      accessibilityLabel={`${tr[f.labelKey]}, ${f.unit}`}
+                      accessibilityLabel={`${tr[f.labelKey]}, ${unitLabel(f.unit)}`}
                       value={vals[f.type] ?? ''}
                       onChangeText={t => setVals(p => ({ ...p, [f.type]: t }))}
                       keyboardType="decimal-pad"
                       placeholder="—" placeholderTextColor={k.text.muted}
                       style={{ width: 96, minHeight: 44, color: c.text, fontSize: 24, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.48, textAlign: 'right', paddingVertical: 8 }}
                     />
-                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, width: 28, textAlign: 'right' }}>{f.unit}</Text>
+                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, width: 28, textAlign: 'right' }}>{unitLabel(f.unit)}</Text>
                   </View>
                 ))}
               </ScrollView>

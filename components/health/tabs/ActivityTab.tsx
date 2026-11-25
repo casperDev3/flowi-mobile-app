@@ -30,6 +30,7 @@ import { getHealthCardColors } from '@/components/health/palette';
 import { dsTokens } from '@/hooks/use-ds';
 import { stepsToKm } from '@/utils/healthUtils';
 import { fontFamily } from '@/constants/theme';
+import { formatSteps } from '@/utils/uiLang';
 
 /** Тренування читаються лише заради дати й калорій — решта полів тут ні до чого. */
 interface WorkoutBrief { date: string; calories?: number }
@@ -103,7 +104,7 @@ export function ActivityTab({ h }: HealthTabProps) {
               <TouchableOpacity key={st} onPress={() => h.addQuick('steps', st)}
                 accessibilityRole="button" accessibilityLabel={`+${st}`}
                 style={[s.chip, { backgroundColor: c.dim }]}>
-                <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>+{st >= 1000 ? `${st / 1000}т` : st}</Text>
+                <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>+{formatSteps(st)}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -115,7 +116,7 @@ export function ActivityTab({ h }: HealthTabProps) {
       node: (
         <MetricTrend entries={h.entries} type="steps" agg="sum" color={ACCENT_STEPS} goal={goals.steps}
           title={`${tr.steps} · ${tr.dynamics}`}
-          format={v => (v >= 1000 ? `${(v / 1000).toFixed(1)}т` : `${Math.round(v)}`)} c={c} tr={tr} />
+          format={v => formatSteps(v)} c={c} tr={tr} />
       ),
     },
     {

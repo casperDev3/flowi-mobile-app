@@ -166,6 +166,7 @@ import { formatClock, formatDuration } from '@/utils/durationFormat';
 import { fontFamily, radius } from '@/constants/theme';
 import { BentoArrowButton, BentoCard, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
 import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
+import { formatDurationShort } from '@/utils/uiLang';
 
 
 /**
@@ -2499,9 +2500,7 @@ export default function TasksScreen() {
                       const isPast = phase === 'past';
                       const isNow = phase === 'current';
                       const dFmt = tr.today;
-                      const dur = mtg.durationMinutes >= 60
-                        ? `${Math.floor(mtg.durationMinutes / 60)}г${mtg.durationMinutes % 60 ? ` ${mtg.durationMinutes % 60}хв` : ''}`
-                        : `${mtg.durationMinutes} хв`;
+                      const dur = formatDurationShort(mtg.durationMinutes, lang);
                       return (
                         <TouchableOpacity key={mtg.id} onPress={() => openMeetingView(mtg)} activeOpacity={0.75}>
                           <View style={{ borderRadius: Atlas.radius.large, paddingVertical: 8, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 8, overflow: 'hidden', opacity: isPast ? 0.5 : 1, backgroundColor: t.surface.subtle }}>

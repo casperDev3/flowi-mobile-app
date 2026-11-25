@@ -12,6 +12,7 @@ import { EntryType } from '@/utils/healthUtils';
 import { useSheetSurface } from '@/hooks/use-content-width';
 import { useGlassStyles } from '@/components/finance/finPalette';
 import { OverlayMaterial } from '@/components/ds';
+import { unitLabel } from '@/utils/uiLang';
 
 export interface BodyRecord { type: EntryType; value: number; }
 
@@ -101,14 +102,14 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
                       <Text style={[s.label, { color: c.sub }]}>{tr[f.labelKey]}</Text>
                       <View style={[s.inputWrap, { backgroundColor: c.dim }]}>
                         <TextInput
-                          accessibilityLabel={`${tr[f.labelKey]}, ${f.unit}`}
+                          accessibilityLabel={`${tr[f.labelKey]}, ${unitLabel(f.unit)}`}
                           value={vals[f.type] ?? ''}
                           onChangeText={t => setVals(p => ({ ...p, [f.type]: t }))}
                           keyboardType="decimal-pad"
                           placeholder="—" placeholderTextColor={k.text.muted}
                           style={{ flex: 1, minHeight: 44, color: c.text, fontSize: 22, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.44, paddingVertical: 10 }}
                         />
-                        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular }}>{f.unit}</Text>
+                        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular }}>{unitLabel(f.unit)}</Text>
                       </View>
                     </View>
                   ))}

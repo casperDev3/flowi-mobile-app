@@ -27,6 +27,7 @@ import {
 import { getHealthCardColors } from '@/components/health/palette';
 import { dsTokens } from '@/hooks/use-ds';
 import { fontFamily } from '@/constants/theme';
+import { formatKcal, formatWater } from '@/utils/uiLang';
 
 export function NutritionTab({ h }: HealthTabProps) {
   const grid = useHealthTabGrid();
@@ -87,7 +88,7 @@ export function NutritionTab({ h }: HealthTabProps) {
           <View style={{ flexDirection: 'row', gap: 6 }}>
             {[200, 350, 500, 700].map(kk => (
               <TouchableOpacity key={kk} onPress={() => h.addQuick('calories', kk)}
-                accessibilityRole="button" accessibilityLabel={`+${kk} кк`}
+                accessibilityRole="button" accessibilityLabel={`+${formatKcal(kk)}`}
                 style={[s.chip, { backgroundColor: c.dim }]}>
                 <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>+{kk} кк</Text>
               </TouchableOpacity>
@@ -101,7 +102,7 @@ export function NutritionTab({ h }: HealthTabProps) {
       node: (
         <MetricTrend entries={h.entries} type="calories" agg="sum" color={ACCENT_CAL} goal={goals.calories}
           title={`${tr.calories} · ${tr.dynamics}`}
-          format={v => `${Math.round(v)} кк`} c={c} tr={tr} />
+          format={v => formatKcal(v)} c={c} tr={tr} />
       ),
     },
     {
@@ -136,9 +137,9 @@ export function NutritionTab({ h }: HealthTabProps) {
         <HealthCard c={c} title={tr.water} icon="drop.fill">
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
             <Text style={{ color: c.text, fontSize: 32, lineHeight: 36, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.64 }}>
-              {today.water >= 1000 ? `${(today.water / 1000).toFixed(1)} л` : `${today.water} мл`}
+              {formatWater(today.water)}
             </Text>
-            <Text style={{ color: c.sub, fontSize: 11, marginLeft: 4 }}>/ {goals.water} мл</Text>
+            <Text style={{ color: c.sub, fontSize: 11, marginLeft: 4 }}>/ {formatWater(goals.water)}</Text>
             <View style={{ flex: 1 }} />
             <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
               {today.water >= goals.water ? tr.target : `${Math.round(today.water / goals.water * 100)}%`}
@@ -153,9 +154,9 @@ export function NutritionTab({ h }: HealthTabProps) {
           <View style={{ flexDirection: 'row', gap: 6 }}>
             {[150, 250, 350, 500].map(ml => (
               <TouchableOpacity key={ml} onPress={() => h.addQuick('water', ml)}
-                accessibilityRole="button" accessibilityLabel={`+${ml} мл`}
+                accessibilityRole="button" accessibilityLabel={`+${formatWater(ml)}`}
                 style={[s.chip, { backgroundColor: c.dim }]}>
-                <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>+{ml} мл</Text>
+                <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>+{formatWater(ml)}</Text>
               </TouchableOpacity>
             ))}
           </View>

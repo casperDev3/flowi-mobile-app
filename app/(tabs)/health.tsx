@@ -67,6 +67,7 @@ import { HealthEntry, getMonthEntries } from '@/utils/healthUtils';
 import { KpiCounter, MeshBackground } from '@/components/ds';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
 import { AccentIcon } from '@/components/shared/GlassBits';
+import { formatKcal, formatSteps, formatWater, unitLabel } from '@/utils/uiLang';
 
 export default function HealthHubScreen() {
   const tabBarInset = useTabBarInset();
@@ -131,7 +132,7 @@ export default function HealthHubScreen() {
     <>
       <KpiCounter value={h.cal.consumed} label={tr.calories} onPress={() => setTab('nutrition')} />
       <KpiCounter
-        value={h.today.steps >= 1000 ? `${(h.today.steps / 1000).toFixed(1)}т` : h.today.steps}
+        value={formatSteps(h.today.steps)}
         label={tr.steps}
         onPress={() => setTab('activity')}
       />
@@ -294,13 +295,13 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
 
 function getEntryCfg(entry: HealthEntry, tr: any) {
   switch (entry.type) {
-    case 'water':        return { icon: 'drop.fill',         color: ACCENT,        typeLabel: tr.water,    valueStr: entry.value >= 1000 ? `${(entry.value / 1000).toFixed(1)} л` : `+${entry.value} мл` };
-    case 'calories':     return { icon: 'flame.fill',        color: ACCENT_CAL,    typeLabel: tr.consumed, valueStr: `${entry.value} кк${entry.protein ? ` · ${entry.protein}${tr.proteinShort}` : ''}` };
-    case 'calories_out': return { icon: 'flame',             color: ACCENT_STEPS,  typeLabel: tr.burned,   valueStr: `${entry.value} кк` };
-    case 'weight':       return { icon: 'scalemass.fill',    color: ACCENT_WEIGHT, typeLabel: tr.weight,   valueStr: `${entry.value} кг` };
+    case 'water':        return { icon: 'drop.fill',         color: ACCENT,        typeLabel: tr.water,    valueStr: entry.value >= 1000 ? formatWater(entry.value) : `+${formatWater(entry.value)}` };
+    case 'calories':     return { icon: 'flame.fill',        color: ACCENT_CAL,    typeLabel: tr.consumed, valueStr: `${formatKcal(entry.value)}${entry.protein ? ` · ${entry.protein}${tr.proteinShort}` : ''}` };
+    case 'calories_out': return { icon: 'flame',             color: ACCENT_STEPS,  typeLabel: tr.burned,   valueStr: formatKcal(entry.value) };
+    case 'weight':       return { icon: 'scalemass.fill',    color: ACCENT_WEIGHT, typeLabel: tr.weight,   valueStr: `${entry.value} ${unitLabel('кг')}` };
     case 'sleep':        return { icon: 'moon.fill',         color: ACCENT_SLEEP,  typeLabel: tr.sleep,    valueStr: fmtSleep(entry.value) };
-    case 'steps':        return { icon: 'figure.walk',       color: ACCENT_STEPS,  typeLabel: tr.steps,    valueStr: `${entry.value.toLocaleString()} кр` };
-    case 'pulse':        return { icon: 'waveform.path.ecg', color: ACCENT_PULSE,  typeLabel: tr.pulse,    valueStr: `${entry.value} уд/хв` };
+    case 'steps':        return { icon: 'figure.walk',       color: ACCENT_STEPS,  typeLabel: tr.steps,    valueStr: `${entry.value.toLocaleString()} ${unitLabel('кр')}` };
+    case 'pulse':        return { icon: 'waveform.path.ecg', color: ACCENT_PULSE,  typeLabel: tr.pulse,    valueStr: `${entry.value} ${unitLabel('уд/хв')}` };
     // Автодані (health-auto-data.md): без цих гілок записи падали в default і показували «—».
     case 'pulse_rest':   return { icon: 'heart.fill',        color: ACCENT_PULSE,  typeLabel: tr.hautoPulseRest, valueStr: `${entry.value} ${tr.hautoBpm}` };
     case 'spo2':         return { icon: 'lungs.fill',        color: ACCENT_PULSE,  typeLabel: tr.hautoSpo2,      valueStr: `${Math.round(entry.value)}%` };

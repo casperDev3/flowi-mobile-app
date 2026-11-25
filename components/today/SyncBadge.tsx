@@ -11,15 +11,17 @@ import { useI18n } from '@/store/i18n';
 import { useSync } from '@/store/sync-engine';
 import { fontFamily } from '@/constants/theme';
 import { glassOf, dsGlass } from '@/components/shared/dsTheme';
+import { getUiLang } from '@/utils/uiLang';
 
 function fmtRelative(ms: number): string {
+  const en = getUiLang() === 'en';
   const diff = Date.now() - ms;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'щойно';
-  if (mins < 60) return `${mins}хв`;
+  if (mins < 1) return en ? 'just now' : 'щойно';
+  if (mins < 60) return en ? `${mins}m` : `${mins}хв`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}год`;
-  return new Date(ms).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' });
+  if (hrs < 24) return en ? `${hrs}h` : `${hrs}год`;
+  return new Date(ms).toLocaleDateString(en ? 'en-US' : 'uk-UA', { day: '2-digit', month: '2-digit' });
 }
 
 export function SyncBadge() {

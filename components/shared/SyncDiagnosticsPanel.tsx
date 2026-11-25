@@ -1,5 +1,6 @@
 import { Atlas } from '@/constants/atlas';
 import { fontFamily } from '@/constants/theme';
+import { unitLabel } from '@/utils/uiLang';
 /**
  * components/shared/SyncDiagnosticsPanel.tsx
  *
@@ -296,8 +297,8 @@ const yesNo = (value: boolean): string => (value ? 'так' : 'НІ');
 
 /** Секунди з десятою — на цій шкалі (5 с дебаунсу) хвилини марні. */
 function secs(ms: number): string {
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} с`;
-  return `${Math.round(ms / 60_000)} хв`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} ${unitLabel('с')}`;
+  return `${Math.round(ms / 60_000)} ${unitLabel('хв')}`;
 }
 
 function ago(at: number, now: number): string {

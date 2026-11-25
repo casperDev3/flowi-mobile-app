@@ -349,8 +349,8 @@ export default function TimeScreen() {
   }, [periodOnly, projects, taskProjects]);
 
   const breakdown = useMemo(
-    () => projectBreakdown(filtered, projects, undefined, undefined, taskProjects),
-    [filtered, projects, taskProjects],
+    () => projectBreakdown(filtered, projects, tr.timerProjectPersonal, undefined, taskProjects),
+    [filtered, projects, taskProjects, tr.timerProjectPersonal],
   );
   const total = useMemo(() => totalSeconds(filtered), [filtered]);
   const average = useMemo(() => averageTaskSeconds(filtered), [filtered]);
@@ -392,7 +392,7 @@ export default function TimeScreen() {
 
   const sections = useMemo<Section[]>(() => {
     if (grouping === 'project') {
-      return groupByProject(sorted, projects, undefined, undefined, taskProjects).map(group => ({
+      return groupByProject(sorted, projects, tr.timerProjectPersonal, undefined, taskProjects).map(group => ({
         key: group.projectId ?? 'personal',
         title: group.name,
         seconds: group.seconds,
@@ -411,7 +411,7 @@ export default function TimeScreen() {
         : date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
       return { key: group.key, title, seconds: group.seconds, color: null, data: group.items };
     });
-  }, [grouping, sorted, projects, now, tr.today, tr.yesterday, locale, taskProjects]);
+  }, [grouping, sorted, projects, now, tr.today, tr.yesterday, tr.timerProjectPersonal, locale, taskProjects]);
 
   const c = useMemo(() => timeColors(isDark), [isDark]);
   const projectById = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects]);

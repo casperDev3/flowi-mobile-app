@@ -45,6 +45,7 @@ import { getHealthDSColors } from '@/components/health/palette';
 import { fontFamily, shadow } from '@/constants/theme';
 import { dsTokens, useDS } from '@/hooks/use-ds';
 import { BentoCard, HatchedBars, MeshBackground } from '@/components/ds';
+import { formatDurationShort } from '@/utils/uiLang';
 
 
 const WORKOUT_NAMES: Record<number, string> = {
@@ -66,9 +67,7 @@ function workoutName(id: number) {
 }
 
 function fmtDuration(sec: number) {
-  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
-  if (h > 0) return `${h} год ${m} хв`;
-  return `${m} хв`;
+  return formatDurationShort(Math.floor(sec / 60));
 }
 
 /**

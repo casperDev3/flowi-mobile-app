@@ -320,6 +320,9 @@ const WORKSPACE_SWITCH_STORAGE_KEYS = [
   // проштовхувати їх від імені нового акаунта (чи взагалі мовчки прибрати
   // на 403 not_a_member — flushPendingProjectDeletes) сенсу нема.
   'pending_project_deletes',
+  // Заблоковані автори коментарів (utils/commentModeration.ts) — id
+  // користувачів цього workspace/акаунта, іншому акаунту вони не належать.
+  'blocked_users_v1',
   // Серверна колекція статусів звернень (feedback-inbox.md §3.2) і її кеш —
   // дані акаунта, а не пристрою; у SYNC_ARRAY_KEYS їх немає (клієнт їх лише
   // тягне, див. SYNC_SERVER_OWNED_KEYS).

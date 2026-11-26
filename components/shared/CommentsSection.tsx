@@ -21,6 +21,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
+import { useAuth } from '@/store/auth';
+import { blockUser, submitCommentReport, unblockUser, useBlockedUsers } from '@/store/comment-moderation';
 import { fetchProjectMembers, type MemberOut } from '@/store/project-team';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
@@ -37,6 +39,13 @@ import {
   type Comment,
   type CommentTargetType,
 } from '@/utils/comments';
+import {
+  canReportComment,
+  COMMENT_REPORT_REASONS,
+  partitionBlockedComments,
+  type CommentReportReason,
+} from '@/utils/commentModeration';
+import { showActionMenu } from '@/utils/actionMenu';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
@@ -63,6 +72,11 @@ export interface CommentsSectionProps {
     | 'commentsEmpty' | 'commentsPlaceholder' | 'commentsSend' | 'commentsEdited'
     | 'commentsEditAction' | 'commentsDeleteAction' | 'commentsDeleteConfirm' | 'commentsSaveEdit'
     | 'commentsCancelEdit' | 'projectMembersYou' | 'cancel' | 'delete'
+    | 'commentsReportAction' | 'commentsBlockAction' | 'commentsReportTitle' | 'commentsReportMessage'
+    | 'commentsReportReasonSpam' | 'commentsReportReasonAbuse' | 'commentsReportReasonInappropriate'
+    | 'commentsReportReasonOther' | 'commentsReportSent' | 'commentsReportFailed' | 'commentsReportBugTitle'
+    | 'commentsBlockTitle' | 'commentsBlockMessage' | 'commentsBlockOwnerHint' | 'commentsBlockDone'
+    | 'commentsHiddenBlocked' | 'commentsShowHidden' | 'commentsHideHidden' | 'commentsUnblockAction'
   >;
 }
 
@@ -82,6 +96,12 @@ export function CommentsSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const blocked = useBlockedUsers();
+  // Хто дивиться — навіть коли `currentUserId` свідомо null (глядач, архівна
+  // кімната обговорення): поскаржитися й заблокувати може будь-хто з учасників.
+  const { user } = useAuth();
+  const viewerId = currentUserId ?? (user ? String(user.id) : null);
 
   const load = useCallback(async () => {
     setAll(await loadData<Comment[]>(COMMENTS_KEY, []));
@@ -112,6 +132,12 @@ export function CommentsSection({
     () => commentsForTarget(all, targetType, targetId),
     [all, targetType, targetId],
   );
+  const { visible: visibleComments, hidden: hiddenComments } = useMemo(
+    () => partitionBlockedComments(comments, blocked, viewerId),
+    [comments, blocked, viewerId],
+  );
+  const hiddenIds = useMemo(() => new Set(hiddenComments.map(cm => cm.id)), [hiddenComments]);
+  const shownComments = showHidden ? comments : visibleComments;
 
   // ─── Автодоповнення @згадки ────────────────────────────────────────────────
   const mentionQuery = draft.match(MENTION_QUERY)?.[1];
@@ -184,17 +210,83 @@ export function CommentsSection({
     ]);
   }, [trackWrite, tr]);
 
+  // ─── Модерація (App Review 1.2): скарга й блокування автора ───────────────
+  const sendReport = useCallback(async (comment: Comment, reason: CommentReportReason, silent = false) => {
+    if (!viewerId) return;
+    try {
+      await submitCommentReport({
+        comment,
+        reason,
+        reporterId: viewerId,
+        authorName: nameById.get(comment.authorId),
+        title: tr.commentsReportBugTitle,
+        locale,
+      });
+      if (!silent) Alert.alert(tr.commentsReportSent);
+    } catch (e) {
+      if (__DEV__) console.warn('[comments] скарга не надіслалась:', e);
+      if (!silent) Alert.alert(tr.commentsReportFailed);
+    }
+  }, [viewerId, nameById, tr, locale]);
+
+  const report = useCallback((comment: Comment) => {
+    const labels: Record<(typeof COMMENT_REPORT_REASONS)[number], string> = {
+      spam: tr.commentsReportReasonSpam,
+      abuse: tr.commentsReportReasonAbuse,
+      inappropriate: tr.commentsReportReasonInappropriate,
+      other: tr.commentsReportReasonOther,
+    };
+    showActionMenu(tr.commentsReportTitle, tr.commentsReportMessage, [
+      ...COMMENT_REPORT_REASONS.map(reason => ({
+        text: labels[reason],
+        onPress: () => { void sendReport(comment, reason); },
+      })),
+      { text: tr.cancel, style: 'cancel' as const },
+    ]);
+  }, [tr, sendReport]);
+
+  const block = useCallback((comment: Comment) => {
+    const name = nameById.get(comment.authorId);
+    const message = isOwner ? `${tr.commentsBlockMessage}\n\n${tr.commentsBlockOwnerHint}` : tr.commentsBlockMessage;
+    Alert.alert(tr.commentsBlockTitle.replace('{name}', name ?? comment.authorId), message, [
+      { text: tr.cancel, style: 'cancel' },
+      {
+        text: tr.commentsBlockAction, style: 'destructive', onPress: () => {
+          void (async () => {
+            try {
+              await blockUser(comment.authorId, name);
+            } catch (e) {
+              if (__DEV__) console.warn('[comments] блокування не вдалося:', e);
+              Alert.alert(tr.commentsReportFailed);
+              return;
+            }
+            setShowHidden(false);
+            // Блокування теж повідомляє розробників про вміст (Guideline 1.2).
+            await sendReport(comment, 'blocked', true);
+            Alert.alert(tr.commentsBlockDone);
+          })();
+        },
+      },
+    ]);
+  }, [nameById, isOwner, tr, sendReport]);
+
+  const unblock = useCallback((authorId: string) => {
+    void unblockUser(authorId).catch(e => { if (__DEV__) console.warn('[comments] розблокування не вдалося:', e); });
+  }, []);
+
   return (
     <View>
-      {comments.length === 0 ? (
+      {shownComments.length === 0 && hiddenComments.length === 0 ? (
         <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginVertical: 16 }}>{tr.commentsEmpty}</Text>
       ) : (
-        comments.map(comment => {
+        shownComments.map(comment => {
           const editable = !readOnly && !!currentUserId && canEditComment(comment, currentUserId);
           const deletable = !readOnly && !!currentUserId && canDeleteComment(comment, currentUserId, isOwner);
+          const reportable = canReportComment(comment, viewerId);
+          const isHidden = hiddenIds.has(comment.id);
           const when = new Date(comment.createdAt);
           return (
-            <View key={comment.id} style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+            <View key={comment.id} style={{ flexDirection: 'row', gap: 8, marginBottom: 16, opacity: isHidden ? 0.6 : 1 }}>
               <View style={{
                 width: 26, height: 26, borderRadius: 13, backgroundColor: c.accent + '26',
                 alignItems: 'center', justifyContent: 'center', marginTop: 2,
@@ -238,8 +330,8 @@ export function CommentsSection({
                         )
                       ))}
                     </Text>
-                    {(editable || deletable) ? (
-                      <View style={{ flexDirection: 'row', gap: 16, marginTop: 4 }}>
+                    {(editable || deletable || reportable) ? (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 4 }}>
                         {editable ? (
                           <TouchableOpacity onPress={() => startEdit(comment)}>
                             <Text style={{ color: c.sub, fontSize: 11 }}>{tr.commentsEditAction}</Text>
@@ -250,6 +342,22 @@ export function CommentsSection({
                             <Text style={{ color: t.status.danger, fontSize: 11 }}>{tr.commentsDeleteAction}</Text>
                           </TouchableOpacity>
                         ) : null}
+                        {reportable ? (
+                          <TouchableOpacity accessibilityRole="button" hitSlop={8} onPress={() => report(comment)}>
+                            <Text style={{ color: c.sub, fontSize: 11 }}>{tr.commentsReportAction}</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                        {reportable ? (
+                          isHidden ? (
+                            <TouchableOpacity accessibilityRole="button" hitSlop={8} onPress={() => unblock(comment.authorId)}>
+                              <Text style={{ color: c.sub, fontSize: 11 }}>{tr.commentsUnblockAction}</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity accessibilityRole="button" hitSlop={8} onPress={() => block(comment)}>
+                              <Text style={{ color: t.status.danger, fontSize: 11 }}>{tr.commentsBlockAction}</Text>
+                            </TouchableOpacity>
+                          )
+                        ) : null}
                       </View>
                     ) : null}
                   </>
@@ -259,6 +367,19 @@ export function CommentsSection({
           );
         })
       )}
+
+      {hiddenComments.length > 0 ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Text style={{ color: c.sub, fontSize: 12 }}>
+            {tr.commentsHiddenBlocked.replace('{count}', String(hiddenComments.length))}
+          </Text>
+          <TouchableOpacity accessibilityRole="button" hitSlop={8} onPress={() => setShowHidden(v => !v)}>
+            <Text style={{ color: c.accent, fontSize: 12, fontFamily: fontFamily.semibold }}>
+              {showHidden ? tr.commentsHideHidden : tr.commentsShowHidden}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {!readOnly && mentionCandidates.length > 0 ? (
         <View style={{ backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong'), borderRadius: Atlas.radius.large, marginBottom: 6, overflow: 'hidden', ...shadow[isDark ? 'dark' : 'light'].popover }}>

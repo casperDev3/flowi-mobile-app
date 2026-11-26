@@ -48,6 +48,8 @@ import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 import { INVITE_EVENT_PENDING, inviteIdFromPayload, syncMyInvites } from '@/store/invite-inbox';
 import { notificationRoute } from '@/utils/pushLink';
+import { useBlockedUsers } from '@/store/comment-moderation';
+import { withoutBlockedActors } from '@/utils/commentModeration';
 import { fontFamily } from '@/constants/theme';
 import { Atlas } from '@/constants/atlas';
 import { BulkActionBar, SwipeRow, ZoneSkeleton, type BulkAction, type SwipeAction } from '@/components/layout-zones';
@@ -110,10 +112,12 @@ export default function NotificationsScreen() {
     refreshInbox().finally(() => setRefreshing(false));
   }, []);
 
-  const items = useMemo(
-    () => (filter === 'unread' ? inbox.visibleItems.filter(item => !item.read_at) : inbox.visibleItems),
-    [inbox.visibleItems, filter],
-  );
+  // Сповіщення від заблокованих авторів (згадки, коментарі) — не показуємо (App Review 1.2).
+  const blockedUsers = useBlockedUsers();
+  const items = useMemo(() => {
+    const visible = withoutBlockedActors(inbox.visibleItems, blockedUsers);
+    return filter === 'unread' ? visible.filter(item => !item.read_at) : visible;
+  }, [inbox.visibleItems, filter, blockedUsers]);
 
   const openItem = useCallback((item: InboxItem) => {
     if (!item.read_at) void markNotificationsRead([item.id]);

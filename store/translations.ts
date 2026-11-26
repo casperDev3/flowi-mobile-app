@@ -1835,6 +1835,31 @@ export interface Translations {
   commentsDeleteConfirm: string;
   commentsSaveEdit: string;
   commentsCancelEdit: string;
+  // Модерація коментарів (App Review 1.2): скарга й блокування автора
+  commentsReportAction: string;
+  commentsBlockAction: string;
+  commentsReportTitle: string;
+  commentsReportMessage: string;
+  commentsReportReasonSpam: string;
+  commentsReportReasonAbuse: string;
+  commentsReportReasonInappropriate: string;
+  commentsReportReasonOther: string;
+  commentsReportSent: string;
+  commentsReportFailed: string;
+  commentsReportBugTitle: string;
+  commentsBlockTitle: string;
+  commentsBlockMessage: string;
+  commentsBlockOwnerHint: string;
+  commentsBlockDone: string;
+  commentsHiddenBlocked: string;
+  commentsShowHidden: string;
+  commentsHideHidden: string;
+  commentsUnblockAction: string;
+  blockedUsersTitle: string;
+  blockedUsersEmpty: string;
+  blockedUsersPick: string;
+  blockedUsersUnblockConfirm: string;
+  blockedUsersUnblockMessage: string;
 
   // Стрічка активності проєкту (§4.6)
   projectActivityTitle: string;
@@ -4882,6 +4907,30 @@ const uk: Translations = {
   commentsDeleteConfirm: 'Видалити цей коментар?',
   commentsSaveEdit: 'Зберегти',
   commentsCancelEdit: 'Скасувати',
+  commentsReportAction: 'Поскаржитися',
+  commentsBlockAction: 'Заблокувати',
+  commentsReportTitle: 'Поскаржитися на коментар',
+  commentsReportMessage: 'Оберіть причину скарги',
+  commentsReportReasonSpam: 'Спам',
+  commentsReportReasonAbuse: 'Образи чи цькування',
+  commentsReportReasonInappropriate: 'Неприйнятний вміст',
+  commentsReportReasonOther: 'Інше',
+  commentsReportSent: 'Дякуємо, скаргу надіслано. Ми розглянемо її протягом 24 годин.',
+  commentsReportFailed: 'Не вдалося надіслати скаргу. Спробуйте ще раз.',
+  commentsReportBugTitle: 'Скарга на коментар',
+  commentsBlockTitle: 'Заблокувати {name}?',
+  commentsBlockMessage: 'Ви більше не бачитимете коментарів цього користувача, а ми отримаємо скаргу на його вміст. Розблокувати можна в Налаштуваннях → Акаунт → Заблоковані користувачі.',
+  commentsBlockOwnerHint: 'Як власник проєкту, ви також можете видалити цього учасника з проєкту: Налаштування проєкту → Учасники.',
+  commentsBlockDone: 'Користувача заблоковано. Його коментарі приховано.',
+  commentsHiddenBlocked: 'Приховано коментарів від заблокованих користувачів: {count}',
+  commentsShowHidden: 'Показати',
+  commentsHideHidden: 'Сховати',
+  commentsUnblockAction: 'Розблокувати',
+  blockedUsersTitle: 'Заблоковані користувачі',
+  blockedUsersEmpty: 'Ви нікого не заблокували.',
+  blockedUsersPick: 'Оберіть користувача, щоб розблокувати його.',
+  blockedUsersUnblockConfirm: 'Розблокувати {name}?',
+  blockedUsersUnblockMessage: 'Ви знову бачитимете коментарі цього користувача.',
 
   projectActivityTitle: 'Активність',
   projectActivityEmpty: 'Поки що немає активності',
@@ -7913,6 +7962,30 @@ const en: Translations = {
   commentsDeleteConfirm: 'Delete this comment?',
   commentsSaveEdit: 'Save',
   commentsCancelEdit: 'Cancel',
+  commentsReportAction: 'Report',
+  commentsBlockAction: 'Block',
+  commentsReportTitle: 'Report comment',
+  commentsReportMessage: 'Why are you reporting this comment?',
+  commentsReportReasonSpam: 'Spam',
+  commentsReportReasonAbuse: 'Abuse or harassment',
+  commentsReportReasonInappropriate: 'Inappropriate content',
+  commentsReportReasonOther: 'Other',
+  commentsReportSent: 'Thank you, your report has been sent. We will review it within 24 hours.',
+  commentsReportFailed: 'Could not send the report. Please try again.',
+  commentsReportBugTitle: 'Comment report',
+  commentsBlockTitle: 'Block {name}?',
+  commentsBlockMessage: 'You will no longer see comments from this user, and we will receive a report about their content. You can unblock them in Settings → Account → Blocked users.',
+  commentsBlockOwnerHint: 'As the project owner, you can also remove this member from the project: Project settings → Members.',
+  commentsBlockDone: 'User blocked. Their comments are now hidden.',
+  commentsHiddenBlocked: 'Hidden comments from blocked users: {count}',
+  commentsShowHidden: 'Show',
+  commentsHideHidden: 'Hide',
+  commentsUnblockAction: 'Unblock',
+  blockedUsersTitle: 'Blocked users',
+  blockedUsersEmpty: 'You have not blocked anyone.',
+  blockedUsersPick: 'Choose a user to unblock.',
+  blockedUsersUnblockConfirm: 'Unblock {name}?',
+  blockedUsersUnblockMessage: 'You will see comments from this user again.',
 
   projectActivityTitle: 'Activity',
   projectActivityEmpty: 'No activity yet',

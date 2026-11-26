@@ -298,6 +298,7 @@ constants/
 | `'health_auto_state'` / `'health_auto_suppressed'` / `'health_weight_cleanup_v1'` | локальні | Стан автоданих здоровʼя пристрою — не синхронізуються й не бекапляться |
 | `'notes_view_mode_v1'` | локальний | «Список» / «Сітка» екрана нотаток на цьому пристрої (components/notes/noteActions.ts): не синхронізується, не бекапиться, при виході не стирається |
 | `'notes_attachment_moves_v1'` | локальний | Черга `POST /notes/<id>/attachments/move/` після переміщення нотатки з файлами між «Особистими» й проєктом (components/notes/noteAttachmentsApi.ts); стирається при виході |
+| `'blocked_users_v1'` | локальний | Заблоковані автори коментарів `{userId,name?,blockedAt}[]` (store/comment-moderation.ts, App Review 1.2): ховає їхні коментарі й сповіщення; не синхронізується, не бекапиться, стирається при виході; розблокування — Налаштування → Акаунт → «Заблоковані користувачі» |
 | `'projects_list_prefs_v1'` | локальний | Сортування й фільтр статусу екрана «Проєкти» на цьому пристрої (utils/projectListPrefs.ts): не синхронізується, не бекапиться, при виході не стирається — даних акаунта не містить |
 
 SecureStore (не AsyncStorage): `flowi_access`, `flowi_refresh`, `flowi_registration_token`.

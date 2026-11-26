@@ -55,6 +55,8 @@ import { AppHeader } from '@/components/shared/AppHeader';
 import { useHeaderScroll } from '@/hooks/use-header-scroll';
 import { useUnreadNotificationsCount } from '@/components/notifications/use-notification-center';
 import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
+import { openBlockedUsersMenu } from '@/components/settings/blockedUsersMenu';
+import { useBlockedUsers } from '@/store/comment-moderation';
 
 /**
  * Натискання рядка йде через один спільний колбек, а маршрут приходить
@@ -105,6 +107,7 @@ export default function SettingsScreen() {
   const { lang, setLang, tr } = useI18n();
   const { online } = useAppMode();
   const { user, status, logout } = useAuth();
+  const blockedUsers = useBlockedUsers();
   const { syncNow, state: syncState, lastSyncAt, pendingCount } = useSync();
   // Лічильник біля рядка «Модулі інтерфейсу»: скільки розділів зараз
   // приховано. Без нього вимкнений місяць тому модуль просто «зник».
@@ -561,6 +564,18 @@ export default function SettingsScreen() {
                   last={false}
                 />
               )}
+              {/* Заблоковані автори коментарів (App Review 1.2) — розблокування. */}
+              <SettingRow
+                icon="hand.raised"
+                iconColor="#E8543F"
+                label={tr.blockedUsersTitle}
+                value={blockedUsers.length ? String(blockedUsers.length) : undefined}
+                onPress={() => openBlockedUsersMenu(blockedUsers, tr)}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
               <TouchableOpacity accessibilityRole="button" onPress={() => handleLogout(true)} style={st.row}>
                 <Text style={[st.rowLabel, { color: c.text }]}>{lang === 'en' ? 'Sign out all devices' : 'Вийти з усіх пристроїв'}</Text>
               </TouchableOpacity>

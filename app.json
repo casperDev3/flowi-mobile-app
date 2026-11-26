@@ -96,37 +96,37 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "Flowi читає з Здоровʼя кроки, пульс і пульс спокою, сон і його фази, вагу, SpO₂ та дистанцію, щоб показувати їх у розділі «Здоровʼя».",
-          "NSHealthUpdateUsageDescription": "Flowi не записує дані в Здоровʼя — лише читає.",
+          "NSHealthShareUsageDescription": "Flowi reads steps, heart rate and resting heart rate, sleep and its stages, weight, SpO₂ and distance from Health to show them in the Health section.",
+          "NSHealthUpdateUsageDescription": "Flowi does not write data to Health; it only reads it.",
           "background": true
         }
       ],
       [
         "expo-secure-store",
         {
-          "faceIDPermission": "Flowi використовує Face ID, щоб захистити ваші збережені дані входу."
+          "faceIDPermission": "Flowi uses Face ID to protect your saved sign-in details."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Flowi використовує камеру, щоб сканувати QR-наліпки на коробках і відкривати їхній вміст.",
-          "microphonePermission": "Flowi записує звук зустрічі, лише коли ви натискаєте «Запис», щоб зберегти аудіо до цієї зустрічі.",
+          "cameraPermission": "Flowi uses the camera to scan QR labels on boxes and to take photos of boxes and items.",
+          "microphonePermission": "Flowi records meeting audio only when you tap “Record”, to save it to that meeting.",
           "recordAudioAndroid": false
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Flowi відкриває фото, щоб ви могли додати зображення коробок, речей і скріншоти до звернень.",
-          "cameraPermission": "Flowi використовує камеру, щоб сфотографувати коробку чи річ і додати фото до її картки.",
-          "microphonePermission": "Flowi записує звук зустрічі, лише коли ви натискаєте «Запис», щоб зберегти аудіо до цієї зустрічі."
+          "photosPermission": "Flowi opens your photos so you can attach pictures of boxes and items, and screenshots to feedback reports.",
+          "cameraPermission": "Flowi uses the camera to scan QR labels on boxes and to take photos of boxes and items.",
+          "microphonePermission": "Flowi records meeting audio only when you tap “Record”, to save it to that meeting."
         }
       ],
       [
         "expo-av",
         {
-          "microphonePermission": "Flowi записує звук зустрічі, лише коли ви натискаєте «Запис», щоб зберегти аудіо до цієї зустрічі."
+          "microphonePermission": "Flowi records meeting audio only when you tap “Record”, to save it to that meeting."
         }
       ],
       "expo-font",
@@ -142,6 +142,10 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "locales": {
+      "en": "./locales/en.json",
+      "uk": "./locales/uk.json"
     }
   }
 }

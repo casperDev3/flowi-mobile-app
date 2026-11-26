@@ -1,0 +1,8 @@
+{
+  "NSCameraUsageDescription": "Flowi використовує камеру, щоб сканувати QR-наліпки на коробках і фотографувати коробки та речі.",
+  "NSMicrophoneUsageDescription": "Flowi записує звук зустрічі, лише коли ви натискаєте «Запис», щоб зберегти аудіо до цієї зустрічі.",
+  "NSPhotoLibraryUsageDescription": "Flowi відкриває фото, щоб ви могли додати зображення коробок, речей і скріншоти до звернень.",
+  "NSFaceIDUsageDescription": "Flowi використовує Face ID, щоб захистити ваші збережені дані входу.",
+  "NSHealthShareUsageDescription": "Flowi читає з Здоровʼя кроки, пульс і пульс спокою, сон і його фази, вагу, SpO₂ та дистанцію, щоб показувати їх у розділі «Здоровʼя».",
+  "NSHealthUpdateUsageDescription": "Flowi не записує дані в Здоровʼя — лише читає."
+}

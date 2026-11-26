@@ -1,5 +1,6 @@
 import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
-import { useRouter } from 'expo-router';
+import { Redirect , useRouter } from 'expo-router';
+import { medicalFeaturesEnabled } from '@/utils/storePolicy';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text,
@@ -28,7 +29,13 @@ import { fontFamily } from '@/constants/theme';
 import { useGlassStyles } from '@/components/finance/finPalette';
 import { BentoCard, OverlayMaterial, KpiCounter, MeshBackground, PageHeader } from '@/components/ds';
 
-export default function VaccinesScreen() {
+export default function VaccinesScreenGate() {
+  // Google Play: медичні розділи на Android сховано (див. utils/storePolicy.ts).
+  if (!medicalFeaturesEnabled()) return <Redirect href="/(tabs)/health" />;
+  return <VaccinesScreen />;
+}
+
+function VaccinesScreen() {
   const contentWidth = useContentWidth();
   const androidSheetPad = useAndroidBottomPad();
   const sheetSurface = useSheetSurface();

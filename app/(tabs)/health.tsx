@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { medicalFeaturesEnabled } from '@/utils/storePolicy';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 import { fontFamily } from '@/constants/theme';
 /**
@@ -111,6 +112,7 @@ export default function HealthHubScreen() {
   // Лічильник «на сьогодні» для бейджа вкладки Профілактики (невипиті ліки).
   const [medsDue, setMedsDue] = useState(0);
   const loadMedsDue = useCallback(async () => {
+    if (!medicalFeaturesEnabled()) { setMedsDue(0); return; }
     const meds = await loadData<any[]>('health_meds', []);
     const today = new Date();
     let due = 0;

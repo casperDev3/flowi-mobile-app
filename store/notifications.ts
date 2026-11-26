@@ -1,4 +1,5 @@
 import * as Device from 'expo-device';
+import { medicalFeaturesEnabled } from '@/utils/storePolicy';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
@@ -830,7 +831,7 @@ export function rescheduleHealthRemindersFromStorage(
       loadData<MedLike[]>('health_meds', []),
       loadData<HabitLike[]>('health_habits', []),
     ]);
-    const meds = Array.isArray(medsRaw) ? medsRaw : [];
+    const meds = Array.isArray(medsRaw) && medicalFeaturesEnabled() ? medsRaw : [];
     const habits = Array.isArray(habitsRaw) ? habitsRaw : [];
 
     let ours: string[] = [];

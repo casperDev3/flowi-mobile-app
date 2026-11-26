@@ -15,6 +15,7 @@
  * цьому файлі: мова — рантайм-вибір, і вписаний сюди текст зробив би вкладки
  * єдиним місцем застосунку, що не перекладається.
  */
+import { medicalFeaturesEnabled } from '@/utils/storePolicy';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -68,7 +69,7 @@ export const HEALTH_TAB_META: HealthTabMeta[] = [
   { id: 'sleep',      icon: 'moon.fill',       label: tr => tr.sleep,             a11yLabel: tr => tr.sleepRecovery },
   // «Тіло і вітальні»: вага, ІМТ, пульс і обводи — те, що було двома екранами.
   { id: 'body',       icon: 'ruler.fill',      label: tr => tr.healthTabBodyShort, a11yLabel: tr => tr.healthTabBody },
-  { id: 'prevention', icon: 'cross.case.fill', label: tr => tr.prevention,        a11yLabel: tr => tr.prevention },
+  { id: 'prevention', icon: medicalFeaturesEnabled() ? 'cross.case.fill' : 'checklist', label: tr => (medicalFeaturesEnabled() ? tr.prevention : tr.habits), a11yLabel: tr => (medicalFeaturesEnabled() ? tr.prevention : tr.habits) },
 ];
 
 /** Проміжок між вкладками на смузі. */

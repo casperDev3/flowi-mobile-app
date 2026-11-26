@@ -9,6 +9,7 @@
  * Самі списки лишаються окремими екранами-аркушами (`app/health-meds.tsx` і
  * решта): там ввід і редагування, тут — стан «що лишилось сьогодні».
  */
+import { medicalFeaturesEnabled } from '@/utils/storePolicy';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -109,6 +110,7 @@ export function PreventionTab({ h }: HealthTabProps) {
       {/* Відʼємні поля сітки гасять padding крайніх комірок, тож на телефоні
           зовнішні відступи лишаються такими самими, як були з gap: 12. */}
       <View style={s.tileGrid}>
+        {medicalFeaturesEnabled() && <>
         <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
           <HubTile title={tr.meds} icon="pills.fill" color={HEALTH_ACCENTS.prevention}
             stat={activeMeds ? `${tr.medActive}: ${activeMeds}` : tr.medsSub} badge={medsDue}
@@ -124,6 +126,7 @@ export function PreventionTab({ h }: HealthTabProps) {
             stat={vaccines.length ? `${vaccines.length}` : tr.vaccinesSub}
             onPress={() => router.push('/health-vaccines')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={solidCard} />
         </View>
+        </>}
         <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
           <HubTile title={tr.habits} icon="checklist" color={ACCENT_PROT}
             stat={habits.length ? `${habitsLeft} ${tr.dueToday}` : tr.habitsSub} badge={habitsLeft}
@@ -132,6 +135,7 @@ export function PreventionTab({ h }: HealthTabProps) {
       </View>
 
       {/* Експорт звіту для лікаря */}
+      {medicalFeaturesEnabled() && (
       <TouchableOpacity onPress={exportReport} activeOpacity={0.85} style={{ marginTop: 12 }}
         accessibilityRole="button" accessibilityLabel={tr.exportReport}>
         <View style={[s.report, { backgroundColor: solidCard }, shadow[isDark ? 'dark' : 'light'].card]}>
@@ -145,6 +149,7 @@ export function PreventionTab({ h }: HealthTabProps) {
           <IconSymbol name="chevron.right" size={14} color={c.sub} />
         </View>
       </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }

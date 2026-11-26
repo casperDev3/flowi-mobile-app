@@ -1,5 +1,6 @@
 import { useAndroidBottomPad } from '@/hooks/use-android-nav-inset';
-import { useRouter } from 'expo-router';
+import { Redirect , useRouter } from 'expo-router';
+import { medicalFeaturesEnabled } from '@/utils/storePolicy';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View,
@@ -28,7 +29,13 @@ import { BentoCard, OverlayMaterial, KpiCounter, MeshBackground, PageHeader, Seg
 
 const ACC = HEALTH_ACCENTS.prevention;
 
-export default function MedsScreen() {
+export default function MedsScreenGate() {
+  // Google Play: медичні розділи на Android сховано (див. utils/storePolicy.ts).
+  if (!medicalFeaturesEnabled()) return <Redirect href="/(tabs)/health" />;
+  return <MedsScreen />;
+}
+
+function MedsScreen() {
   const contentWidth = useContentWidth();
   const androidSheetPad = useAndroidBottomPad();
   const sheetSurface = useSheetSurface();

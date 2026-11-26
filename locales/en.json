@@ -1,8 +1,10 @@
 {
-  "NSCameraUsageDescription": "Flowi uses the camera to scan QR labels on boxes and to take photos of boxes and items.",
-  "NSMicrophoneUsageDescription": "Flowi records meeting audio only when you tap “Record”, to save it to that meeting.",
-  "NSPhotoLibraryUsageDescription": "Flowi opens your photos so you can attach pictures of boxes and items, and screenshots to feedback reports.",
-  "NSFaceIDUsageDescription": "Flowi uses Face ID to protect your saved sign-in details.",
-  "NSHealthShareUsageDescription": "Flowi reads steps, heart rate and resting heart rate, sleep and its stages, weight, SpO₂ and distance from Health to show them in the Health section.",
-  "NSHealthUpdateUsageDescription": "Flowi does not write data to Health; it only reads it."
+  "ios": {
+    "NSCameraUsageDescription": "Flowi uses the camera to scan QR labels on boxes and to take photos of boxes and items.",
+    "NSMicrophoneUsageDescription": "Flowi records meeting audio only when you tap “Record”, to save it to that meeting.",
+    "NSPhotoLibraryUsageDescription": "Flowi opens your photos so you can attach pictures of boxes and items, and screenshots to feedback reports.",
+    "NSFaceIDUsageDescription": "Flowi uses Face ID to protect your saved sign-in details.",
+    "NSHealthShareUsageDescription": "Flowi reads steps, heart rate and resting heart rate, sleep and its stages, weight, SpO₂ and distance from Health to show them in the Health section.",
+    "NSHealthUpdateUsageDescription": "Flowi does not write data to Health; it only reads it."
+  }
 }

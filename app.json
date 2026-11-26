@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.flowi.mobile",
-      "buildNumber": "2611253",
+      "buildNumber": "2611261",
       "associatedDomains": [
         "applinks:app.flowi.com.ua",
         "webcredentials:app.flowi.com.ua"
@@ -37,7 +37,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "app.flowi.mobile",
-      "versionCode": 2611253,
+      "versionCode": 2611261,
       "permissions": [],
       "intentFilters": [
         {

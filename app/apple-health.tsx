@@ -379,14 +379,6 @@ export default function AppleHealthScreen() {
               </View>
             )}
 
-            {/* WIP banner */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 20, backgroundColor: k.status.warning + '1F', padding: 20, marginBottom: 18 }}>
-              <IconSymbol name="hammer.fill" size={16} color={c.text} />
-              <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }}>
-                {tr.hautoWip}
-              </Text>
-            </View>
-
             {/* Today summary grid */}
             <Text style={[s.sectionTitle, { color: c.text, marginTop: 4, marginBottom: 12 }]}>{tr.today}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP }}>

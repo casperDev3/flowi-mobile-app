@@ -1,6 +1,6 @@
 import { useAndroidNavInset } from '@/hooks/use-android-nav-inset';
 import * as Clipboard from 'expo-clipboard';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo } from 'react';
 import {
   Alert,
@@ -21,6 +21,7 @@ import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 import { fontFamily } from '@/constants/theme';
+import { donationsEnabled } from '@/utils/legalLinks';
 import { glassStyles } from '@/components/finance/finPalette';
 import { BentoArrowButton, BentoCard, BentoGrid, MeshBackground } from '@/components/ds';
 
@@ -28,6 +29,12 @@ const PAYPAL_EMAIL = 'ihor.lialuik@gmail.com';
 const DONATELLO_URL = 'https://donatello.to/igorichua';
 
 export default function DonateScreen() {
+  // Магазини не дозволяють донати розробнику повз вбудовані покупки (див. donationsEnabled).
+  if (!donationsEnabled()) return <Redirect href="/(tabs)/settings" />;
+  return <DonateContent />;
+}
+
+function DonateContent() {
   const { tr } = useI18n();
   const navInset = useAndroidNavInset();
   const contentWidth = useContentWidth();

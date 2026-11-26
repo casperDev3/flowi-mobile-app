@@ -36,3 +36,12 @@ export function rateAppUrl(os: string = Platform.OS): string {
     ? `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}`
     : `https://apps.apple.com/app/id${APP_STORE_ID}?action=write-review`;
 }
+
+/**
+ * Донати розробнику (Donatello/PayPal) — лише поза магазинами застосунків.
+ * App Store 3.1.1 і правила Google Play вимагають для «чайових» розробнику
+ * вбудованих покупок; зовнішні посилання дозволені тільки благодійним організаціям.
+ */
+export function donationsEnabled(os: string = Platform.OS): boolean {
+  return os === 'web';
+}

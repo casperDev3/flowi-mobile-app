@@ -45,7 +45,7 @@ import { wideModalStyles } from '@/components/finance/wideModal';
 import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { ProfileCard } from '@/components/settings/ProfileCard';
 import { AnalyticsConsentCard } from '@/components/settings/AnalyticsConsentCard';
-import { feedbackMailUrl, legalLinks, legalUrl, rateAppUrl } from '@/utils/legalLinks';
+import { donationsEnabled, feedbackMailUrl, legalLinks, legalUrl, rateAppUrl } from '@/utils/legalLinks';
 import { ToolTiles } from '@/components/settings/ToolTiles';
 import { settingsColumnCount, settingsSectionLayout, type SettingsSectionId } from '@/components/settings/model';
 import { fontFamily, type GlassAccent } from '@/constants/theme';
@@ -499,9 +499,9 @@ export default function SettingsScreen() {
                 text={c.text}
                 sub={c.sub}
                 border={c.border}
-                last={false}
+                last={!donationsEnabled()}
               />
-              <SettingRow
+              {donationsEnabled() && <SettingRow
                 icon="heart.fill"
                 iconColor="#E8543F"
                 label={tr.donate}
@@ -512,7 +512,7 @@ export default function SettingsScreen() {
                 sub={c.sub}
                 border={c.border}
                 last
-              />
+              />}
             </SettingsCard>
             <AdvertisingSettings />
             {/* rc1: згода на анонімну статистику — синхронізується з вебом. */}
